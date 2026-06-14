@@ -10,7 +10,7 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, SettingsViewModel settings, ToastNotificationService toast, GifService gif) : ObservableObject
+public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, GifService gif) : ObservableObject
 {
     private bool _initialized;
     private static readonly ConcurrentDictionary<string, LinkPreviewDto?> PreviewCache = new();
@@ -45,6 +45,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private bool _hasUnreadBelow;
     [ObservableProperty] private int _unreadBelowCount;
     [ObservableProperty] private bool _isStreaming;
+    [ObservableProperty] private bool _isCameraOn;
+
+    public ObservableCollection<VideoTileViewModel> VideoTiles { get; } = [];
+    public bool HasVideoTiles => VideoTiles.Count > 0;
 
     private bool _isAtBottom = true;
     private MessageViewItem? _dividerItem;
@@ -87,6 +91,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private Window? _streamWindow;
     private Window? _settingsWindow;
     private int _streamSending; // Interlocked — drop frames rather than queue when link is busy
+    private int _cameraSending; // Interlocked — same drop pattern for camera frames
     private Timer? _latencyTimer;
     private int _streamChannelId; // which channel the active stream is in
     private volatile byte[]? _pendingFrame; // latest received frame waiting to be shown
@@ -119,6 +124,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public bool IsWaitingForStream => HasActiveStream && !HasStreamFrame;
     public bool StreamViewerVisible => IsStreamTab && !IsFullScreen;
     public bool HasPendingAttachment => PendingAttachmentUrl is not null;
+    public string CameraButtonLabel => IsCameraOn ? "📷 Stop Camera" : "📷 Camera";
+    public Color  CameraButtonColor => IsCameraOn ? Color.FromArgb("#ed4245") : Color.FromArgb("#3a3a3a");
     public string StreamButtonLabel => IsStreaming ? "⏹ Stop Sharing" : "📺 Share Screen";
     public double StreamTabOpacity => HasActiveStream ? 1.0 : 0.5;
     public string StreamHeaderText => IsStreaming
@@ -275,6 +282,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         OnPropertyChanged(nameof(VoiceHintText));
         OnPropertyChanged(nameof(VoiceHintColor));
     }
+    partial void OnIsCameraOnChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CameraButtonLabel));
+        OnPropertyChanged(nameof(CameraButtonColor));
+    }
     partial void OnIsStreamingChanged(bool value)
     {
         OnPropertyChanged(nameof(StreamButtonLabel));
@@ -374,6 +386,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.UserStatusChanged       += OnUserStatusChanged;
         hub.KickedFromVoice         += OnKickedFromVoice;
         hub.UserSpeaking            += OnUserSpeaking;
+        hub.CameraStarted           += OnCameraStarted;
+        hub.CameraStopped           += OnCameraStopped;
+        hub.CameraFrameReceived     += OnCameraFrameReceived;
         hub.Reconnecting += _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Reconnecting");
         hub.Reconnected  += _ => MainThread.BeginInvokeOnMainThread(async () =>
         {
@@ -832,6 +847,78 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     }
 
     [RelayCommand]
+    public async Task CopyInviteLinkAsync()
+    {
+        if (SelectedServer is null) return;
+        try
+        {
+            var invite = await api.GetInviteAsync(SelectedServer.Id);
+            if (invite is null) return;
+            var text = $"{api.ServerUrl}/invite/{invite.Code}";
+            await Clipboard.SetTextAsync(text);
+            await Shell.Current.DisplayAlert("Invite Link Copied",
+                $"Share this link:\n\n{text}\n\nAnyone with it can join {invite.ServerName}.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlert("Error", ex.Message, "OK");
+        }
+    }
+
+    [RelayCommand]
+    public async Task ResetInviteLinkAsync()
+    {
+        if (SelectedServer is null) return;
+        var confirm = await Shell.Current.DisplayAlert("Reset Invite Link",
+            "The old link will stop working. Generate a new one?", "Reset", "Cancel");
+        if (!confirm) return;
+        try
+        {
+            var invite = await api.ResetInviteAsync(SelectedServer.Id);
+            if (invite is null) return;
+            var text = $"{api.ServerUrl}/invite/{invite.Code}";
+            await Clipboard.SetTextAsync(text);
+            await Shell.Current.DisplayAlert("New Invite Link Copied",
+                $"New link copied to clipboard:\n\n{text}", "OK");
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlert("Error", ex.Message, "OK");
+        }
+    }
+
+    [RelayCommand]
+    public async Task JoinByInviteAsync()
+    {
+        var code = await Shell.Current.DisplayPromptAsync(
+            "Join by Invite",
+            "Paste an invite link or just the code:",
+            placeholder: "e.g. abc1234ef0");
+        if (string.IsNullOrWhiteSpace(code)) return;
+
+        // Strip URL prefix if the user pasted the full link
+        var lastSlash = code.LastIndexOf('/');
+        if (lastSlash >= 0) code = code[(lastSlash + 1)..];
+        code = code.Trim();
+
+        try
+        {
+            var server = await api.JoinByInviteAsync(code);
+            if (server is null)
+            {
+                await Shell.Current.DisplayAlert("Invalid Code", "That invite link is invalid or has expired.", "OK");
+                return;
+            }
+            Servers.Add(server);
+            await SelectServerAsync(server);
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlert("Error", ex.Message, "OK");
+        }
+    }
+
+    [RelayCommand]
     public void ToggleMute()
     {
         IsMuted = !IsMuted;
@@ -901,6 +988,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public async Task LeaveVoiceAsync()
     {
         if (IsStreaming) { screen.StopCapture(); await hub.StopStreamAsync(); IsStreaming = false; }
+        if (IsCameraOn) await StopCameraAsync();
         audio.AudioCaptured -= OnAudioCaptured;
         await hub.LeaveVoiceChannelAsync();
         if (IsLoopbackActive) { audio.StopLoopback(); IsLoopbackActive = false; }
@@ -910,6 +998,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         IsTestMic = false;
         IsPttActive = false;
         VoiceParticipants.Clear();
+        MainThread.BeginInvokeOnMainThread(() => VideoTiles.Clear());
     }
 
     [RelayCommand]
@@ -1158,6 +1247,95 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         var participant = VoiceParticipants.FirstOrDefault(p => p.UserId == userId);
         participant?.SetSpeaking();
+    }
+
+    [RelayCommand]
+    public async Task ToggleCameraAsync()
+    {
+        if (!InVoice || SelectedChannel is null) return;
+        if (IsCameraOn)
+            await StopCameraAsync();
+        else
+            await StartCameraAsync();
+    }
+
+    private async Task StartCameraAsync()
+    {
+        try
+        {
+            camera.FrameCaptured += OnCameraFrameCaptured;
+            await camera.StartAsync();
+            await hub.StartCameraAsync(SelectedChannel!.Id);
+
+            var localTile = new VideoTileViewModel(api.CurrentUserId, api.CurrentUsername, isLocal: true);
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                VideoTiles.Add(localTile);
+                OnPropertyChanged(nameof(HasVideoTiles));
+            });
+            IsCameraOn = true;
+        }
+        catch (Exception ex)
+        {
+            camera.FrameCaptured -= OnCameraFrameCaptured;
+            await Shell.Current.DisplayAlert("Camera Error", ex.Message, "OK");
+        }
+    }
+
+    private async Task StopCameraAsync()
+    {
+        camera.FrameCaptured -= OnCameraFrameCaptured;
+        await camera.StopAsync();
+        if (SelectedChannel is not null)
+            await hub.StopCameraAsync(SelectedChannel.Id);
+        IsCameraOn = false;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var local = VideoTiles.FirstOrDefault(t => t.IsLocal);
+            if (local is not null) VideoTiles.Remove(local);
+            OnPropertyChanged(nameof(HasVideoTiles));
+        });
+    }
+
+    private void OnCameraFrameCaptured(byte[] jpeg)
+    {
+        if (Interlocked.CompareExchange(ref _cameraSending, 1, 0) != 0) return;
+        _ = hub.SendCameraFrameAsync(jpeg)
+              .ContinueWith(_ => Interlocked.Exchange(ref _cameraSending, 0));
+
+        // Update local tile preview
+        var local = VideoTiles.FirstOrDefault(t => t.IsLocal);
+        local?.UpdateFrame(jpeg);
+    }
+
+    private void OnCameraStarted(int userId, string username, int channelId)
+    {
+        if (SelectedChannel?.Id != channelId) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (VideoTiles.Any(t => t.UserId == userId)) return;
+            VideoTiles.Add(new VideoTileViewModel(userId, username));
+            OnPropertyChanged(nameof(HasVideoTiles));
+        });
+    }
+
+    private void OnCameraStopped(int userId, int channelId)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var tile = VideoTiles.FirstOrDefault(t => t.UserId == userId && !t.IsLocal);
+            if (tile is not null)
+            {
+                VideoTiles.Remove(tile);
+                OnPropertyChanged(nameof(HasVideoTiles));
+            }
+        });
+    }
+
+    private void OnCameraFrameReceived(int userId, byte[] jpeg)
+    {
+        var tile = VideoTiles.FirstOrDefault(t => t.UserId == userId && !t.IsLocal);
+        tile?.UpdateFrame(jpeg);
     }
 
     private void OnUserConnected(UserDto user)

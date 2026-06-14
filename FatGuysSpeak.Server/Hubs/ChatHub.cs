@@ -21,6 +21,8 @@ public class ChatHub(AppDbContext db) : Hub
     private static readonly ConcurrentDictionary<int, string> OnlineUsers = new();
     // userId -> (channelId, serverId, username) for active screen shares
     private static readonly ConcurrentDictionary<int, (int ChannelId, int ServerId, string Username)> ActiveStreamers = new();
+    // userId -> (channelId, username) for active webcam feeds
+    private static readonly ConcurrentDictionary<int, (int ChannelId, string Username)> ActiveCameras = new();
 
     // Exposed for the metrics dashboard — read-only snapshots of live state
     internal static int OnlineUserCount       => OnlineUsers.Count;
@@ -137,9 +139,39 @@ public class ChatHub(AppDbContext db) : Hub
         if (!VoiceChannelMap.TryRemove(UserId, out var channelId))
             return;
 
+        if (ActiveCameras.TryRemove(UserId, out var cam) && cam.ChannelId == channelId)
+            await Clients.OthersInGroup($"voice-{channelId}").SendAsync("CameraStopped", UserId, channelId);
+
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"voice-{channelId}");
         await Clients.Group($"voice-{channelId}").SendAsync("UserLeftVoice",
             new VoiceStateDto(UserId, Username, null, false, false));
+    }
+
+    // ─── Webcam Video ─────────────────────────────────────────────────────────
+
+    private const int MaxCameraFrameBytes = 64 * 1024; // 64 KB — 320×240 JPEG
+
+    public async Task StartCamera(int channelId)
+    {
+        if (!VoiceChannelMap.TryGetValue(UserId, out var voiceCh) || voiceCh != channelId) return;
+        ActiveCameras[UserId] = (channelId, Username);
+        await Clients.OthersInGroup($"voice-{channelId}")
+            .SendAsync("CameraStarted", UserId, Username, channelId);
+    }
+
+    public async Task StopCamera(int channelId)
+    {
+        ActiveCameras.TryRemove(UserId, out _);
+        await Clients.OthersInGroup($"voice-{channelId}")
+            .SendAsync("CameraStopped", UserId, channelId);
+    }
+
+    public async Task SendCameraFrame(byte[] frame)
+    {
+        if (frame.Length > MaxCameraFrameBytes) return;
+        if (!ActiveCameras.TryGetValue(UserId, out var info)) return;
+        await Clients.OthersInGroup($"voice-{info.ChannelId}")
+            .SendAsync("ReceiveCameraFrame", UserId, frame);
     }
 
     public async Task<List<UserDto>> GetOnlineUsersForServer(int serverId)
@@ -232,6 +264,9 @@ public class ChatHub(AppDbContext db) : Hub
 
         await LeaveVoiceChannel();
         await StopStream();
+        if (ActiveCameras.TryRemove(UserId, out var camInfo))
+            await Clients.OthersInGroup($"voice-{camInfo.ChannelId}")
+                .SendAsync("CameraStopped", UserId, camInfo.ChannelId);
         await base.OnDisconnectedAsync(exception);
     }
 

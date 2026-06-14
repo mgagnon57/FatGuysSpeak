@@ -33,6 +33,9 @@ public class ChatHubService
     public event Action<int, UserStatus>? UserStatusChanged;  // (userId, newStatus)
     public event Action? KickedFromVoice;
     public event Action<int>? UserSpeaking;  // userId
+    public event Action<int, string, int>? CameraStarted;   // (userId, username, channelId)
+    public event Action<int, int>? CameraStopped;            // (userId, channelId)
+    public event Action<int, byte[]>? CameraFrameReceived;  // (userId, frame)
     public event Action<Exception?>? Reconnecting;
     public event Action<string?>?    Reconnected;
     public event Action<Exception?>? Disconnected;
@@ -72,6 +75,9 @@ public class ChatHubService
         _connection.On<int, UserStatus>("UserStatusChanged", (uid, s) => UserStatusChanged?.Invoke(uid, s));
         _connection.On("KickFromVoice", () => KickedFromVoice?.Invoke());
         _connection.On<int>("UserSpeaking", uid => UserSpeaking?.Invoke(uid));
+        _connection.On<int, string, int>("CameraStarted", (uid, name, cid) => CameraStarted?.Invoke(uid, name, cid));
+        _connection.On<int, int>("CameraStopped", (uid, cid) => CameraStopped?.Invoke(uid, cid));
+        _connection.On<int, byte[]>("ReceiveCameraFrame", (uid, frame) => CameraFrameReceived?.Invoke(uid, frame));
 
         _connection.Reconnecting  += ex  => { Reconnecting?.Invoke(ex);  return Task.CompletedTask; };
         _connection.Reconnected   += cid => { Reconnected?.Invoke(cid);  return Task.CompletedTask; };
@@ -115,6 +121,11 @@ public class ChatHubService
     public Task SendStreamFrameAsync(byte[] data) => _connection?.SendAsync("SendStreamFrame", data) ?? Task.CompletedTask;
     public Task WatchStreamAsync(int channelId) => _connection!.InvokeAsync("WatchStream", channelId);
     public Task StopWatchingAsync(int channelId) => _connection!.InvokeAsync("StopWatching", channelId);
+
+    public Task StartCameraAsync(int channelId) => _connection!.InvokeAsync("StartCamera", channelId);
+    public Task StopCameraAsync(int channelId) => _connection!.InvokeAsync("StopCamera", channelId);
+    public Task SendCameraFrameAsync(byte[] frame) =>
+        _connection?.SendAsync("SendCameraFrame", frame) ?? Task.CompletedTask;
 
     public Task StartTypingAsync(int channelId) =>
         _connection?.SendAsync("StartTyping", channelId) ?? Task.CompletedTask;

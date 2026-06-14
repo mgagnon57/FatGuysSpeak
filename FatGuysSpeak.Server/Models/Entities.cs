@@ -23,6 +23,7 @@ public class GuildServer
     public string? Description { get; set; }
     public int OwnerId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? InviteCode { get; set; }
 
     public List<Channel> Channels { get; set; } = [];
     public List<ServerMember> Members { get; set; } = [];

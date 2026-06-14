@@ -151,6 +151,26 @@ public class ApiService
         return r.IsSuccessStatusCode;
     }
 
+    public Task<ServerInviteDto?> GetInviteAsync(int serverId) =>
+        _http.GetFromJsonAsync<ServerInviteDto>($"api/servers/{serverId}/invite");
+
+    public Task<ServerInviteDto?> ResetInviteAsync(int serverId) =>
+        _http.PostAsync($"api/servers/{serverId}/invite/reset", null)
+             .ContinueWith(t => t.Result.IsSuccessStatusCode
+                 ? t.Result.Content.ReadFromJsonAsync<ServerInviteDto>().Result
+                 : null);
+
+    public Task<ServerInviteDto?> PreviewInviteAsync(string code) =>
+        _http.GetFromJsonAsync<ServerInviteDto>($"api/servers/by-invite/{code}");
+
+    public async Task<ServerDto?> JoinByInviteAsync(string code)
+    {
+        var r = await _http.PostAsync($"api/servers/by-invite/{code}/join", null);
+        return r.IsSuccessStatusCode
+            ? await r.Content.ReadFromJsonAsync<ServerDto>()
+            : null;
+    }
+
     public Task<UserProfileDto?> GetUserProfileAsync(int userId, int serverId) =>
         _http.GetFromJsonAsync<UserProfileDto>($"api/users/{userId}/profile?serverId={serverId}");
 

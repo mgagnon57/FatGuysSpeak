@@ -64,3 +64,5 @@ public record VoiceStateDto(int UserId, string Username, int? ChannelId, bool Mu
 public record JoinVoiceRequest(int ChannelId);
 
 public record LinkPreviewDto(string Url, string? Title, string? Description, string? ImageUrl, string? SiteName);
+
+public record ServerInviteDto(string Code, int ServerId, string ServerName, int MemberCount);

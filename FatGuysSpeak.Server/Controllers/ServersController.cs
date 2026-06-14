@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using FatGuysSpeak.Server.Data;
 using FatGuysSpeak.Server.Hubs;
 using FatGuysSpeak.Server.Models;
@@ -195,6 +196,79 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
 
         await hub.Clients.Group($"server-{serverId}").SendAsync("MemberRoleChanged", targetUserId, req.Role.ToString());
         return NoContent();
+    }
+
+    // ── Invite links ──────────────────────────────────────────────────────────
+
+    private static string GenerateCode() =>
+        Convert.ToHexString(RandomNumberGenerator.GetBytes(5)).ToLowerInvariant(); // 10 hex chars
+
+    [HttpGet("{serverId}/invite")]
+    public async Task<ActionResult<ServerInviteDto>> GetInvite(int serverId)
+    {
+        var member = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (member is null || member.Role < ServerRole.Admin) return Forbid();
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
+
+        if (server.InviteCode is null)
+        {
+            server.InviteCode = GenerateCode();
+            await db.SaveChangesAsync();
+        }
+
+        var memberCount = await db.ServerMembers.CountAsync(sm => sm.ServerId == serverId);
+        return Ok(new ServerInviteDto(server.InviteCode, server.Id, server.Name, memberCount));
+    }
+
+    [HttpPost("{serverId}/invite/reset")]
+    public async Task<ActionResult<ServerInviteDto>> ResetInvite(int serverId)
+    {
+        var member = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (member is null || member.Role < ServerRole.Admin) return Forbid();
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
+
+        server.InviteCode = GenerateCode();
+        await db.SaveChangesAsync();
+
+        var memberCount = await db.ServerMembers.CountAsync(sm => sm.ServerId == serverId);
+        return Ok(new ServerInviteDto(server.InviteCode, server.Id, server.Name, memberCount));
+    }
+
+    [HttpGet("by-invite/{code}")]
+    public async Task<ActionResult<ServerInviteDto>> PreviewInvite(string code)
+    {
+        var server = await db.Servers
+            .Include(s => s.Members)
+            .FirstOrDefaultAsync(s => s.InviteCode == code);
+        if (server is null) return NotFound("Invalid or expired invite code.");
+        return Ok(new ServerInviteDto(code, server.Id, server.Name, server.Members.Count));
+    }
+
+    [HttpPost("by-invite/{code}/join")]
+    public async Task<ActionResult<ServerDto>> JoinByInvite(string code)
+    {
+        var server = await db.Servers
+            .Include(s => s.Members)
+            .FirstOrDefaultAsync(s => s.InviteCode == code);
+        if (server is null) return NotFound("Invalid or expired invite code.");
+
+        if (server.Members.Any(m => m.UserId == UserId))
+            return Conflict("Already a member.");
+
+        db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = UserId });
+        await db.SaveChangesAsync();
+
+        var user = await db.Users.FindAsync(UserId);
+        if (user is not null)
+            await hub.Clients.Group($"server-{server.Id}")
+                .SendAsync("UserJoinedServer", new UserDto(UserId, user.Username, UserStatus.Online));
+
+        var memberCount = await db.ServerMembers.CountAsync(sm => sm.ServerId == server.Id);
+        return Ok(new ServerDto(server.Id, server.Name, server.Description, server.OwnerId.ToString(), memberCount, ServerRole.Member));
     }
 
     [HttpDelete("{serverId}/members/{targetUserId}")]

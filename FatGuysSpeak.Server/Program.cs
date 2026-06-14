@@ -165,6 +165,10 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='ReplyToId'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"ReplyToId\" INTEGER");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Servers' AND column_name='InviteCode'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Servers\" ADD COLUMN \"InviteCode\" TEXT");
     }
     else
     {
@@ -191,6 +195,10 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='ReplyToId'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN ReplyToId INTEGER");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Servers') WHERE name='InviteCode'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Servers ADD COLUMN InviteCode TEXT");
     }
 
     // MessageReactions table (added for reactions feature)
