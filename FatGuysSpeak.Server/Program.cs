@@ -33,6 +33,7 @@ else
 }
 
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddSingleton<FatGuysSpeak.Server.Services.ServerMetricsService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey))
@@ -187,4 +188,25 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 
+#if WINDOWS
+// Start ASP.NET Core in the background, then open the dashboard as a WPF window.
+// Closing the window also stops the server.
+await app.StartAsync();
+
+var tcs = new TaskCompletionSource();
+var wpfThread = new Thread(() =>
+{
+    var wpfApp = new System.Windows.Application();
+    wpfApp.ShutdownMode = System.Windows.ShutdownMode.OnMainWindowClose;
+    wpfApp.Run(new FatGuysSpeak.Server.Dashboard.DashboardWindow());
+    tcs.SetResult();
+});
+wpfThread.SetApartmentState(ApartmentState.STA);
+wpfThread.IsBackground = false;
+wpfThread.Start();
+
+await tcs.Task;
+await app.StopAsync();
+#else
 app.Run();
+#endif

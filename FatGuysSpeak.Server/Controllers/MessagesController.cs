@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FatGuysSpeak.Server.Data;
 using FatGuysSpeak.Server.Models;
+using FatGuysSpeak.Server.Services;
 using FatGuysSpeak.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +14,7 @@ namespace FatGuysSpeak.Server.Controllers;
 [ApiController]
 [Route("api/channels/{channelId}/messages")]
 [Authorize]
-public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : ControllerBase
+public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, ServerMetricsService metrics) : ControllerBase
 {
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string BaseUrl => $"{Request.Scheme}://{Request.Host}";
@@ -70,6 +71,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         await db.SaveChangesAsync();
 
         message.Author = user!;
+        metrics.RecordMessage();
         var dto = ToDto(message);
         await hub.Clients.Group($"channel-{channelId}").SendAsync("ReceiveMessage", dto);
         // Broadcast to the server group so all connected clients can update unread badges

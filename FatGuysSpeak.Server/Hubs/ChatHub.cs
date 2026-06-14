@@ -22,6 +22,11 @@ public class ChatHub(AppDbContext db) : Hub
     // userId -> (channelId, serverId, username) for active screen shares
     private static readonly ConcurrentDictionary<int, (int ChannelId, int ServerId, string Username)> ActiveStreamers = new();
 
+    // Exposed for the metrics dashboard — read-only snapshots of live state
+    internal static int OnlineUserCount       => OnlineUsers.Count;
+    internal static int VoiceParticipantCount => VoiceChannelMap.Count;
+    internal static int ActiveStreamCount     => ActiveStreamers.Count;
+
     private int UserId => int.Parse(Context.User!.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string Username => Context.User!.FindFirstValue(ClaimTypes.Name)!;
 
