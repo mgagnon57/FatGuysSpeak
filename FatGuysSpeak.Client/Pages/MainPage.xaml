@@ -1,0 +1,452 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:shared="clr-namespace:FatGuysSpeak.Shared;assembly=FatGuysSpeak.Shared"
+             xmlns:vm="clr-namespace:FatGuysSpeak.Client.ViewModels"
+             x:Class="FatGuysSpeak.Client.Pages.MainPage"
+             Title="FatGuysSpeak"
+             BackgroundColor="#1a1a1a">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- ═══ TOP BAR ═══ -->
+        <Grid Grid.Row="0" BackgroundColor="#2a2a2a" Padding="10,6"
+              ColumnDefinitions="Auto,*,Auto">
+            <!-- Server icon + name -->
+            <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
+                <Label Text="🖥" FontSize="14" TextColor="#8ab4d4" VerticalOptions="Center" />
+                <Label Text="FatGuysSpeak" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13" VerticalOptions="Center" />
+                <BoxView WidthRequest="1" HeightRequest="14" BackgroundColor="#444444" VerticalOptions="Center" Margin="4,0" />
+                <Ellipse WidthRequest="8" HeightRequest="8" Fill="#44bb44" VerticalOptions="Center" />
+                <Label Text="Connected" TextColor="#44bb44" FontSize="11" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+            <!-- Channel name in top bar -->
+            <Label Grid.Column="1"
+                   Text="{Binding SelectedChannel.Name, StringFormat='  /  # {0}', FallbackValue=''}"
+                   TextColor="#888888" FontSize="12" VerticalOptions="Center" />
+        </Grid>
+
+        <!-- ═══ MAIN CONTENT ═══ -->
+        <Grid Grid.Row="1" ColumnDefinitions="270,*">
+
+            <!-- LEFT: Server tree -->
+            <Grid Grid.Column="0" BackgroundColor="#1e1e1e"
+                  RowDefinitions="Auto,*">
+
+                <!-- Server node header -->
+                <Grid Grid.Row="0" BackgroundColor="#252525" Padding="8,7"
+                      ColumnDefinitions="Auto,*,Auto">
+                    <Label Grid.Column="0" Text="▼" TextColor="#8ab4d4" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0" />
+                    <Label Grid.Column="1" Text="FatGuysSpeak" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="12" VerticalOptions="Center" />
+                    <Label Grid.Column="2" Text="{Binding Members.Count, StringFormat='{0} online'}"
+                           TextColor="#666666" FontSize="10" VerticalOptions="Center" />
+                </Grid>
+
+                <!-- Server tree: connected users + channels -->
+                <ScrollView Grid.Row="1">
+                    <VerticalStackLayout Spacing="0">
+
+                        <!-- Connected users section -->
+                        <Label Text="  CONNECTED" TextColor="#666666" FontSize="10"
+                               FontAttributes="Bold" Padding="8,8,8,4"
+                               IsVisible="{Binding Members.Count, Converter={StaticResource NullToBoolConverter}}" />
+                        <StackLayout BindableLayout.ItemsSource="{Binding Members}" Spacing="0">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="shared:UserDto">
+                                    <Grid Padding="16,3,8,3" BackgroundColor="Transparent">
+                                        <FlyoutBase.ContextFlyout>
+                                            <MenuFlyout>
+                                                <MenuFlyoutItem Text="🎤 Test My Mic (Loopback)"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ToggleMicLoopbackCommand}" />
+                                            </MenuFlyout>
+                                        </FlyoutBase.ContextFlyout>
+                                        <HorizontalStackLayout Spacing="7">
+                                            <Ellipse WidthRequest="7" HeightRequest="7" Fill="#44bb44" VerticalOptions="Center" />
+                                            <Label Text="{Binding Username}" TextColor="#c0c0c0" FontSize="12" VerticalOptions="Center" />
+                                        </HorizontalStackLayout>
+                                    </Grid>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </StackLayout>
+
+                        <!-- Separator -->
+                        <BoxView HeightRequest="1" BackgroundColor="#333333" Margin="0,4" />
+
+                        <!-- Channels section -->
+                        <Label Text="  CHANNELS" TextColor="#666666" FontSize="10"
+                               FontAttributes="Bold" Padding="8,4,8,4" />
+                        <StackLayout BindableLayout.ItemsSource="{Binding Channels}" Spacing="0">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ChannelViewItem">
+                                    <VerticalStackLayout Spacing="0">
+
+                                        <!-- Channel row -->
+                                        <Grid Padding="8,5,8,5"
+                                              BackgroundColor="{Binding IsSelected, Converter={StaticResource ChannelSelectionConverter}}">
+                                            <HorizontalStackLayout Spacing="7">
+                                                <Label Text="📢" FontSize="11" VerticalOptions="Center" />
+                                                <Label Text="{Binding Channel.Name}" FontSize="12" VerticalOptions="Center"
+                                                       TextColor="{Binding IsSelected, Converter={StaticResource ChannelTextConverter}}"
+                                                       FontAttributes="{Binding IsSelected, Converter={StaticResource SelectedFontConverter}}" />
+                                            </HorizontalStackLayout>
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectChannelCommand}"
+                                                    CommandParameter="{Binding .}" />
+                                            </Grid.GestureRecognizers>
+                                        </Grid>
+
+                                        <!-- Users in this channel -->
+                                        <StackLayout BindableLayout.ItemsSource="{Binding Occupants}" Spacing="0">
+                                            <BindableLayout.ItemTemplate>
+                                                <DataTemplate x:DataType="shared:UserDto">
+                                                    <Grid Padding="28,3,8,3" BackgroundColor="Transparent">
+                                                        <FlyoutBase.ContextFlyout>
+                                                            <MenuFlyout>
+                                                                <MenuFlyoutItem Text="🎤 Test My Mic (Loopback)"
+                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ToggleMicLoopbackCommand}" />
+                                                            </MenuFlyout>
+                                                        </FlyoutBase.ContextFlyout>
+                                                        <HorizontalStackLayout Spacing="6">
+                                                            <Label Text="🎧" FontSize="10" TextColor="#8ab4d4" VerticalOptions="Center" />
+                                                            <Label Text="{Binding Username}" TextColor="#aaaaaa" FontSize="11" VerticalOptions="Center" />
+                                                        </HorizontalStackLayout>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </BindableLayout.ItemTemplate>
+                                        </StackLayout>
+
+                                    </VerticalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </StackLayout>
+
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Grid>
+
+            <!-- RIGHT: Chat panel -->
+            <Grid Grid.Column="1" BackgroundColor="#1a1a1a" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto">
+
+                <!-- Channel header bar -->
+                <Grid Grid.Row="0" BackgroundColor="#252525" Padding="14,8"
+                      ColumnDefinitions="Auto,*">
+                    <Label Grid.Column="0" Text="#" TextColor="#555555" FontSize="16" VerticalOptions="Center" />
+                    <Label Grid.Column="1" Text="{Binding SelectedChannel.Name, FallbackValue='Select a channel'}"
+                           TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13"
+                           VerticalOptions="Center" Margin="6,0,0,0" />
+                </Grid>
+
+                <!-- Tab bar -->
+                <Grid Grid.Row="1" ColumnDefinitions="*,*,*" HeightRequest="34" BackgroundColor="#141420"
+                      IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}">
+                    <Button Grid.Column="0" Text="💬 Chat"
+                            Command="{Binding SelectTabCommand}" CommandParameter="Text"
+                            BackgroundColor="{Binding IsTextTab, Converter={StaticResource TabBgConverter}}"
+                            TextColor="White" FontSize="11" CornerRadius="0" BorderWidth="0"
+                            Padding="0" Margin="0" />
+                    <Button Grid.Column="1" Text="🎙 Voice"
+                            Command="{Binding SelectTabCommand}" CommandParameter="Voice"
+                            BackgroundColor="{Binding IsVoiceTab, Converter={StaticResource TabBgConverter}}"
+                            TextColor="White" FontSize="11" CornerRadius="0" BorderWidth="0"
+                            Padding="0" Margin="0" />
+                    <Button Grid.Column="2" Text="📺 Stream"
+                            Command="{Binding SelectTabCommand}" CommandParameter="Stream"
+                            BackgroundColor="{Binding IsStreamTab, Converter={StaticResource TabBgConverter}}"
+                            TextColor="White" FontSize="11" CornerRadius="0" BorderWidth="0"
+                            Padding="0" Margin="0"
+                            Opacity="{Binding StreamTabOpacity}" />
+                </Grid>
+
+                <!-- Voice participants strip -->
+                <Grid Grid.Row="2" BackgroundColor="#1a2f1a" Padding="12,5"
+                      IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}">
+                    <HorizontalStackLayout Spacing="14">
+                        <HorizontalStackLayout Spacing="5">
+                            <Ellipse WidthRequest="8" HeightRequest="8" Fill="#44bb44" VerticalOptions="Center" />
+                            <Label Text="Voice Active" TextColor="#44bb44" FontSize="11" FontAttributes="Bold" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <StackLayout BindableLayout.ItemsSource="{Binding VoiceParticipants}"
+                                     Orientation="Horizontal" Spacing="10">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="shared:VoiceStateDto">
+                                    <HorizontalStackLayout Spacing="4">
+                                        <Label Text="🎧" FontSize="11" TextColor="#8ab4d4" VerticalOptions="Center" />
+                                        <Label Text="{Binding Username}" TextColor="#8ecf8e" FontSize="11" VerticalOptions="Center" />
+                                    </HorizontalStackLayout>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </StackLayout>
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- Stream viewer (in-app, hidden when popped out) -->
+                <Grid Grid.Row="3" BackgroundColor="#0a0a12"
+                      IsVisible="{Binding StreamViewerVisible}"
+                      RowDefinitions="Auto,480">
+                    <Grid Grid.Row="0" BackgroundColor="#141420" ColumnDefinitions="*,Auto,Auto">
+                        <Label Grid.Column="0"
+                               Text="{Binding StreamHeaderText}"
+                               TextColor="#8ab4d4" FontSize="11" FontAttributes="Bold"
+                               VerticalOptions="Center" Padding="8,5" />
+                        <!-- Latency + quality indicator -->
+                        <HorizontalStackLayout Grid.Column="1" Spacing="5" VerticalOptions="Center" Margin="0,0,8,0">
+                            <Ellipse WidthRequest="8" HeightRequest="8"
+                                     Fill="{Binding StreamLatencyColor}"
+                                     VerticalOptions="Center" />
+                            <Label Text="{Binding StreamLatencyText}"
+                                   TextColor="#aaaaaa" FontSize="10" VerticalOptions="Center" />
+                            <Label Text="·" TextColor="#555555" FontSize="10" VerticalOptions="Center" />
+                            <Label Text="{Binding StreamQualityLabel}"
+                                   TextColor="#888888" FontSize="10" VerticalOptions="Center" />
+                        </HorizontalStackLayout>
+                        <Button Grid.Column="2" Text="⛶"
+                                Command="{Binding ToggleFullScreenCommand}"
+                                BackgroundColor="Transparent" TextColor="#8ab4d4" FontSize="15"
+                                HeightRequest="30" WidthRequest="36" Padding="0" Margin="0,0,4,0"
+                                ToolTipProperties.Text="Pop out to separate window" />
+                    </Grid>
+                    <!-- Broadcaster view -->
+                    <Grid Grid.Row="1" IsVisible="{Binding IsStreaming}"
+                          BackgroundColor="#0a120a">
+                        <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="8">
+                            <Label Text="🟢  You are sharing your screen"
+                                   TextColor="#44bb44" FontSize="14" FontAttributes="Bold"
+                                   HorizontalOptions="Center" />
+                            <Label Text="{Binding StreamQualityLabel, StringFormat='Quality: {0}'}"
+                                   TextColor="#4a7a4a" FontSize="11"
+                                   HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </Grid>
+                    <!-- Viewer -->
+                    <Grid Grid.Row="1" IsVisible="{Binding IsStreaming, Converter={StaticResource InvertBoolConverter}}">
+                        <!-- Live stream image -->
+                        <Image Source="{Binding StreamFrame}" Aspect="AspectFit"
+                               BackgroundColor="#0a0a0a"
+                               IsVisible="{Binding HasStreamFrame}" />
+                        <!-- Stream active but frames haven't arrived yet -->
+                        <Label Text="⏳  Connecting to stream…"
+                               TextColor="#555555" FontSize="12" FontAttributes="Italic"
+                               HorizontalOptions="Center" VerticalOptions="Center"
+                               IsVisible="{Binding IsWaitingForStream}" />
+                        <!-- No stream active -->
+                        <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="6"
+                                             IsVisible="{Binding HasActiveStream, Converter={StaticResource InvertBoolConverter}}">
+                            <Label Text="📺" FontSize="36" HorizontalOptions="Center" />
+                            <Label Text="No active stream" TextColor="#555555" FontSize="13"
+                                   FontAttributes="Italic" HorizontalOptions="Center" />
+                            <Label Text="A notification will appear in chat when someone shares."
+                                   TextColor="#444444" FontSize="10" HorizontalOptions="Center" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </Grid>
+
+                <!-- Compact bar shown while stream is popped out -->
+                <Grid Grid.Row="3" BackgroundColor="#141420" Padding="12,6"
+                      IsVisible="{Binding IsFullScreen}">
+                    <HorizontalStackLayout Spacing="12" HorizontalOptions="Center">
+                        <Label Text="{Binding ActiveStreamerName, StringFormat='📺  {0} — stream in separate window'}"
+                               TextColor="#8ab4d4" FontSize="11" VerticalOptions="Center" />
+                        <Button Text="↩ Return to In-App"
+                                Command="{Binding ToggleFullScreenCommand}"
+                                BackgroundColor="#2d5f9e" TextColor="White" FontSize="10"
+                                HeightRequest="26" CornerRadius="3" Padding="10,0" />
+                    </HorizontalStackLayout>
+                </Grid>
+
+                <!-- Messages -->
+                <CollectionView x:Name="MessagesView" Grid.Row="4" ItemsSource="{Binding Messages}"
+                                BackgroundColor="#1a1a1a"
+                                IsVisible="{Binding IsStreamTab, Converter={StaticResource InvertBoolConverter}}">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MessageViewItem">
+                            <VerticalStackLayout>
+                                <!-- System notification (join / leave events) -->
+                                <Label IsVisible="{Binding IsSystemMessage}"
+                                       Text="{Binding Message.Content}"
+                                       TextColor="#4a7a4a" FontSize="11" FontAttributes="Italic"
+                                       HorizontalOptions="Center" Padding="0,5" />
+                                <!-- Regular chat message -->
+                                <Grid Padding="14,6" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto"
+                                      IsVisible="{Binding IsSystemMessage, Converter={StaticResource InvertBoolConverter}}">
+                                <!-- Avatar -->
+                                <Frame Grid.Row="0" Grid.RowSpan="3" Grid.Column="0"
+                                       CornerRadius="18" WidthRequest="36" HeightRequest="36"
+                                       BackgroundColor="#2d5f9e" Padding="0" Margin="0,0,10,0"
+                                       VerticalOptions="Start">
+                                    <Label Text="{Binding Message.AuthorUsername, Converter={StaticResource InitialsConverter}}"
+                                           TextColor="White" FontSize="12" FontAttributes="Bold"
+                                           HorizontalOptions="Center" VerticalOptions="Center" />
+                                </Frame>
+                                <!-- Author + time -->
+                                <HorizontalStackLayout Grid.Row="0" Grid.Column="1" Spacing="8">
+                                    <Label Text="{Binding Message.AuthorUsername}" TextColor="#8ab4d4"
+                                           FontAttributes="Bold" FontSize="13" />
+                                    <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
+                                           TextColor="#555555" FontSize="10" VerticalOptions="End" Margin="0,0,0,1" />
+                                </HorizontalStackLayout>
+                                <!-- Message content -->
+                                <Label Grid.Row="1" Grid.Column="1" Text="{Binding Message.Content}"
+                                       TextColor="#c8c8c8" FontSize="13" />
+                                <!-- Link preview card -->
+                                <Grid Grid.Row="2" Grid.Column="1"
+                                      IsVisible="{Binding Preview, Converter={StaticResource NullToBoolConverter}}"
+                                      Margin="0,6,40,4" ColumnDefinitions="4,*">
+                                    <!-- Accent bar -->
+                                    <BoxView Grid.Column="0" BackgroundColor="#2d5f9e"
+                                             WidthRequest="4" CornerRadius="2" VerticalOptions="Fill" />
+                                    <!-- Content -->
+                                    <VerticalStackLayout Grid.Column="1" Padding="10,8" Spacing="3"
+                                                         BackgroundColor="#1e1e2e">
+                                        <!-- Site name -->
+                                        <Label Text="{Binding Preview.SiteName}"
+                                               TextColor="#8ab4d4" FontSize="10" FontAttributes="Bold"
+                                               IsVisible="{Binding Preview.SiteName, Converter={StaticResource StringToBoolConverter}}" />
+                                        <!-- Title -->
+                                        <Label Text="{Binding Preview.Title}"
+                                               TextColor="#d0d0d0" FontSize="13" FontAttributes="Bold"
+                                               IsVisible="{Binding Preview.Title, Converter={StaticResource StringToBoolConverter}}"
+                                               MaxLines="2" LineBreakMode="TailTruncation" />
+                                        <!-- Description -->
+                                        <Label Text="{Binding Preview.Description}"
+                                               TextColor="#888888" FontSize="11"
+                                               IsVisible="{Binding Preview.Description, Converter={StaticResource StringToBoolConverter}}"
+                                               MaxLines="3" LineBreakMode="TailTruncation" />
+                                        <!-- Thumbnail -->
+                                        <Image Source="{Binding Preview.ImageUrl}"
+                                               IsVisible="{Binding Preview.ImageUrl, Converter={StaticResource StringToBoolConverter}}"
+                                               Aspect="AspectFill"
+                                               HeightRequest="160"
+                                               HorizontalOptions="Start"
+                                               WidthRequest="280"
+                                               Margin="0,4,0,0" />
+                                    </VerticalStackLayout>
+                                </Grid>
+                                </Grid>
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- PTT hint shown only on Voice tab -->
+                <Label Grid.Row="5"
+                       BackgroundColor="#1a1a2a" Padding="12,8"
+                       IsVisible="{Binding IsVoiceTab}"
+                       Text="{Binding VoiceHintText}"
+                       TextColor="{Binding VoiceHintColor}"
+                       FontSize="11" FontAttributes="Italic"
+                       VerticalOptions="Center" />
+
+                <!-- Message input area (hidden on Voice tab — speech-to-text auto-posts) -->
+                <Grid Grid.Row="5" BackgroundColor="#252525" RowDefinitions="Auto,Auto" Padding="12,4,12,8"
+                      IsVisible="{Binding IsTextTab}">
+                    <!-- Hypothesis: live partial speech shown while speaking -->
+                    <Label Grid.Row="0"
+                           Text="{Binding HypothesisText, StringFormat='🎙 {0}…'}"
+                           TextColor="#f0a030" FontSize="11" FontAttributes="Italic"
+                           Margin="0,0,0,2"
+                           IsVisible="{Binding HypothesisText, Converter={StaticResource StringToBoolConverter}}" />
+                    <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
+                        <Entry Grid.Column="0"
+                               Placeholder="{Binding SelectedChannel.Name, StringFormat='Message #{0}', FallbackValue='Select a channel'}"
+                               BackgroundColor="#1a1a1a" PlaceholderColor="#555555" TextColor="#d0d0d0"
+                               Text="{Binding MessageInput}" ReturnCommand="{Binding SendMessageCommand}" />
+                        <Button Grid.Column="1" Text="Send" Command="{Binding SendMessageCommand}"
+                                BackgroundColor="#2d5f9e" TextColor="White" CornerRadius="3"
+                                FontSize="12" Margin="8,0,0,0" HeightRequest="36" Padding="14,0" />
+                    </Grid>
+                </Grid>
+            </Grid>
+
+        </Grid>
+
+        <!-- ═══ BOTTOM CONTROLS BAR ═══ -->
+        <Grid Grid.Row="2" BackgroundColor="#252525" Padding="10,6"
+              ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
+
+            <!-- Mute -->
+            <Button Grid.Column="0"
+                    Text="{Binding IsMuted, Converter={StaticResource MuteButtonConverter}}"
+                    Command="{Binding ToggleMuteCommand}"
+                    BackgroundColor="{Binding IsMuted, Converter={StaticResource MutedBgConverter}}"
+                    TextColor="White" FontSize="13"
+                    WidthRequest="40" HeightRequest="32" CornerRadius="3" Margin="0,0,4,0"
+                    ToolTipProperties.Text="Mute / Unmute your microphone" />
+
+            <!-- Deafen -->
+            <Button Grid.Column="1"
+                    Text="{Binding IsDeafened, Converter={StaticResource DeafenButtonConverter}}"
+                    Command="{Binding ToggleDeafenCommand}"
+                    BackgroundColor="#3a3a3a" TextColor="White" FontSize="13"
+                    WidthRequest="40" HeightRequest="32" CornerRadius="3" Margin="0,0,4,0"
+                    ToolTipProperties.Text="Deafen / Undeafen — mutes all incoming audio" />
+
+            <!-- Loopback test button -->
+            <Button Grid.Column="2"
+                    Text="🔁 Mic Test"
+                    Command="{Binding ToggleMicLoopbackCommand}"
+                    BackgroundColor="{Binding IsLoopbackActive, Converter={StaticResource LoopbackColorConverter}}"
+                    TextColor="White" FontSize="11"
+                    HeightRequest="32" CornerRadius="3" Margin="0,0,8,0" Padding="8,0"
+                    ToolTipProperties.Text="Play your mic back to yourself to test audio" />
+
+            <!-- Mic level meter -->
+            <VerticalStackLayout Grid.Column="3" VerticalOptions="Center" Spacing="1" Margin="0,0,8,0">
+                <Label Text="MIC" TextColor="#666666" FontSize="8" HorizontalOptions="Center" />
+                <ProgressBar Progress="{Binding MicLevel}"
+                             ProgressColor="{Binding MicLevel, Converter={StaticResource MicLevelColorConverter}}"
+                             WidthRequest="80" HeightRequest="10"
+                             BackgroundColor="#1a1a1a" />
+            </VerticalStackLayout>
+
+            <!-- PTT button: click to rebind, shows active state while transmitting -->
+            <Button Grid.Column="4"
+                    Text="{Binding PttButtonLabel}"
+                    Command="{Binding SetPttKeyCommand}"
+                    BackgroundColor="{Binding PttButtonColor}"
+                    TextColor="White" FontSize="11"
+                    HeightRequest="32" CornerRadius="3" Margin="0,0,8,0" Padding="10,0"
+                    ToolTipProperties.Text="Hold your Push to Talk key to transmit. Click here to rebind the key." />
+
+            <!-- Stream button -->
+            <Button Grid.Column="5"
+                    Text="{Binding StreamButtonLabel}"
+                    Command="{Binding ToggleStreamCommand}"
+                    BackgroundColor="{Binding StreamButtonColor}"
+                    TextColor="White" FontSize="11"
+                    HeightRequest="32" CornerRadius="3" Margin="0,0,8,0" Padding="10,0"
+                    ToolTipProperties.Text="Share your screen with everyone in the channel" />
+
+            <!-- Status label -->
+            <HorizontalStackLayout Grid.Column="6" Spacing="6" VerticalOptions="Center" Margin="8,0">
+                <Ellipse WidthRequest="8" HeightRequest="8" Fill="#44bb44"
+                         IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}"
+                         VerticalOptions="Center" />
+                <Label Text="{Binding SelectedChannel.Name, StringFormat='🎙 {0}', FallbackValue='No channel'}"
+                       TextColor="#888888" FontSize="11" VerticalOptions="Center" />
+                <!-- Loopback indicator -->
+                <Label Text="● LOOPBACK" TextColor="#f0a030" FontSize="10" FontAttributes="Bold"
+                       VerticalOptions="Center" IsVisible="{Binding IsLoopbackActive}" />
+            </HorizontalStackLayout>
+
+            <!-- Ping/info -->
+            <Label Grid.Column="7" Text="localhost:5238" TextColor="#555555"
+                   FontSize="10" VerticalOptions="Center" Margin="0,0,12,0" />
+
+            <!-- Settings -->
+            <Button Grid.Column="8" Text="⚙"
+                    Command="{Binding OpenSettingsCommand}"
+                    BackgroundColor="#3a3a3a" TextColor="#aaaaaa" FontSize="14"
+                    WidthRequest="36" HeightRequest="32" CornerRadius="3" Margin="0,0,4,0"
+                    ToolTipProperties.Text="Settings" />
+
+            <!-- Sign Out -->
+            <Button Grid.Column="9" Text="Sign Out"
+                    Command="{Binding LogoutCommand}"
+                    BackgroundColor="#3a3a3a" TextColor="#cc4444"
+                    FontSize="11" FontAttributes="Bold"
+                    HeightRequest="32" CornerRadius="3" Padding="10,0" />
+        </Grid>
+
+    </Grid>
+</ContentPage>

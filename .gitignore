@@ -1,0 +1,32 @@
+## Build output
+bin/
+obj/
+*.user
+
+## Visual Studio
+.vs/
+*.suo
+
+## Rider
+.idea/
+
+## macOS
+.DS_Store
+
+## NuGet
+*.nupkg
+packages/
+
+## Secrets / local config
+appsettings.Development.json
+*.pfx
+*.p12
+
+## MAUI hot reload
+**/.hotreload/
+
+## Test results
+TestResults/
+
+## Claude binary
+claude.exe

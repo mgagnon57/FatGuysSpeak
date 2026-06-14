@@ -1,0 +1,36 @@
+<?xml version = "1.0" encoding = "UTF-8" ?>
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:FatGuysSpeak.Client"
+             x:Class="FatGuysSpeak.Client.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
+                <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <local:StringToBoolConverter x:Key="StringToBoolConverter" />
+            <local:InvertBoolConverter x:Key="InvertBoolConverter" />
+            <local:InitialsConverter x:Key="InitialsConverter" />
+            <local:ChannelIconConverter x:Key="ChannelIconConverter" />
+            <local:MuteButtonConverter x:Key="MuteButtonConverter" />
+            <local:DeafenButtonConverter x:Key="DeafenButtonConverter" />
+            <local:NullToBoolConverter x:Key="NullToBoolConverter" />
+            <local:ChannelSelectionConverter x:Key="ChannelSelectionConverter" />
+            <local:ChannelTextConverter x:Key="ChannelTextConverter" />
+            <local:MutedBgConverter x:Key="MutedBgConverter" />
+            <local:SelectedFontConverter x:Key="SelectedFontConverter" />
+            <local:VoiceStatusLabelConverter x:Key="VoiceStatusLabelConverter" />
+            <local:VoiceJoinButtonConverter x:Key="VoiceJoinButtonConverter" />
+            <local:VoiceJoinColorConverter x:Key="VoiceJoinColorConverter" />
+            <local:TestMicButtonConverter x:Key="TestMicButtonConverter" />
+            <local:TestMicColorConverter x:Key="TestMicColorConverter" />
+            <local:LoopbackColorConverter x:Key="LoopbackColorConverter" />
+            <local:MicLevelColorConverter x:Key="MicLevelColorConverter" />
+            <local:DictateColorConverter x:Key="DictateColorConverter" />
+            <local:TabBgConverter x:Key="TabBgConverter" />
+            <local:UtcToLocalTimeConverter x:Key="UtcToLocalTimeConverter" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

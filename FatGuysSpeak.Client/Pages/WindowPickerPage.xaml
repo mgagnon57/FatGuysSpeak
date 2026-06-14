@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:FatGuysSpeak.Client.Models"
+             xmlns:vm="clr-namespace:FatGuysSpeak.Client.ViewModels"
+             x:Class="FatGuysSpeak.Client.Pages.WindowPickerPage"
+             x:DataType="vm:WindowPickerViewModel"
+             BackgroundColor="#1a1a1a"
+             Title="Choose what to share">
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- Header -->
+        <Grid Grid.Row="0" BackgroundColor="#252525" Padding="16,12"
+              ColumnDefinitions="*,Auto">
+            <Label Grid.Column="0" Text="Choose what to share"
+                   TextColor="#d0d0d0" FontAttributes="Bold" FontSize="14"
+                   VerticalOptions="Center" />
+            <Button Grid.Column="1" Text="✕"
+                    Command="{Binding CancelCommand}"
+                    BackgroundColor="Transparent" TextColor="#666666"
+                    FontSize="16" WidthRequest="32" HeightRequest="32"
+                    Padding="0" CornerRadius="3" />
+        </Grid>
+
+        <!-- Search -->
+        <Grid Grid.Row="1" Padding="14,10" BackgroundColor="#1e1e1e">
+            <Entry Placeholder="Search apps..."
+                   Text="{Binding SearchText}"
+                   TextColor="#d0d0d0" BackgroundColor="#2a2a2a"
+                   PlaceholderColor="#555555" FontSize="12" />
+        </Grid>
+
+        <!-- Window list -->
+        <CollectionView Grid.Row="2"
+                        ItemsSource="{Binding FilteredWindows}"
+                        SelectedItem="{Binding SelectedWindow}"
+                        SelectionMode="Single"
+                        BackgroundColor="#1a1a1a">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="models:AppWindow">
+                    <Grid Padding="14,10" ColumnDefinitions="40,*">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroupList>
+                                <VisualStateGroup Name="CommonStates">
+                                    <VisualState Name="Normal">
+                                        <VisualState.Setters>
+                                            <Setter Property="BackgroundColor" Value="Transparent" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState Name="Selected">
+                                        <VisualState.Setters>
+                                            <Setter Property="BackgroundColor" Value="#1e3050" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateGroupList>
+                        </VisualStateManager.VisualStateGroups>
+
+                        <!-- Icon -->
+                        <Label Grid.Column="0" Text="{Binding Icon}"
+                               FontSize="22" HorizontalOptions="Center"
+                               VerticalOptions="Center" />
+
+                        <!-- Title + subtitle -->
+                        <VerticalStackLayout Grid.Column="1" Spacing="2"
+                                             VerticalOptions="Center">
+                            <Label Text="{Binding DisplayTitle}"
+                                   TextColor="#d0d0d0" FontSize="12"
+                                   FontAttributes="Bold"
+                                   LineBreakMode="TailTruncation" />
+                            <Label Text="{Binding DisplaySubtitle}"
+                                   TextColor="#666666" FontSize="11"
+                                   LineBreakMode="TailTruncation"
+                                   IsVisible="{Binding DisplaySubtitle,
+                                       Converter={StaticResource StringToBoolConverter}}" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Bottom bar -->
+        <Grid Grid.Row="3" BackgroundColor="#252525" Padding="14,10"
+              ColumnDefinitions="*,Auto,Auto">
+            <Label Grid.Column="0"
+                   Text="Select a window or Entire Screen to share"
+                   TextColor="#555555" FontSize="11"
+                   VerticalOptions="Center" />
+            <Button Grid.Column="1" Text="Cancel"
+                    Command="{Binding CancelCommand}"
+                    BackgroundColor="#3a3a3a" TextColor="#aaaaaa"
+                    HeightRequest="32" CornerRadius="3"
+                    Padding="14,0" Margin="0,0,8,0" FontSize="12" />
+            <Button Grid.Column="2" Text="Share"
+                    Command="{Binding ShareCommand}"
+                    BackgroundColor="#2d5f9e" TextColor="White"
+                    HeightRequest="32" CornerRadius="3"
+                    Padding="14,0" FontSize="12" />
+        </Grid>
+
+    </Grid>
+</ContentPage>

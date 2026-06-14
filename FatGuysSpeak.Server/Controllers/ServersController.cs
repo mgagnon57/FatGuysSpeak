@@ -1,0 +1,122 @@
+using System.Security.Claims;
+using FatGuysSpeak.Server.Data;
+using FatGuysSpeak.Server.Hubs;
+using FatGuysSpeak.Server.Models;
+using FatGuysSpeak.Shared;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+
+namespace FatGuysSpeak.Server.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : ControllerBase
+{
+    private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    [HttpGet]
+    public async Task<List<ServerDto>> GetMyServers()
+    {
+        return await db.ServerMembers
+            .Where(sm => sm.UserId == UserId)
+            .Include(sm => sm.Server).ThenInclude(s => s.Members)
+            .Select(sm => new ServerDto(
+                sm.Server.Id,
+                sm.Server.Name,
+                sm.Server.Description,
+                sm.Server.OwnerId.ToString(),
+                sm.Server.Members.Count))
+            .ToListAsync();
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<ServerDto>> CreateServer(CreateServerRequest req)
+    {
+        var server = new GuildServer { Name = req.Name, Description = req.Description, OwnerId = UserId };
+        db.Servers.Add(server);
+        await db.SaveChangesAsync();
+
+        db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = UserId, Role = ServerRole.Admin });
+        db.Channels.Add(new Channel { Name = "general", Type = ChannelType.Text, ServerId = server.Id, Position = 0 });
+        db.Channels.Add(new Channel { Name = "General", Type = ChannelType.Voice, ServerId = server.Id, Position = 1 });
+        await db.SaveChangesAsync();
+
+        return Ok(new ServerDto(server.Id, server.Name, server.Description, server.OwnerId.ToString(), 1));
+    }
+
+    [HttpPost("{serverId}/join")]
+    public async Task<IActionResult> JoinServer(int serverId)
+    {
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
+
+        if (await db.ServerMembers.AnyAsync(sm => sm.ServerId == serverId && sm.UserId == UserId))
+            return Conflict("Already a member.");
+
+        db.ServerMembers.Add(new ServerMember { ServerId = serverId, UserId = UserId });
+        await db.SaveChangesAsync();
+
+        var user = await db.Users.FindAsync(UserId);
+        if (user is not null)
+            await hub.Clients.Group($"server-{serverId}")
+                .SendAsync("UserJoinedServer", new UserDto(UserId, user.Username, UserStatus.Online));
+
+        return Ok();
+    }
+
+    [HttpDelete("{serverId}/leave")]
+    public async Task<IActionResult> LeaveServer(int serverId)
+    {
+        var member = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (member is null) return NotFound();
+
+        db.ServerMembers.Remove(member);
+        await db.SaveChangesAsync();
+        return Ok();
+    }
+
+    [HttpGet("{serverId}/channels")]
+    public async Task<ActionResult<List<ChannelDto>>> GetChannels(int serverId)
+    {
+        if (!await db.ServerMembers.AnyAsync(sm => sm.ServerId == serverId && sm.UserId == UserId))
+            return Forbid();
+
+        return await db.Channels
+            .Where(c => c.ServerId == serverId)
+            .OrderBy(c => c.Position)
+            .Select(c => new ChannelDto(c.Id, c.Name, c.Type, c.ServerId, c.Position))
+            .ToListAsync();
+    }
+
+    [HttpPost("{serverId}/channels")]
+    public async Task<ActionResult<ChannelDto>> CreateChannel(int serverId, CreateChannelRequest req)
+    {
+        var member = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (member is null) return Forbid();
+
+        var pos = await db.Channels.Where(c => c.ServerId == serverId).CountAsync();
+        var channel = new Channel { Name = req.Name, Type = req.Type, ServerId = serverId, Position = pos };
+        db.Channels.Add(channel);
+        await db.SaveChangesAsync();
+
+        var dto = new ChannelDto(channel.Id, channel.Name, channel.Type, channel.ServerId, channel.Position);
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelCreated", dto);
+        return Ok(dto);
+    }
+
+    [HttpGet("{serverId}/members")]
+    public async Task<ActionResult<List<UserDto>>> GetMembers(int serverId)
+    {
+        if (!await db.ServerMembers.AnyAsync(sm => sm.ServerId == serverId && sm.UserId == UserId))
+            return Forbid();
+
+        return await db.ServerMembers
+            .Where(sm => sm.ServerId == serverId)
+            .Include(sm => sm.User)
+            .Select(sm => new UserDto(sm.User.Id, sm.User.Username, sm.User.Status))
+            .ToListAsync();
+    }
+}

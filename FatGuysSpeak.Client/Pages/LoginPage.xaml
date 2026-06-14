@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FatGuysSpeak.Client.ViewModels"
+             x:Class="FatGuysSpeak.Client.Pages.LoginPage"
+             Title="FatGuysSpeak"
+             BackgroundColor="#1e1f22">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="40" Spacing="16" VerticalOptions="Center">
+
+            <Label Text="FatGuysSpeak" FontSize="32" FontAttributes="Bold"
+                   TextColor="#5865F2" HorizontalOptions="Center" />
+            <Label Text="Welcome back!" FontSize="18" TextColor="#ffffff"
+                   HorizontalOptions="Center" />
+            <Label Text="We're so excited to see you again!" FontSize="14"
+                   TextColor="#b5bac1" HorizontalOptions="Center" Margin="0,0,0,16" />
+
+            <Label Text="USERNAME" FontSize="12" TextColor="#b5bac1" FontAttributes="Bold" />
+            <Entry x:Name="UsernameEntry" Placeholder="Enter your username"
+                   PlaceholderColor="#72767d" TextColor="White" BackgroundColor="#1e1f22"
+                   Text="{Binding Username}" />
+
+            <Label Text="PASSWORD" FontSize="12" TextColor="#b5bac1" FontAttributes="Bold" />
+            <Entry x:Name="PasswordEntry" Placeholder="Enter your password"
+                   PlaceholderColor="#72767d" TextColor="White" BackgroundColor="#1e1f22"
+                   IsPassword="True" Text="{Binding Password}" />
+
+            <Label Text="{Binding ErrorMessage}" TextColor="#ed4245" IsVisible="{Binding ErrorMessage, Converter={StaticResource StringToBoolConverter}}" />
+
+            <Button Text="Log In" Command="{Binding LoginCommand}"
+                    BackgroundColor="#5865F2" TextColor="White"
+                    CornerRadius="4" HeightRequest="44"
+                    IsEnabled="{Binding IsLoading, Converter={StaticResource InvertBoolConverter}}" />
+
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="4">
+                <Label Text="Need an account?" TextColor="#b5bac1" />
+                <Label Text="Register" TextColor="#00b0f4" >
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnRegisterTapped" />
+                    </Label.GestureRecognizers>
+                </Label>
+            </HorizontalStackLayout>
+
+            <!-- Server URL — pre-filled from last session, change to point at hosted server -->
+            <BoxView HeightRequest="1" BackgroundColor="#2e3035" Margin="0,16,0,8" />
+            <Label Text="SERVER ADDRESS" FontSize="10" TextColor="#4e5058"
+                   FontAttributes="Bold" />
+            <Entry Placeholder="http://localhost:5238"
+                   Text="{Binding ServerUrl}"
+                   TextColor="#72767d" BackgroundColor="#1e1f22"
+                   PlaceholderColor="#3f4248" FontSize="12" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

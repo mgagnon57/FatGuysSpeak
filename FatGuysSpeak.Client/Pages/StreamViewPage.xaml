@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FatGuysSpeak.Client.Pages.StreamViewPage"
+             BackgroundColor="Black"
+             Title="Screen Share">
+    <Grid>
+        <Image Source="{Binding StreamFrame}"
+               Aspect="AspectFit"
+               IsVisible="{Binding HasStreamFrame}" />
+
+        <Label Text="⏳  Waiting for stream…"
+               TextColor="#555555" FontSize="16" FontAttributes="Italic"
+               HorizontalOptions="Center" VerticalOptions="Center"
+               IsVisible="{Binding HasStreamFrame, Converter={StaticResource InvertBoolConverter}}" />
+
+        <!-- Overlay: streamer name + latency (top-left) -->
+        <VerticalStackLayout HorizontalOptions="Start" VerticalOptions="Start"
+                             Margin="10,8,0,0" Spacing="3">
+            <Label Text="{Binding ActiveStreamerName, StringFormat='📺  {0}'}"
+                   TextColor="#8ab4d4" FontSize="11" FontAttributes="Bold" />
+            <HorizontalStackLayout Spacing="5">
+                <Ellipse WidthRequest="7" HeightRequest="7"
+                         Fill="{Binding StreamLatencyColor}"
+                         VerticalOptions="Center" />
+                <Label Text="{Binding StreamLatencyText}"
+                       TextColor="#aaaaaa" FontSize="10" VerticalOptions="Center" />
+                <Label Text="·" TextColor="#555555" FontSize="10" VerticalOptions="Center" />
+                <Label Text="{Binding StreamQualityLabel}"
+                       TextColor="#888888" FontSize="10" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+        </VerticalStackLayout>
+
+        <!-- Overlay: return button (top-right) -->
+        <Button Text="⛶  Return to In-App"
+                Command="{Binding ToggleFullScreenCommand}"
+                BackgroundColor="#CC141420"
+                TextColor="White" FontSize="11"
+                HorizontalOptions="End" VerticalOptions="Start"
+                Margin="0,6,8,0"
+                HeightRequest="30" CornerRadius="4" Padding="10,0" />
+    </Grid>
+</ContentPage>

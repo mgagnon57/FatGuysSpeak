@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FatGuysSpeak.Client.Pages.RegisterPage"
+             Title="Create Account"
+             BackgroundColor="#1e1f22">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="40" Spacing="16" VerticalOptions="Center">
+
+            <Label Text="Create an account" FontSize="24" FontAttributes="Bold"
+                   TextColor="#ffffff" HorizontalOptions="Center" />
+
+            <Label Text="EMAIL" FontSize="12" TextColor="#b5bac1" FontAttributes="Bold" />
+            <Entry Placeholder="Enter your email" PlaceholderColor="#72767d"
+                   TextColor="White" BackgroundColor="#1e1f22"
+                   Keyboard="Email" Text="{Binding Email}" />
+
+            <Label Text="USERNAME" FontSize="12" TextColor="#b5bac1" FontAttributes="Bold" />
+            <Entry Placeholder="Choose a username" PlaceholderColor="#72767d"
+                   TextColor="White" BackgroundColor="#1e1f22" Text="{Binding Username}" />
+
+            <Label Text="PASSWORD" FontSize="12" TextColor="#b5bac1" FontAttributes="Bold" />
+            <Entry Placeholder="Choose a password" PlaceholderColor="#72767d"
+                   TextColor="White" BackgroundColor="#1e1f22"
+                   IsPassword="True" Text="{Binding Password}" />
+
+            <Label Text="{Binding ErrorMessage}" TextColor="#ed4245"
+                   IsVisible="{Binding ErrorMessage, Converter={StaticResource StringToBoolConverter}}" />
+
+            <Button Text="Continue" Command="{Binding RegisterCommand}"
+                    BackgroundColor="#5865F2" TextColor="White"
+                    CornerRadius="4" HeightRequest="44" />
+
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="4">
+                <Label Text="Already have an account?" TextColor="#b5bac1" />
+                <Label Text="Log In" TextColor="#00b0f4">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnLoginTapped" />
+                    </Label.GestureRecognizers>
+                </Label>
+            </HorizontalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

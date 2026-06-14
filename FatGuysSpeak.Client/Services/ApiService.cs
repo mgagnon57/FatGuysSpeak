@@ -1,0 +1,121 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using FatGuysSpeak.Shared;
+
+namespace FatGuysSpeak.Client.Services;
+
+public class ApiService
+{
+    private HttpClient _http;
+    private string? _token;
+
+    public const string DefaultServerUrl = "http://localhost:5238";
+
+    public string ServerUrl { get; private set; }
+
+    public ApiService()
+    {
+        ServerUrl = Preferences.Get("server_url", DefaultServerUrl).TrimEnd('/');
+        _http = BuildClient(ServerUrl);
+    }
+
+    public void SetServerUrl(string url)
+    {
+        var normalized = url.TrimEnd('/');
+        ServerUrl = normalized;
+        Preferences.Set("server_url", normalized);
+        _http = BuildClient(normalized);
+        if (_token is not null)
+            _http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", _token);
+    }
+
+    private static HttpClient BuildClient(string baseUrl) =>
+        new() { BaseAddress = new Uri(baseUrl + "/") };
+
+    public int CurrentUserId { get; private set; }
+    public string CurrentUsername { get; private set; } = "";
+
+    public void SetToken(string token)
+    {
+        _token = token;
+        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+    }
+
+    public void SetCurrentUser(int userId, string username)
+    {
+        CurrentUserId = userId;
+        CurrentUsername = username;
+    }
+
+    public void ClearToken()
+    {
+        _token = null;
+        CurrentUserId = 0;
+        CurrentUsername = "";
+        _http.DefaultRequestHeaders.Authorization = null;
+    }
+
+    public string? Token => _token;
+
+    public async Task<AuthResponse?> RegisterAsync(RegisterRequest req)
+    {
+        var resp = await _http.PostAsJsonAsync("api/auth/register", req);
+        if (!resp.IsSuccessStatusCode)
+            throw new Exception((await resp.Content.ReadAsStringAsync()).Trim('"'));
+        return await resp.Content.ReadFromJsonAsync<AuthResponse>();
+    }
+
+    public async Task<AuthResponse?> LoginAsync(LoginRequest req)
+    {
+        var resp = await _http.PostAsJsonAsync("api/auth/login", req);
+        if (!resp.IsSuccessStatusCode)
+            throw new Exception((await resp.Content.ReadAsStringAsync()).Trim('"'));
+        return await resp.Content.ReadFromJsonAsync<AuthResponse>();
+    }
+
+    public Task<List<ServerDto>?> GetServersAsync() =>
+        _http.GetFromJsonAsync<List<ServerDto>>("api/servers");
+
+    public Task<ServerDto?> CreateServerAsync(CreateServerRequest req) =>
+        _http.PostAsJsonAsync("api/servers", req).ContinueWith(t => t.Result.Content.ReadFromJsonAsync<ServerDto>().Result);
+
+    public Task<List<ChannelDto>?> GetChannelsAsync(int serverId) =>
+        _http.GetFromJsonAsync<List<ChannelDto>>($"api/servers/{serverId}/channels");
+
+    public Task<ChannelDto?> CreateChannelAsync(int serverId, CreateChannelRequest req) =>
+        _http.PostAsJsonAsync($"api/servers/{serverId}/channels", req).ContinueWith(t => t.Result.Content.ReadFromJsonAsync<ChannelDto>().Result);
+
+    public Task<List<UserDto>?> GetMembersAsync(int serverId) =>
+        _http.GetFromJsonAsync<List<UserDto>>($"api/servers/{serverId}/members");
+
+    public Task<List<MessageDto>?> GetMessagesAsync(int channelId) =>
+        _http.GetFromJsonAsync<List<MessageDto>>($"api/channels/{channelId}/messages");
+
+    public Task<MessageDto?> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text) =>
+        _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source))
+             .ContinueWith(t => t.Result.Content.ReadFromJsonAsync<MessageDto>().Result);
+
+    public async Task<bool> JoinServerAsync(int serverId)
+    {
+        var r = await _http.PostAsync($"api/servers/{serverId}/join", null);
+        return r.IsSuccessStatusCode;
+    }
+
+    public async Task<LinkPreviewDto?> GetLinkPreviewAsync(string url)
+    {
+        try
+        {
+            var encoded = Uri.EscapeDataString(url);
+            var resp = await _http.GetAsync($"api/preview?url={encoded}");
+            if (resp.StatusCode == System.Net.HttpStatusCode.NoContent) return null;
+            return resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<LinkPreviewDto>()
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+}

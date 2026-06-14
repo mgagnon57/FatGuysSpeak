@@ -1,0 +1,155 @@
+using System.Text;
+using System.Threading.RateLimiting;
+using FatGuysSpeak.Server.Data;
+using FatGuysSpeak.Server.Hubs;
+using FatGuysSpeak.Server.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Railway (and most cloud hosts) set DATABASE_URL as a postgres:// URI.
+// Fall back to the config connection string (SQLite for local dev).
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+if (!string.IsNullOrEmpty(databaseUrl))
+{
+    var uri = new Uri(databaseUrl);
+    var userInfo = uri.UserInfo.Split(':');
+    var pgConn = $"Host={uri.Host};Port={uri.Port};" +
+                 $"Database={uri.AbsolutePath.TrimStart('/')};" +
+                 $"Username={userInfo[0]};Password={Uri.UnescapeDataString(userInfo[1])};" +
+                 "SSL Mode=Require;Trust Server Certificate=true";
+    builder.Services.AddDbContext<AppDbContext>(opt => opt.UseNpgsql(pgConn));
+}
+else
+{
+    var connStr = builder.Configuration.GetConnectionString("Default") ?? "Data Source=fatguys.db";
+    builder.Services.AddDbContext<AppDbContext>(opt => opt.UseSqlite(connStr));
+}
+
+builder.Services.AddScoped<TokenService>();
+
+var jwtKey = builder.Configuration["Jwt:Key"];
+if (string.IsNullOrWhiteSpace(jwtKey))
+    throw new InvalidOperationException("JWT key is not configured. Set Jwt:Key in appsettings or the JWT__Key environment variable.");
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(opt =>
+    {
+        opt.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero,
+        };
+        // Allow JWT via query string for SignalR WebSocket handshakes
+        opt.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                var token = ctx.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(token) && ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                    ctx.Token = token;
+                return Task.CompletedTask;
+            }
+        };
+    });
+
+// 10 auth attempts per minute per IP
+builder.Services.AddRateLimiter(opt =>
+{
+    opt.AddFixedWindowLimiter("auth", limiter =>
+    {
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.PermitLimit = 10;
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 0;
+    });
+    opt.RejectionStatusCode = 429;
+});
+
+builder.Services.AddAuthorization();
+builder.Services.AddControllers();
+builder.Services.AddHttpClient("preview", c =>
+{
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; FatGuysSpeak/1.0)");
+    c.Timeout = TimeSpan.FromSeconds(8);
+});
+builder.Services.AddSignalR(opt =>
+{
+    opt.MaximumReceiveMessageSize = 4 * 1024 * 1024; // 4 MB — full-res JPEG frames at high quality
+});
+builder.Services.AddCors(opt =>
+    opt.AddDefaultPolicy(p => p
+        .SetIsOriginAllowed(origin => new Uri(origin).Host is "localhost" or "127.0.0.1")
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()));
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    ctx.Database.EnsureCreated();
+    // Non-destructive migration: add Source column only if it doesn't exist yet
+    using var conn = ctx.Database.GetDbConnection();
+    conn.Open();
+    using var checkCmd = conn.CreateCommand();
+    bool isPostgres = ctx.Database.ProviderName?.Contains("Npgsql") == true;
+    if (isPostgres)
+    {
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='Source'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"Source\" INTEGER NOT NULL DEFAULT 0");
+    }
+    else
+    {
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='Source'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN Source INTEGER NOT NULL DEFAULT 0");
+    }
+
+    if (!ctx.Servers.Any())
+    {
+        var server = new FatGuysSpeak.Server.Models.GuildServer { Name = "FatGuysSpeak", OwnerId = 0 };
+        ctx.Servers.Add(server);
+        ctx.SaveChanges();
+        ctx.Channels.AddRange(
+            new FatGuysSpeak.Server.Models.Channel { Name = "lobby",          Type = FatGuysSpeak.Shared.ChannelType.Text, ServerId = server.Id, Position = 0 },
+            new FatGuysSpeak.Server.Models.Channel { Name = "angry-fat-guys", Type = FatGuysSpeak.Shared.ChannelType.Text, ServerId = server.Id, Position = 1 }
+        );
+        ctx.SaveChanges();
+    }
+    else
+    {
+        var server = ctx.Servers.First();
+        // Rename general → lobby if the old name still exists
+        var generalChannel = ctx.Channels.FirstOrDefault(c => c.ServerId == server.Id && c.Name == "general");
+        if (generalChannel is not null)
+        {
+            generalChannel.Name = "lobby";
+            ctx.SaveChanges();
+        }
+        // Add angry-fat-guys channel if it was added after the initial seed
+        if (!ctx.Channels.Any(c => c.ServerId == server.Id && c.Name == "angry-fat-guys"))
+        {
+            ctx.Channels.Add(new FatGuysSpeak.Server.Models.Channel { Name = "angry-fat-guys", Type = FatGuysSpeak.Shared.ChannelType.Text, ServerId = server.Id, Position = 1 });
+            ctx.SaveChanges();
+        }
+    }
+}
+
+app.UseCors();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
+
+app.Run();
