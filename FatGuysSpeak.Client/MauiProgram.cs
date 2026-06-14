@@ -25,6 +25,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<PttService>();
         builder.Services.AddSingleton<ScreenStreamService>();
         builder.Services.AddSingleton<ToastNotificationService>();
+        builder.Services.AddSingleton<GifService>();
 
         builder.Services.AddSingleton<SettingsViewModel>();
 

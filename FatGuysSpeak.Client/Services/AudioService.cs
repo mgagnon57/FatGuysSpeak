@@ -26,14 +26,27 @@ public class AudioService : IDisposable
     private const int FrameSizeMs = 20;
     private const int FrameSamples = SampleRate * FrameSizeMs / 1000;
     private const double TestToneHz = 440.0;
+    private const int NoiseGateHoldFrames = 5;     // 5 × 20ms = 100ms tail after level drops
+    private const int AdaptiveUpdateFrames = 100;   // recalculate every 100 × 20ms = 2 seconds
+    private const double AdaptiveHeadroom = 1.8;    // threshold = floor × headroom
+    private const double AdaptiveMin = 0.01;
+    private const double AdaptiveMax = 0.40;
 
     public event Action<byte[]>? AudioCaptured;
     public event Action<double>? MicLevelChanged;
+    public event Action<double>? ThresholdChanged;  // fired when adaptive mode updates the threshold
 
     public bool IsMuted { get; private set; }
     public bool IsDeafened { get; private set; }
     public bool IsTestMicActive { get; private set; }
     public bool IsLoopbackActive { get; private set; }
+    public bool NoiseGateEnabled { get; set; }
+    public bool AdaptiveThresholdEnabled { get; set; }
+    public double NoiseGateThreshold { get; set; } = 0.05;
+
+    private int _noiseGateHoldRemaining;
+    private double _noiseFloorAccum;
+    private int _noiseFloorFrames;
 
     public int InputDeviceIndex { get; set; }
     public int OutputDeviceIndex { get; set; }
@@ -54,6 +67,9 @@ public class AudioService : IDisposable
         OutputDeviceIndex = Preferences.Get("audio_output_device", 0);
         InputGain = Preferences.Get("audio_input_gain", 1.0f);
         _outputVolume = Preferences.Get("audio_output_volume", 1.0f);
+        NoiseGateEnabled = Preferences.Get("noise_gate_enabled", false);
+        NoiseGateThreshold = Preferences.Get("noise_gate_threshold", 0.05f);
+        AdaptiveThresholdEnabled = Preferences.Get("adaptive_threshold_enabled", false);
     }
 
     public static List<AudioDevice> GetInputDevices()
@@ -75,6 +91,9 @@ public class AudioService : IDisposable
     public void StartCapture(bool testMic = false)
     {
         IsTestMicActive = testMic;
+        _noiseGateHoldRemaining = 0;
+        _noiseFloorAccum = 0;
+        _noiseFloorFrames = 0;
         _encoder = OpusCodecFactory.CreateEncoder(SampleRate, Channels, OpusApplication.OPUS_APPLICATION_VOIP);
 
         if (testMic)
@@ -213,12 +232,42 @@ public class AudioService : IDisposable
             for (int i = 0; i < samples.Length; i++)
                 samples[i] = (short)Math.Clamp(samples[i] * InputGain, short.MinValue, short.MaxValue);
 
-        MicLevelChanged?.Invoke(IsMuted ? 0 : ComputeLevel(samples));
+        var level = ComputeLevel(samples);
+        MicLevelChanged?.Invoke(IsMuted ? 0 : level);
 
         if (IsLoopbackActive && _playbackBuffer is not null)
             _playbackBuffer.AddSamples(e.Buffer, 0, e.BytesRecorded);
 
         if (IsMuted) return;
+
+        if (NoiseGateEnabled)
+        {
+            if (AdaptiveThresholdEnabled)
+            {
+                // Accumulate frames where the signal is below the current threshold (noise floor samples)
+                if (level < NoiseGateThreshold)
+                {
+                    _noiseFloorAccum += level;
+                    _noiseFloorFrames++;
+                }
+
+                if (_noiseFloorFrames >= AdaptiveUpdateFrames)
+                {
+                    var floor = _noiseFloorAccum / _noiseFloorFrames;
+                    NoiseGateThreshold = Math.Clamp(floor * AdaptiveHeadroom, AdaptiveMin, AdaptiveMax);
+                    ThresholdChanged?.Invoke(NoiseGateThreshold);
+                    _noiseFloorAccum = 0;
+                    _noiseFloorFrames = 0;
+                }
+            }
+
+            if (level >= NoiseGateThreshold)
+                _noiseGateHoldRemaining = NoiseGateHoldFrames;
+            else if (_noiseGateHoldRemaining > 0)
+                _noiseGateHoldRemaining--;
+            else
+                return;
+        }
 
         var encoded = new byte[4000];
         int len = _encoder.Encode(samples, FrameSamples, encoded, encoded.Length);

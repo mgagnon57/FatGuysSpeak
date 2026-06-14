@@ -1,4 +1,8 @@
+using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using FatGuysSpeak.Client.Pages;
 using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
@@ -7,17 +11,71 @@ public partial class MessageViewItem : ObservableObject
 {
     private static int _systemIdCounter = -1;
 
-    // Message is observable so MAUI re-evaluates nested bindings (Content, IsDeleted, etc.)
-    // when ApplyEdit replaces the backing record.
     [ObservableProperty] private MessageDto _message;
     [ObservableProperty] private bool _isEdited;
     [ObservableProperty] private LinkPreviewDto? _preview;
 
+    // GIF playback control
+    private string? _attachmentDisplayUrl;
+    private Timer? _gifTimer;
+
+    public string? AttachmentDisplayUrl
+    {
+        get => _attachmentDisplayUrl;
+        private set
+        {
+            if (_attachmentDisplayUrl == value) return;
+            _attachmentDisplayUrl = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsGifPlaying));
+            OnPropertyChanged(nameof(GifPaused));
+        }
+    }
+
     public bool IsSystemMessage { get; private init; }
+    public bool IsNewMessageDivider { get; private init; }
+    public bool IsRegularMessage => !IsSystemMessage && !IsNewMessageDivider;
     public bool IsMention { get; private init; }
     public bool IsOwnMessage { get; private init; }
+    public bool IsBot => Message.Source == MessageSource.AI;
+    public bool CanModerate { get; set; }
+    public bool CanDelete => IsOwnMessage || CanModerate;
 
     public bool HasAttachment => Message.AttachmentUrl is not null;
+    public bool HasGifAttachment => IsGifUrl(Message.AttachmentUrl);
+    public bool HasStaticAttachment => HasAttachment && !HasGifAttachment;
+    public bool IsGifPlaying => HasGifAttachment && _attachmentDisplayUrl is not null;
+    public bool GifPaused => HasGifAttachment && _attachmentDisplayUrl is null;
+
+    public bool HasAvatarImage => !string.IsNullOrEmpty(Message.AuthorAvatarUrl);
+    public bool HasReply => Message.ReplyToId.HasValue;
+
+    // Link / video helpers
+    private static readonly Regex ContentUrlRegex = new(@"https?://\S+", RegexOptions.Compiled);
+
+    public string? ContentUrl
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Message.Content)) return null;
+            var m = ContentUrlRegex.Match(Message.Content);
+            return m.Success ? m.Value.TrimEnd('.', ',', ')', ']', '!', '?') : null;
+        }
+    }
+
+    public bool IsVideoLink => VideoUrlHelper.GetEmbedUrl(ContentUrl) is not null;
+    public string? VideoEmbedUrl => VideoUrlHelper.GetEmbedUrl(ContentUrl);
+    public string ReplyAuthor => Message.ReplyToUsername ?? "";
+    public string ReplyBodyPreview => Message.ReplyPreview ?? "";
+    public bool HasReactions => Reactions.Count > 0;
+
+    public ObservableCollection<ReactionCountItem> Reactions { get; } = [];
+
+    // Set by the ViewModel so the command can reach the API without coupling to ApiService
+    public Action<MessageViewItem, string>? ReactionRequested { get; set; }
+
+    // Called from both the quick-react context menu items (with a fixed emoji) and by pills
+    public IRelayCommand<string> ToggleReactionCommand { get; }
 
     public MessageViewItem(MessageDto message, string currentUsername = "", int currentUserId = 0)
     {
@@ -29,6 +87,82 @@ public partial class MessageViewItem : ObservableObject
             && message.AuthorId != 0
             && message.AuthorUsername != currentUsername
             && message.Content.Contains($"@{currentUsername}", StringComparison.OrdinalIgnoreCase);
+
+        ToggleReactionCommand = new RelayCommand<string>(emoji =>
+            ReactionRequested?.Invoke(this, emoji ?? ""));
+
+        if (message.Reactions is not null)
+            ApplyReactionsCore(message.Reactions);
+
+        Reactions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasReactions));
+
+        _attachmentDisplayUrl = message.AttachmentUrl;
+        if (HasGifAttachment)
+            StartGifTimer();
+    }
+
+    private static bool IsGifUrl(string? url)
+    {
+        if (url is null) return false;
+        var path = url.Split('?')[0];
+        return path.EndsWith(".gif", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void StartGifTimer()
+    {
+        _gifTimer?.Dispose();
+        _gifTimer = new Timer(_ =>
+            MainThread.BeginInvokeOnMainThread(() => AttachmentDisplayUrl = null),
+            null, TimeSpan.FromSeconds(10), Timeout.InfiniteTimeSpan);
+    }
+
+    [RelayCommand]
+    public async Task ReplayGif()
+    {
+        if (!HasGifAttachment) return;
+        _gifTimer?.Dispose();
+        AttachmentDisplayUrl = null;          // force Image to unload
+        await Task.Delay(50);                 // one render pass so MAUI releases the source
+        AttachmentDisplayUrl = Message.AttachmentUrl;
+        StartGifTimer();
+    }
+
+    [RelayCommand]
+    public async Task OpenLink()
+    {
+        var url = ContentUrl;
+        if (url is null) return;
+        try { await Launcher.OpenAsync(url); }
+        catch { }
+    }
+
+    [RelayCommand]
+    public void WatchVideo()
+    {
+        var embedUrl = VideoEmbedUrl;
+        var originalUrl = ContentUrl;
+        if (embedUrl is null || originalUrl is null) return;
+        var title = Preview?.Title ?? "Video";
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            try
+            {
+                var page = new VideoPlayerPage(embedUrl, title, originalUrl);
+                var window = new Window(page)
+                {
+                    Title = "FatGuysSpeak — Video Player",
+                    Width = 960,
+                    Height = 580,
+                    MinimumWidth = 640,
+                    MinimumHeight = 400,
+                };
+                Application.Current?.OpenWindow(window);
+            }
+            catch (Exception ex)
+            {
+                _ = Application.Current?.MainPage?.DisplayAlert("Video Player", ex.Message, "OK");
+            }
+        });
     }
 
     public void ApplyEdit(MessageDto updated)
@@ -42,13 +176,44 @@ public partial class MessageViewItem : ObservableObject
         Message = Message with { IsDeleted = true };
     }
 
-    partial void OnMessageChanged(MessageDto value) =>
+    public void ApplyReactions(List<ReactionDto> reactions)
+    {
+        Reactions.Clear();
+        ApplyReactionsCore(reactions);
+    }
+
+    private void ApplyReactionsCore(List<ReactionDto> reactions)
+    {
+        foreach (var r in reactions)
+            Reactions.Add(new ReactionCountItem(r.Emoji, r.Count, r.IsOwn,
+                emoji => ReactionRequested?.Invoke(this, emoji)));
+    }
+
+    partial void OnMessageChanged(MessageDto value)
+    {
         OnPropertyChanged(nameof(HasAttachment));
+        OnPropertyChanged(nameof(HasGifAttachment));
+        OnPropertyChanged(nameof(HasStaticAttachment));
+        OnPropertyChanged(nameof(HasAvatarImage));
+        OnPropertyChanged(nameof(HasReply));
+        OnPropertyChanged(nameof(ReplyAuthor));
+        OnPropertyChanged(nameof(ReplyBodyPreview));
+        OnPropertyChanged(nameof(ContentUrl));
+        OnPropertyChanged(nameof(IsVideoLink));
+        OnPropertyChanged(nameof(VideoEmbedUrl));
+    }
 
     public static MessageViewItem CreateSystem(string text, int channelId, MessageSource source = MessageSource.Text)
     {
         var id = Interlocked.Decrement(ref _systemIdCounter);
         var dto = new MessageDto(id, text, string.Empty, 0, DateTime.UtcNow, channelId, source);
         return new MessageViewItem(dto) { IsSystemMessage = true };
+    }
+
+    public static MessageViewItem CreateNewMessagesDivider(int channelId)
+    {
+        var id = Interlocked.Decrement(ref _systemIdCounter);
+        var dto = new MessageDto(id, "", string.Empty, 0, DateTime.UtcNow, channelId);
+        return new MessageViewItem(dto) { IsNewMessageDivider = true };
     }
 }

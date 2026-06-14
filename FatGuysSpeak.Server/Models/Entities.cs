@@ -10,6 +10,7 @@ public class User
     public string PasswordHash { get; set; } = "";
     public UserStatus Status { get; set; } = UserStatus.Offline;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public string? AvatarUrl { get; set; }
 
     public List<ServerMember> ServerMemberships { get; set; } = [];
     public List<Message> Messages { get; set; } = [];
@@ -62,6 +63,37 @@ public class Message
     public string? AttachmentUrl { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime? EditedAt { get; set; }
+    public int? ReplyToId { get; set; }
+    public Message? ReplyTo { get; set; }
 }
 
-public enum ServerRole { Member, Moderator, Admin }
+public class AuditLog
+{
+    public int Id { get; set; }
+    public int ServerId { get; set; }
+    public int ActorId { get; set; }
+    public string ActorUsername { get; set; } = "";
+    public string Action { get; set; } = "";
+    public int? TargetId { get; set; }
+    public string? TargetUsername { get; set; }
+    public string? Detail { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class ChannelPermission
+{
+    public int ChannelId { get; set; }
+    public ServerRole MinRoleToRead { get; set; } = ServerRole.Member;
+    public ServerRole MinRoleToWrite { get; set; } = ServerRole.Member;
+}
+
+public class MessageReaction
+{
+    public int Id { get; set; }
+    public int MessageId { get; set; }
+    public Message Message { get; set; } = null!;
+    public int UserId { get; set; }
+    public string Username { get; set; } = "";
+    public string Emoji { get; set; } = "";
+}
+

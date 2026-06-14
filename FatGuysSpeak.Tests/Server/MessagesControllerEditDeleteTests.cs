@@ -30,7 +30,7 @@ public class MessagesControllerEditDeleteTests : IDisposable
         _hubMock = new Mock<IHubContext<ChatHub>>();
         _hubMock.Setup(h => h.Clients).Returns(clients.Object);
 
-        _controller = new MessagesController(_testDb.Db, _hubMock.Object);
+        _controller = new MessagesController(_testDb.Db, _hubMock.Object, new FatGuysSpeak.Server.Services.ServerMetricsService(), TestHelpers.NullBot());
     }
 
     public void Dispose() => _testDb.Dispose();
@@ -205,14 +205,22 @@ public class MessagesControllerEditDeleteTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteMessage_OtherUsersMessage_ReturnsForbid()
+    public async Task DeleteMessage_RegularMember_CannotDeleteOthersMessage()
     {
         await SeedAsync();
-        var other = new User { Username = "other2", Email = "other2@test.com", PasswordHash = "*" };
-        _testDb.Db.Users.Add(other);
+        // Add a second member (Member role) and a message authored by the owner
+        var regularMember = new User { Username = "regular2", Email = "regular2@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(regularMember);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.Add(new FatGuysSpeak.Server.Models.ServerMember
+        {
+            ServerId = _server.Id, UserId = regularMember.Id,
+            Role = FatGuysSpeak.Shared.ServerRole.Member
+        });
         await _testDb.Db.SaveChangesAsync();
 
-        var msg = await AddMessageAsync(authorId: other.Id);
+        var msg = await AddMessageAsync(authorId: _owner.Id, content: "owner message");
+        TestHelpers.SetUser(_controller, regularMember.Id, regularMember.Username);
 
         var result = await _controller.DeleteMessage(_textChannel.Id, msg.Id);
 

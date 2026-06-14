@@ -10,6 +10,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ServerMember> ServerMembers => Set<ServerMember>();
     public DbSet<Channel> Channels => Set<Channel>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<MessageReaction> MessageReactions => Set<MessageReaction>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<ChannelPermission> ChannelPermissions => Set<ChannelPermission>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -21,5 +24,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<User>()
             .HasIndex(u => u.Email).IsUnique();
 
+        b.Entity<MessageReaction>()
+            .HasIndex(r => new { r.MessageId, r.UserId, r.Emoji }).IsUnique();
+
+        b.Entity<ChannelPermission>()
+            .HasKey(cp => cp.ChannelId);
+
+        b.Entity<Message>()
+            .HasOne(m => m.ReplyTo)
+            .WithMany()
+            .HasForeignKey(m => m.ReplyToId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

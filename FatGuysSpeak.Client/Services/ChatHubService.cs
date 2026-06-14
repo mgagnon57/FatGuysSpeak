@@ -29,6 +29,13 @@ public class ChatHubService
     public event Action<MessageDto>? MessageEdited;
     public event Action<int, int>? MessageDeleted;           // (messageId, channelId)
     public event Action<MessageDto>? NewMessageNotification; // server-wide, for unread badge tracking
+    public event Action<ReactionsUpdatedDto>? ReactionsUpdated;
+    public event Action<int, UserStatus>? UserStatusChanged;  // (userId, newStatus)
+    public event Action? KickedFromVoice;
+    public event Action<int>? UserSpeaking;  // userId
+    public event Action<Exception?>? Reconnecting;
+    public event Action<string?>?    Reconnected;
+    public event Action<Exception?>? Disconnected;
 
     public bool IsConnected => _connection?.State == HubConnectionState.Connected;
 
@@ -61,6 +68,14 @@ public class ChatHubService
         _connection.On<MessageDto>("MessageEdited", dto => MessageEdited?.Invoke(dto));
         _connection.On<int, int>("MessageDeleted", (mid, cid) => MessageDeleted?.Invoke(mid, cid));
         _connection.On<MessageDto>("NewMessageNotification", dto => NewMessageNotification?.Invoke(dto));
+        _connection.On<ReactionsUpdatedDto>("ReactionsUpdated", dto => ReactionsUpdated?.Invoke(dto));
+        _connection.On<int, UserStatus>("UserStatusChanged", (uid, s) => UserStatusChanged?.Invoke(uid, s));
+        _connection.On("KickFromVoice", () => KickedFromVoice?.Invoke());
+        _connection.On<int>("UserSpeaking", uid => UserSpeaking?.Invoke(uid));
+
+        _connection.Reconnecting  += ex  => { Reconnecting?.Invoke(ex);  return Task.CompletedTask; };
+        _connection.Reconnected   += cid => { Reconnected?.Invoke(cid);  return Task.CompletedTask; };
+        _connection.Closed        += ex  => { Disconnected?.Invoke(ex);  return Task.CompletedTask; };
 
         await _connection.StartAsync();
     }

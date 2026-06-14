@@ -28,7 +28,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
 
           header {
             display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 20px; padding-bottom: 14px;
+            margin-bottom: 16px; padding-bottom: 14px;
             border-bottom: 1px solid #2a2a2a;
           }
           header h1 { font-size: 16px; color: #8ab4d4; font-weight: 600; letter-spacing: 0.3px; }
@@ -42,6 +42,19 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
                              50%  { opacity:.6; box-shadow:0 0 0 5px rgba(68,187,68,0); } }
           .live-text { font-size: 11px; color: #666; }
 
+          /* ── Tabs ── */
+          .tabs { display: flex; gap: 2px; margin-bottom: 16px; border-bottom: 1px solid #2e2e2e; }
+          .tab-btn {
+            background: none; border: none; color: #666; font-size: 12px; font-family: inherit;
+            padding: 8px 18px; cursor: pointer; border-bottom: 2px solid transparent;
+            margin-bottom: -1px; transition: color .15s, border-color .15s;
+          }
+          .tab-btn:hover { color: #aaa; }
+          .tab-btn.active { color: #8ab4d4; border-bottom-color: #8ab4d4; }
+          .tab-panel { display: none; }
+          .tab-panel.active { display: block; }
+
+          /* ── Overview tab ── */
           .cards {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -75,10 +88,79 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           .chart-legend span { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
           .chart-wrap { height: 170px; }
 
+          /* ── Users tab ── */
+          .panel-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px;
+          }
+          .panel-header h2 { font-size: 12px; color: #666; font-weight: 500; text-transform: uppercase; letter-spacing: .6px; }
+          .search-box {
+            background: #252525; border: 1px solid #333; border-radius: 4px;
+            color: #d0d0d0; font-size: 11px; padding: 5px 10px; font-family: inherit;
+            width: 200px;
+          }
+          .search-box:focus { outline: none; border-color: #8ab4d4; }
+
+          .user-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          .user-table th {
+            text-align: left; padding: 7px 10px; color: #555;
+            font-size: 10px; text-transform: uppercase; letter-spacing: .6px;
+            border-bottom: 1px solid #2e2e2e; font-weight: 500;
+          }
+          .user-table td {
+            padding: 8px 10px; border-bottom: 1px solid #222;
+            vertical-align: middle;
+          }
+          .user-table tr:hover td { background: #222; }
+          .badge {
+            display: inline-block; padding: 2px 7px; border-radius: 10px;
+            font-size: 10px; font-weight: 500;
+          }
+          .badge-online  { background: #1a3a1a; color: #44bb44; }
+          .badge-offline { background: #2a2a2a; color: #555; }
+          .badge-voice   { background: #1a2a3a; color: #8ab4d4; }
+          .badge-away    { background: #3a2a0a; color: #f0a030; }
+          .badge-dnd     { background: #3a1010; color: #ed4245; }
+
+          .btn-sm {
+            background: #2d2d2d; border: 1px solid #3a3a3a; color: #aaa;
+            font-size: 10px; padding: 3px 9px; border-radius: 3px; cursor: pointer;
+            font-family: inherit; transition: background .15s;
+          }
+          .btn-sm:hover { background: #3a3a3a; }
+          .btn-sm.danger { border-color: #5a2020; color: #ed4245; }
+          .btn-sm.danger:hover { background: #3a1515; }
+          .btn-sm:disabled { opacity: .4; cursor: default; }
+
           .status-bar {
             display: flex; justify-content: space-between; align-items: center;
             margin-top: 12px; font-size: 10px; color: #444;
           }
+
+          /* ── Role tooltip ── */
+          .role-tip { position: relative; }
+          .role-tip::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #141420;
+            border: 1px solid #3a3a5a;
+            border-radius: 6px;
+            padding: 9px 13px;
+            font-size: 11px;
+            line-height: 1.75;
+            color: #c8c8d8;
+            white-space: pre;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity .15s ease;
+            z-index: 9999;
+            box-shadow: 0 6px 20px rgba(0,0,0,.75);
+            font-weight: normal;
+          }
+          .role-tip:hover::after { opacity: 1; }
         </style>
         </head>
         <body>
@@ -91,61 +173,236 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           </div>
         </header>
 
-        <div class="cards">
-          <div class="card" id="c-online">
-            <span class="icon">👥</span>
-            <div class="value" id="onlineUsers">—</div>
-            <div class="label">Online Users</div>
-          </div>
-          <div class="card" id="c-voice">
-            <span class="icon">🎙</span>
-            <div class="value" id="voiceParticipants">—</div>
-            <div class="label">Voice Sessions</div>
-          </div>
-          <div class="card" id="c-streams">
-            <span class="icon">📺</span>
-            <div class="value" id="activeStreams">—</div>
-            <div class="label">Active Streams</div>
-          </div>
-          <div class="card" id="c-msgsmin">
-            <span class="icon">💬</span>
-            <div class="value" id="msgsPerMin">—</div>
-            <div class="label">Msgs / Min</div>
-          </div>
-          <div class="card" id="c-total">
-            <span class="icon">📨</span>
-            <div class="value" id="totalMsgs">—</div>
-            <div class="label">Total Messages</div>
-          </div>
-          <div class="card" id="c-mem">
-            <span class="icon">🧠</span>
-            <div class="value" id="memoryMb">—</div>
-            <div class="label">Memory (MB)</div>
-          </div>
-          <div class="card" id="c-cpu">
-            <span class="icon">⚡</span>
-            <div class="value" id="cpuPct">—</div>
-            <div class="label">CPU %</div>
-          </div>
-          <div class="card" id="c-uptime">
-            <span class="icon">⏱</span>
-            <div class="value" id="uptime">—</div>
-            <div class="label">Uptime</div>
-          </div>
+        <div class="tabs">
+          <button class="tab-btn active" onclick="showTab('overview')">Overview</button>
+          <button class="tab-btn" onclick="showTab('users')">Users</button>
+          <button class="tab-btn" onclick="showTab('messages')">Message Log</button>
+          <button class="tab-btn" onclick="showTab('channels')">Channels</button>
+          <button class="tab-btn" onclick="showTab('audit')">Audit Log</button>
         </div>
 
-        <div class="chart-card">
-          <div class="chart-header">
-            <h2>Message Throughput &mdash; last 60 min</h2>
-            <div class="chart-legend">
-              <span style="background:#2d5f9e"></span>normal &nbsp;
-              <span style="background:#ed4245"></span>&gt;20 / min
+        <!-- ── Overview ─────────────────────────────────── -->
+        <div id="tab-overview" class="tab-panel active">
+
+          <div class="cards">
+            <div class="card" id="c-online">
+              <span class="icon">👥</span>
+              <div class="value" id="onlineUsers">—</div>
+              <div class="label">Online Users</div>
+            </div>
+            <div class="card" id="c-voice">
+              <span class="icon">🎙</span>
+              <div class="value" id="voiceParticipants">—</div>
+              <div class="label">Voice Sessions</div>
+            </div>
+            <div class="card" id="c-streams">
+              <span class="icon">📺</span>
+              <div class="value" id="activeStreams">—</div>
+              <div class="label">Active Streams</div>
+            </div>
+            <div class="card" id="c-msgsmin">
+              <span class="icon">💬</span>
+              <div class="value" id="msgsPerMin">—</div>
+              <div class="label">Msgs / Min</div>
+            </div>
+            <div class="card" id="c-total">
+              <span class="icon">📨</span>
+              <div class="value" id="totalMsgs">—</div>
+              <div class="label">Total Messages</div>
+            </div>
+            <div class="card" id="c-mem">
+              <span class="icon">🧠</span>
+              <div class="value" id="memoryMb">—</div>
+              <div class="label">Memory (MB)</div>
+            </div>
+            <div class="card" id="c-cpu">
+              <span class="icon">⚡</span>
+              <div class="value" id="cpuPct">—</div>
+              <div class="label">CPU %</div>
+            </div>
+            <div class="card" id="c-uptime">
+              <span class="icon">⏱</span>
+              <div class="value" id="uptime">—</div>
+              <div class="label">Uptime</div>
             </div>
           </div>
-          <div class="chart-wrap">
-            <canvas id="chart"></canvas>
+
+          <div class="chart-card">
+            <div class="chart-header">
+              <h2>Message Throughput &mdash; last 60 min</h2>
+              <div class="chart-legend">
+                <span style="background:#2d5f9e"></span>normal &nbsp;
+                <span style="background:#ed4245"></span>&gt;20 / min
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="chart"></canvas>
+            </div>
           </div>
-        </div>
+
+          <!-- Rate limits section -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+            <div class="chart-card">
+              <div class="chart-header">
+                <h2>Rate Limit Hits &mdash; last 60 min</h2>
+                <div class="chart-legend">
+                  <span id="rl-min-badge" style="color:#f0a030;font-size:11px"></span>
+                  &nbsp;
+                  <span id="rl-hour-badge" style="color:#666;font-size:11px"></span>
+                </div>
+              </div>
+              <div class="chart-wrap" style="height:120px">
+                <canvas id="rlChart"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header"><h2>Top Offenders</h2></div>
+              <table class="user-table" style="font-size:11px">
+                <thead>
+                  <tr>
+                    <th>User / IP</th>
+                    <th style="width:50px;text-align:right">Hits</th>
+                    <th style="width:90px">Last seen</th>
+                  </tr>
+                </thead>
+                <tbody id="rlOffenders">
+                  <tr><td colspan="3" style="color:#444;padding:10px">No rate limit hits yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div><!-- /tab-overview -->
+
+        <!-- ── Users ─────────────────────────────────────── -->
+        <div id="tab-users" class="tab-panel">
+          <div class="panel-header">
+            <h2>All Users</h2>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="userServerFilter" onchange="loadServerMembers()"
+                style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
+                <option value="">All users</option>
+              </select>
+              <input class="search-box" id="userSearch" placeholder="Filter by username…" oninput="filterUsers()" />
+            </div>
+          </div>
+          <table class="user-table" id="userTable">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Status</th>
+                <th>Role</th>
+                <th>Connection</th>
+                <th>Member Since</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="userTableBody">
+              <tr><td colspan="6" style="color:#444;padding:20px 10px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div><!-- /tab-users -->
+
+        <!-- ── Message Log ───────────────────────────────── -->
+        <div id="tab-messages" class="tab-panel">
+          <div class="panel-header">
+            <h2>Message Log</h2>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input class="search-box" id="msgAuthor"  placeholder="Author…"  oninput="loadMessages()" style="width:120px" />
+              <input class="search-box" id="msgChannel" placeholder="Channel…" oninput="loadMessages()" style="width:120px" />
+              <select id="msgSource" onchange="loadMessages()"
+                style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
+                <option value="">All sources</option>
+                <option value="Text">Text</option>
+                <option value="Voice">Voice</option>
+                <option value="Stream">Stream</option>
+              </select>
+              <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:5px;cursor:pointer">
+                <input type="checkbox" id="msgShowDeleted" onchange="loadMessages()" style="accent-color:#8ab4d4" />
+                Show deleted
+              </label>
+            </div>
+          </div>
+          <table class="user-table">
+            <thead>
+              <tr>
+                <th style="width:130px">Time</th>
+                <th style="width:100px">Author</th>
+                <th style="width:90px">Channel</th>
+                <th style="width:70px">Server</th>
+                <th style="width:60px">Source</th>
+                <th>Content</th>
+                <th style="width:60px">Action</th>
+              </tr>
+            </thead>
+            <tbody id="msgTableBody">
+              <tr><td colspan="7" style="color:#444;padding:20px 10px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div><!-- /tab-messages -->
+
+        <!-- ── Channels ──────────────────────────────────── -->
+        <div id="tab-channels" class="tab-panel">
+          <div class="panel-header">
+            <h2>Channel Permissions</h2>
+            <select id="channelServerFilter" onchange="loadChannels()"
+              style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
+              <option value="">All servers</option>
+            </select>
+          </div>
+          <table class="user-table">
+            <thead>
+              <tr>
+                <th>Server</th>
+                <th>Channel</th>
+                <th>Type</th>
+                <th>Min Read Role</th>
+                <th>Min Write Role</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="channelTableBody">
+              <tr><td colspan="6" style="color:#444;padding:20px 10px;">Select a server to view channels.</td></tr>
+            </tbody>
+          </table>
+        </div><!-- /tab-channels -->
+
+        <!-- ── Audit Log ──────────────────────────────────── -->
+        <div id="tab-audit" class="tab-panel">
+          <div class="panel-header">
+            <h2>Audit Log</h2>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="auditServerFilter" onchange="loadAudit()"
+                style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
+                <option value="">All servers</option>
+              </select>
+              <select id="auditActionFilter" onchange="loadAudit()"
+                style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
+                <option value="">All actions</option>
+                <option value="RoleChanged">Role Changed</option>
+                <option value="MemberKicked">Member Kicked</option>
+                <option value="MessageDeleted">Message Deleted</option>
+                <option value="ChannelCreated">Channel Created</option>
+                <option value="ChannelDeleted">Channel Deleted</option>
+                <option value="ChannelPermissionsChanged">Channel Permissions</option>
+              </select>
+            </div>
+          </div>
+          <table class="user-table">
+            <thead>
+              <tr>
+                <th style="width:130px">Time</th>
+                <th style="width:100px">Actor</th>
+                <th style="width:130px">Action</th>
+                <th style="width:100px">Target</th>
+                <th>Detail</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody">
+              <tr><td colspan="5" style="color:#444;padding:20px 10px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div><!-- /tab-audit -->
 
         <div class="status-bar">
           <span id="serverUrl">http://localhost:5238</span>
@@ -153,9 +410,21 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
         </div>
 
         <script>
-        // Build x-axis labels: '60m' ... '10m' ... 'now'
+        // ── Tab switching ──────────────────────────────────
+        function showTab(name) {
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          document.getElementById('tab-' + name).classList.add('active');
+          event.currentTarget.classList.add('active');
+          if (name === 'users')    loadUsers();
+          if (name === 'messages') loadMessages();
+          if (name === 'channels') loadChannels();
+          if (name === 'audit')    loadAudit();
+        }
+
+        // ── Overview ──────────────────────────────────────
         const xLabels = Array.from({length:60}, (_,i) => {
-          const age = 59 - i; // index 0 = 60min ago on left, index 59 = now on right
+          const age = 59 - i;
           if (age === 0)  return 'now';
           if (age % 10 === 0) return age + 'm';
           return '';
@@ -195,55 +464,44 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
               }
             },
             scales: {
-              x: {
-                grid: { color: '#222' },
-                ticks: { color: '#444', font: { size: 10 }, maxRotation: 0 }
-              },
-              y: {
-                grid: { color: '#222' },
-                ticks: { color: '#444', font: { size: 10 }, stepSize: 1 },
-                beginAtZero: true
-              }
+              x: { grid: { color: '#222' }, ticks: { color: '#444', font: { size: 10 }, maxRotation: 0 } },
+              y: { grid: { color: '#222' }, ticks: { color: '#444', font: { size: 10 }, stepSize: 1 }, beginAtZero: true }
             }
           }
         });
 
         const prev = {};
-
         function setCard(cardId, elId, rawVal, display) {
           const card = document.getElementById(cardId);
           const el   = document.getElementById(elId);
           if (!card || !el) return;
-          const key = elId;
-          if (prev[key] !== undefined && prev[key] !== String(rawVal)) {
+          if (prev[elId] !== undefined && prev[elId] !== String(rawVal)) {
             card.classList.add('flash');
             setTimeout(() => card.classList.remove('flash'), 700);
           }
           el.textContent = display ?? rawVal;
-          prev[key] = String(rawVal);
+          prev[elId] = String(rawVal);
         }
 
-        async function refresh() {
+        async function refreshMetrics() {
           try {
             const res = await fetch('/api/metrics');
             if (!res.ok) throw new Error(res.status);
             const d = await res.json();
 
-            setCard('c-online',  'onlineUsers',      d.onlineUsers,        d.onlineUsers);
-            setCard('c-voice',   'voiceParticipants', d.voiceParticipants, d.voiceParticipants);
-            setCard('c-streams', 'activeStreams',     d.activeStreams,      d.activeStreams);
-            setCard('c-msgsmin', 'msgsPerMin',        d.messagesLastMinute, d.messagesLastMinute);
-            setCard('c-total',   'totalMsgs',         d.totalMessages,      d.totalMessages.toLocaleString());
-            setCard('c-mem',     'memoryMb',          d.memoryMb,           d.memoryMb + ' MB');
-            setCard('c-cpu',     'cpuPct',            d.cpuPercent,         d.cpuPercent.toFixed(1) + '%');
-            setCard('c-uptime',  'uptime',            d.uptimeFormatted,    d.uptimeFormatted);
+            setCard('c-online',  'onlineUsers',       d.onlineUsers,        d.onlineUsers);
+            setCard('c-voice',   'voiceParticipants', d.voiceParticipants,  d.voiceParticipants);
+            setCard('c-streams', 'activeStreams',      d.activeStreams,       d.activeStreams);
+            setCard('c-msgsmin', 'msgsPerMin',         d.messagesLastMinute, d.messagesLastMinute);
+            setCard('c-total',   'totalMsgs',          d.totalMessages,      d.totalMessages.toLocaleString());
+            setCard('c-mem',     'memoryMb',           d.memoryMb,           d.memoryMb + ' MB');
+            setCard('c-cpu',     'cpuPct',             d.cpuPercent,         d.cpuPercent.toFixed(1) + '%');
+            setCard('c-uptime',  'uptime',             d.uptimeFormatted,    d.uptimeFormatted);
 
-            // history[0] = current minute (rightmost on chart), history[59] = 60min ago (leftmost)
             throughput.data.datasets[0].data = [...d.messageHistory].reverse();
             throughput.update('none');
 
-            const now = new Date().toLocaleTimeString();
-            document.getElementById('lastUpdated').textContent = 'updated ' + now;
+            document.getElementById('lastUpdated').textContent = 'updated ' + new Date().toLocaleTimeString();
             document.getElementById('liveDot').style.background = '#44bb44';
             document.getElementById('serverUrl').textContent = window.location.origin;
           } catch {
@@ -252,8 +510,465 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           }
         }
 
-        refresh();
-        setInterval(refresh, 2000);
+        // ── Users tab ─────────────────────────────────────
+        let allUsers = [];
+        let serverMembers = [];
+        let currentServerId = null;
+
+        function statusBadge(u) {
+          if (u.voiceChannelId !== null) return '<span class="badge badge-voice">🎙 In Voice</span>';
+          if (!u.isOnline) return '<span class="badge badge-offline">Offline</span>';
+          const s = u.status.toLowerCase();
+          if (s === 'away') return '<span class="badge badge-away">Away</span>';
+          if (s === 'donotdisturb') return '<span class="badge badge-dnd">DnD</span>';
+          return '<span class="badge badge-online">Online</span>';
+        }
+
+        function connBadge(u) {
+          return u.isOnline
+            ? '<span class="badge badge-online">Connected</span>'
+            : '<span class="badge badge-offline">Offline</span>';
+        }
+
+        const ROLE_STR = { 0: 'Member', 1: 'Moderator', 2: 'Admin' };
+        const ROLE_NUM = { Member: 0, Moderator: 1, Admin: 2 };
+        function toRoleStr(r) { return typeof r === 'string' ? r : (ROLE_STR[r] ?? 'Member'); }
+
+        const ROLE_TIPS = {
+          Member:    'Member\n• Send and read messages\n• Join voice channels\n• React to messages',
+          Moderator: 'Moderator\n• Everything a Member can do\n• Delete any message in the server\n• Access moderator-restricted channels',
+          Admin:     'Admin\n• Everything a Moderator can do\n• Create and delete channels\n• Set per-channel read/write permissions\n• Promote or demote members\n• Kick members from the server',
+        };
+
+        function roleBadge(role) {
+          const map = { Admin: '#8ab4d4', Moderator: '#44bb44', Member: '#555' };
+          const col = map[role] || '#555';
+          const tip = (ROLE_TIPS[role] || role || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+          return `<span class="badge role-tip" style="background:${col}22;color:${col};cursor:help" data-tip="${tip}">${role ?? '—'}</span>`;
+        }
+
+        function renderUsers(users) {
+          const tbody = document.getElementById('userTableBody');
+          if (!users.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="color:#444;padding:20px 10px;">No users found.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = users.map(u => {
+            const member = serverMembers.find(m => m.userId === u.id);
+            const role = member?.role ?? null;
+            const nextUp   = role === 'Member' ? 'Moderator' : 'Admin';
+            const nextDown = role === 'Admin'  ? 'Moderator' : 'Member';
+            const roleCell = role
+              ? `${roleBadge(role)}
+                 <button class="btn-sm" style="margin-left:4px" title="Promote to ${nextUp}" onclick="promoteUser(${u.id},this)" ${role==='Admin'?'disabled':''}>▲</button>
+                 <button class="btn-sm danger" title="Demote to ${nextDown}" onclick="demoteUser(${u.id},this)" ${role==='Member'?'disabled':''}>▼</button>`
+              : '<span style="color:#555">—</span>';
+            return `<tr>
+              <td><strong style="color:#d0d0d0">${u.username}</strong></td>
+              <td>${statusBadge(u)}</td>
+              <td>${roleCell}</td>
+              <td>${connBadge(u)}</td>
+              <td style="color:#555">${new Date(u.createdAt).toLocaleDateString()}</td>
+              <td>
+                ${u.voiceChannelId !== null
+                  ? `<button class="btn-sm danger" onclick="kickVoice(${u.id}, this)">Kick Voice</button>`
+                  : `<button class="btn-sm" disabled>Kick Voice</button>`}
+                ${member && role !== 'Admin'
+                  ? ` <button class="btn-sm danger" onclick="kickFromServer(${currentServerId},${u.id},this)">Kick</button>`
+                  : ''}
+              </td>
+            </tr>`;
+          }).join('');
+        }
+
+        function filterUsers() {
+          const q = document.getElementById('userSearch').value.toLowerCase();
+          renderUsers(q ? allUsers.filter(u => u.username.toLowerCase().includes(q)) : allUsers);
+        }
+
+        async function loadUsers() {
+          try {
+            const res = await fetch('/api/admin/users');
+            if (!res.ok) throw new Error(res.status);
+            allUsers = await res.json();
+            filterUsers();
+          } catch (e) {
+            document.getElementById('userTableBody').innerHTML =
+              `<tr><td colspan="6" style="color:#ed4245;padding:20px 10px;">Failed to load users: ${e.message}</td></tr>`;
+          }
+        }
+
+        async function loadServerMembers() {
+          const sid = document.getElementById('userServerFilter').value;
+          currentServerId = sid ? parseInt(sid) : null;
+          serverMembers = [];
+          if (sid) {
+            try {
+              const res = await fetch(`/api/admin/servers/${sid}/members`);
+              if (res.ok) {
+                const data = await res.json();
+                serverMembers = data.map(m => ({ ...m, role: toRoleStr(m.role) }));
+              }
+            } catch {}
+          }
+          filterUsers();
+        }
+
+        async function kickVoice(userId, btn) {
+          btn.disabled = true;
+          btn.textContent = 'Kicking…';
+          try {
+            const res = await fetch(`/api/admin/users/${userId}/kick-voice`, { method: 'POST' });
+            if (!res.ok) throw new Error(res.status);
+            btn.textContent = 'Kicked';
+            setTimeout(() => loadUsers(), 1500);
+          } catch (e) {
+            btn.disabled = false;
+            btn.textContent = 'Kick Voice';
+            alert('Failed: ' + e.message);
+          }
+        }
+
+        async function kickFromServer(serverId, userId, btn) {
+          if (!confirm('Kick this member from the server?')) return;
+          btn.disabled = true;
+          try {
+            const res = await fetch(`/api/admin/servers/${serverId}/members/${userId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(await res.text() || res.status);
+            setTimeout(() => { loadUsers(); loadServerMembers(); }, 1000);
+          } catch (e) {
+            btn.disabled = false;
+            alert('Kick failed: ' + e.message);
+          }
+        }
+
+        async function promoteUser(userId, btn) {
+          if (!currentServerId) return;
+          const member = serverMembers.find(m => m.userId === userId);
+          if (!member) return;
+          const next = member.role === 'Member' ? 'Moderator' : 'Admin';
+          await setRole(userId, next, btn);
+        }
+
+        async function demoteUser(userId, btn) {
+          if (!currentServerId) return;
+          const member = serverMembers.find(m => m.userId === userId);
+          if (!member) return;
+          const prev = member.role === 'Admin' ? 'Moderator' : 'Member';
+          await setRole(userId, prev, btn);
+        }
+
+        async function setRole(userId, role, btn) {
+          btn.disabled = true;
+          try {
+            const res = await fetch(`/api/admin/servers/${currentServerId}/members/${userId}/role`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ role: ROLE_NUM[role] ?? 0 })
+            });
+            if (!res.ok) throw new Error(await res.text() || res.status);
+            await loadServerMembers();
+          } catch (e) {
+            btn.disabled = false;
+            alert('Role change failed: ' + e.message);
+          }
+        }
+
+        // ── Rate Limits ───────────────────────────────────
+        const rlChart = new Chart(document.getElementById('rlChart'), {
+          type: 'bar',
+          data: {
+            labels: xLabels,
+            datasets: [{
+              data: new Array(60).fill(0),
+              backgroundColor: '#f0a03066',
+              borderColor: '#f0a030',
+              borderWidth: 1,
+              borderRadius: 2,
+              borderSkipped: false,
+              maxBarThickness: 14,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#1e1e2e',
+                titleColor: '#f0a030',
+                bodyColor: '#d0d0d0',
+                borderColor: '#333',
+                borderWidth: 1,
+                callbacks: {
+                  title: (items) => {
+                    const age = 59 - items[0].dataIndex;
+                    return age === 0 ? 'This minute' : `${age} min ago`;
+                  },
+                  label: (ctx) => ` ${ctx.parsed.y} hit${ctx.parsed.y !== 1 ? 's' : ''}`,
+                }
+              }
+            },
+            scales: {
+              x: { grid: { color: '#222' }, ticks: { color: '#444', font: { size: 9 }, maxRotation: 0 } },
+              y: { grid: { color: '#222' }, ticks: { color: '#444', font: { size: 9 }, stepSize: 1 }, beginAtZero: true }
+            }
+          }
+        });
+
+        async function refreshRateLimits() {
+          try {
+            const res = await fetch('/api/admin/rate-limits');
+            if (!res.ok) return;
+            const d = await res.json();
+
+            document.getElementById('rl-min-badge').textContent  = d.hitsLastMinute  + ' hits/min';
+            document.getElementById('rl-hour-badge').textContent = d.hitsLastHour + ' hits/hr';
+
+            rlChart.data.datasets[0].data = [...d.hitHistory].reverse();
+            rlChart.update('none');
+
+            const tbody = document.getElementById('rlOffenders');
+            if (!d.topOffenders.length) {
+              tbody.innerHTML = '<tr><td colspan="3" style="color:#444;padding:10px">No rate limit hits yet.</td></tr>';
+            } else {
+              tbody.innerHTML = d.topOffenders.map(o => {
+                const last = new Date(o.lastSeen).toLocaleTimeString();
+                return `<tr>
+                  <td style="color:#d0d0d0">${o.who}</td>
+                  <td style="text-align:right;color:#f0a030;font-weight:600">${o.hits}</td>
+                  <td style="color:#555">${last}</td>
+                </tr>`;
+              }).join('');
+            }
+          } catch {}
+        }
+
+        // ── Message Log ───────────────────────────────────
+        let msgDebounce = null;
+
+        async function loadMessages() {
+          clearTimeout(msgDebounce);
+          msgDebounce = setTimeout(async () => {
+            const author  = document.getElementById('msgAuthor').value.trim();
+            const channel = document.getElementById('msgChannel').value.trim();
+            const source  = document.getElementById('msgSource').value;
+            const showDel = document.getElementById('msgShowDeleted').checked;
+
+            const params = new URLSearchParams({ limit: 200 });
+            if (author)  params.set('author',  author);
+            if (channel) params.set('channel', channel);
+            if (source)  params.set('source',  source);
+
+            try {
+              const res = await fetch('/api/admin/messages?' + params);
+              if (!res.ok) throw new Error(res.status);
+              let msgs = await res.json();
+              if (!showDel) msgs = msgs.filter(m => !m.isDeleted);
+              renderMessages(msgs);
+            } catch (e) {
+              document.getElementById('msgTableBody').innerHTML =
+                `<tr><td colspan="7" style="color:#ed4245;padding:20px 10px;">Failed: ${e.message}</td></tr>`;
+            }
+          }, 250);
+        }
+
+        function sourceBadge(s) {
+          const map = { Text: '#2d5f9e', Voice: '#3a6a3a', Stream: '#5a2d8e' };
+          const col = map[s] || '#333';
+          return `<span class="badge" style="background:${col}20;color:${col === '#333' ? '#888' : col};border:1px solid ${col}40">${s}</span>`;
+        }
+
+        function renderMessages(msgs) {
+          const tbody = document.getElementById('msgTableBody');
+          if (!msgs.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="color:#444;padding:20px 10px;">No messages found.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = msgs.map(m => {
+            const ts = new Date(m.createdAt);
+            const timeStr = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString();
+            const deleted = m.isDeleted;
+            const contentStyle = deleted ? 'color:#555;font-style:italic' : 'color:#c0c0c0';
+            const content = (m.content || '').length > 120 ? m.content.slice(0, 120) + '…' : m.content;
+            const escapedContent = content.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return `<tr style="${deleted ? 'opacity:.55' : ''}">
+              <td style="color:#555;font-size:11px;white-space:nowrap">${timeStr}</td>
+              <td style="color:#8ab4d4;font-weight:500">${m.author}</td>
+              <td style="color:#666">#${m.channel}</td>
+              <td style="color:#555;font-size:11px">${m.server}</td>
+              <td>${sourceBadge(m.source)}</td>
+              <td style="${contentStyle}">${escapedContent}</td>
+              <td>${deleted
+                ? '<span style="color:#444;font-size:10px">Deleted</span>'
+                : `<button class="btn-sm danger" onclick="adminDeleteMsg(${m.id},this)">Delete</button>`}</td>
+            </tr>`;
+          }).join('');
+        }
+
+        async function adminDeleteMsg(msgId, btn) {
+          if (!confirm('Delete this message? It will be marked deleted for all users.')) return;
+          btn.disabled = true;
+          btn.textContent = '…';
+          try {
+            const res = await fetch(`/api/admin/messages/${msgId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(res.status);
+            loadMessages();
+          } catch (e) {
+            btn.disabled = false;
+            btn.textContent = 'Delete';
+            alert('Failed: ' + e.message);
+          }
+        }
+
+        // ── Server list helper ────────────────────────────
+        async function loadServerList() {
+          try {
+            const res = await fetch('/api/admin/servers');
+            if (!res.ok) return;
+            const servers = await res.json();
+            document.querySelectorAll('select[id$="ServerFilter"]').forEach(s => {
+              while (s.options.length > 1) s.remove(1);
+              servers.forEach(srv => {
+                const opt = document.createElement('option');
+                opt.value = srv.id;
+                opt.text = srv.name;
+                s.appendChild(opt);
+              });
+            });
+          } catch {}
+        }
+
+        // ── Audit Log ─────────────────────────────────────
+        async function loadAudit() {
+          const serverId = document.getElementById('auditServerFilter').value;
+          const action   = document.getElementById('auditActionFilter').value;
+          const params   = new URLSearchParams({ limit: 200 });
+          if (serverId) params.set('serverId', serverId);
+          if (action)   params.set('action', action);
+          try {
+            const res = await fetch('/api/admin/audit?' + params);
+            if (!res.ok) throw new Error(res.status);
+            const logs = await res.json();
+            renderAudit(logs);
+          } catch (e) {
+            document.getElementById('auditTableBody').innerHTML =
+              `<tr><td colspan="5" style="color:#ed4245;padding:20px 10px;">Failed: ${e.message}</td></tr>`;
+          }
+        }
+
+        function actionBadge(action) {
+          const map = {
+            RoleChanged:              '#8ab4d4',
+            MemberKicked:             '#ed4245',
+            MessageDeleted:           '#f0a030',
+            ChannelCreated:           '#44bb44',
+            ChannelDeleted:           '#ed4245',
+            ChannelPermissionsChanged:'#8ab4d4',
+          };
+          const col = map[action] || '#888';
+          return `<span class="badge" style="background:${col}22;color:${col}">${action}</span>`;
+        }
+
+        function renderAudit(logs) {
+          const tbody = document.getElementById('auditTableBody');
+          if (!logs.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="color:#444;padding:20px 10px;">No audit entries found.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = logs.map(a => {
+            const ts = new Date(a.createdAt);
+            return `<tr>
+              <td style="color:#555;font-size:11px;white-space:nowrap">${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}</td>
+              <td style="color:#8ab4d4">${a.actorUsername}</td>
+              <td>${actionBadge(a.action)}</td>
+              <td style="color:#aaa">${a.targetUsername ?? '—'}</td>
+              <td style="color:#777;font-size:11px">${(a.detail ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+            </tr>`;
+          }).join('');
+        }
+
+        // ── Channels ──────────────────────────────────────
+        async function loadChannels() {
+          const serverId = document.getElementById('channelServerFilter').value;
+          const params   = new URLSearchParams();
+          if (serverId) params.set('serverId', serverId);
+          try {
+            const res = await fetch('/api/admin/channels?' + params);
+            if (!res.ok) throw new Error(res.status);
+            const channels = await res.json();
+            renderChannels(channels, serverId ? parseInt(serverId) : null);
+          } catch (e) {
+            document.getElementById('channelTableBody').innerHTML =
+              `<tr><td colspan="6" style="color:#ed4245;padding:20px 10px;">Failed: ${e.message}</td></tr>`;
+          }
+        }
+
+        const roles = ['Member','Moderator','Admin'];
+
+        function renderChannels(channels, serverId) {
+          const tbody = document.getElementById('channelTableBody');
+          if (!channels.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="color:#444;padding:20px 10px;">No channels found.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = channels.map(c => `
+            <tr id="ch-row-${c.id}">
+              <td style="color:#555">${c.serverName}</td>
+              <td style="color:#d0d0d0">#${c.name}</td>
+              <td style="color:#666">${c.type}</td>
+              <td>
+                <select onchange="saveChannelPerm(${c.serverId},${c.id})"
+                  id="read-${c.id}"
+                  style="background:#252525;border:1px solid #333;border-radius:3px;color:#d0d0d0;font-size:11px;padding:3px 6px">
+                  ${roles.map(r => `<option value="${r}" ${c.minRoleToRead===r?'selected':''}>${r}</option>`).join('')}
+                </select>
+              </td>
+              <td>
+                <select onchange="saveChannelPerm(${c.serverId},${c.id})"
+                  id="write-${c.id}"
+                  style="background:#252525;border:1px solid #333;border-radius:3px;color:#d0d0d0;font-size:11px;padding:3px 6px">
+                  ${roles.map(r => `<option value="${r}" ${c.minRoleToWrite===r?'selected':''}>${r}</option>`).join('')}
+                </select>
+              </td>
+              <td><span id="ch-status-${c.id}" style="font-size:10px;color:#555"></span></td>
+            </tr>`).join('');
+        }
+
+        async function saveChannelPerm(serverId, channelId) {
+          const minRoleToRead  = document.getElementById(`read-${channelId}`).value;
+          const minRoleToWrite = document.getElementById(`write-${channelId}`).value;
+          const status = document.getElementById(`ch-status-${channelId}`);
+          status.textContent = 'Saving…';
+          status.style.color = '#888';
+          try {
+            const res = await fetch(`/api/admin/servers/${serverId}/channels/${channelId}/permissions`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ minRoleToRead, minRoleToWrite })
+            });
+            if (!res.ok) throw new Error(await res.text() || res.status);
+            status.textContent = 'Saved ✓';
+            status.style.color = '#44bb44';
+            setTimeout(() => { status.textContent = ''; }, 2000);
+          } catch (e) {
+            status.textContent = 'Failed';
+            status.style.color = '#ed4245';
+          }
+        }
+
+        // ── Boot ──────────────────────────────────────────
+        loadServerList();
+        refreshMetrics();
+        refreshRateLimits();
+        setInterval(refreshMetrics, 2000);
+        setInterval(refreshRateLimits, 5000);
+        setInterval(() => {
+          if (document.getElementById('tab-users').classList.contains('active')) loadUsers();
+          if (document.getElementById('tab-messages').classList.contains('active')) loadMessages();
+          if (document.getElementById('tab-audit').classList.contains('active')) loadAudit();
+        }, 5000);
         </script>
         </body>
         </html>

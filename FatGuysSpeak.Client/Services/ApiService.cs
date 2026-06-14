@@ -36,6 +36,7 @@ public class ApiService
 
     public int CurrentUserId { get; private set; }
     public string CurrentUsername { get; private set; } = "";
+    public string? CurrentAvatarUrl { get; private set; }
 
     public void SetToken(string token)
     {
@@ -43,17 +44,21 @@ public class ApiService
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
-    public void SetCurrentUser(int userId, string username)
+    public void SetCurrentUser(int userId, string username, string? avatarUrl = null)
     {
         CurrentUserId = userId;
         CurrentUsername = username;
+        CurrentAvatarUrl = avatarUrl;
     }
+
+    public void UpdateAvatarUrl(string url) => CurrentAvatarUrl = url;
 
     public void ClearToken()
     {
         _token = null;
         CurrentUserId = 0;
         CurrentUsername = "";
+        CurrentAvatarUrl = null;
         _http.DefaultRequestHeaders.Authorization = null;
     }
 
@@ -93,9 +98,28 @@ public class ApiService
     public Task<List<MessageDto>?> GetMessagesAsync(int channelId) =>
         _http.GetFromJsonAsync<List<MessageDto>>($"api/channels/{channelId}/messages");
 
-    public Task<MessageDto?> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text, string? attachmentUrl = null) =>
-        _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source, attachmentUrl))
+    public Task<List<MessageDto>?> GetMessagesAfterAsync(int channelId, int afterId) =>
+        _http.GetFromJsonAsync<List<MessageDto>>($"api/channels/{channelId}/messages?afterId={afterId}");
+
+    public Task<List<MessageDto>?> SearchMessagesAsync(int channelId, string query) =>
+        _http.GetFromJsonAsync<List<MessageDto>>(
+            $"api/channels/{channelId}/messages/search?q={Uri.EscapeDataString(query)}");
+
+    public Task<MessageDto?> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text, string? attachmentUrl = null, int? replyToId = null) =>
+        _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source, attachmentUrl, replyToId))
              .ContinueWith(t => t.Result.Content.ReadFromJsonAsync<MessageDto>().Result);
+
+    public async Task<string?> UploadAvatarAsync(Stream stream, string fileName, string contentType)
+    {
+        using var content = new MultipartFormDataContent();
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        content.Add(fileContent, "file", fileName);
+        var resp = await _http.PostAsync("api/users/me/avatar", content);
+        if (!resp.IsSuccessStatusCode) return null;
+        var dto = await resp.Content.ReadFromJsonAsync<AttachmentDto>();
+        return dto?.Url;
+    }
 
     public async Task<string?> UploadAttachmentAsync(Stream stream, string fileName, string contentType)
     {
@@ -125,6 +149,24 @@ public class ApiService
     {
         var r = await _http.PostAsync($"api/servers/{serverId}/join", null);
         return r.IsSuccessStatusCode;
+    }
+
+    public Task<UserProfileDto?> GetUserProfileAsync(int userId, int serverId) =>
+        _http.GetFromJsonAsync<UserProfileDto>($"api/users/{userId}/profile?serverId={serverId}");
+
+    public async Task UpdateStatusAsync(UserStatus status)
+    {
+        await _http.PutAsJsonAsync("api/users/me/status", new UpdateStatusRequest(status));
+    }
+
+    public async Task<ReactionsUpdatedDto?> ToggleReactionAsync(int channelId, int messageId, string emoji)
+    {
+        var encoded = Uri.EscapeDataString(emoji);
+        var resp = await _http.PostAsync(
+            $"api/channels/{channelId}/messages/{messageId}/reactions/{encoded}", null);
+        return resp.IsSuccessStatusCode
+            ? await resp.Content.ReadFromJsonAsync<ReactionsUpdatedDto>()
+            : null;
     }
 
     public async Task<LinkPreviewDto?> GetLinkPreviewAsync(string url)

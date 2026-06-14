@@ -31,7 +31,7 @@ public class AuthController(AppDbContext db, TokenService tokens) : ControllerBa
         await db.SaveChangesAsync();
         await AutoJoinDefaultServerAsync(user.Id);
 
-        return Ok(new AuthResponse(tokens.CreateToken(user), user.Username, user.Id));
+        return Ok(new AuthResponse(tokens.CreateToken(user), user.Username, user.Id, user.AvatarUrl));
     }
 
     [HttpPost("login")]
@@ -45,7 +45,7 @@ public class AuthController(AppDbContext db, TokenService tokens) : ControllerBa
 
         await AutoJoinDefaultServerAsync(user.Id);
 
-        return Ok(new AuthResponse(tokens.CreateToken(user), user.Username, user.Id));
+        return Ok(new AuthResponse(tokens.CreateToken(user), user.Username, user.Id, user.AvatarUrl));
     }
 
     private async Task AutoJoinDefaultServerAsync(int userId)

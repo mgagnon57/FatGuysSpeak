@@ -175,3 +175,41 @@ public class UnreadBadgeBgConverter : IValueConverter
         Color.FromArgb(value is true ? "#ed4245" : "Transparent");
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }
+
+// Status dot: green=online, amber=away, red=DND, grey=offline
+public class StatusDotColorConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is UserStatus s ? s switch
+        {
+            UserStatus.Online => Color.FromArgb("#23a55a"),
+            UserStatus.Away => Color.FromArgb("#f0a030"),
+            UserStatus.DoNotDisturb => Color.FromArgb("#ed4245"),
+            _ => Color.FromArgb("#555555"),
+        } : Color.FromArgb("#555555");
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
+}
+
+// Reaction pill: highlighted blue if the current user reacted, dark otherwise
+public class ReactionBgConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        Color.FromArgb(value is true ? "#1e3a5f" : "#2a2a2a");
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
+}
+
+// Active toggle button text: blue when active, grey when inactive
+public class ActiveButtonTextColorConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        Color.FromArgb(value is true ? "#2d5f9e" : "#888888");
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
+}
+
+// Reaction pill border: bright blue if own, subtle grey otherwise
+public class ReactionStrokeConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        Color.FromArgb(value is true ? "#2d5f9e" : "#3a3a3a");
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
+}

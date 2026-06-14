@@ -16,6 +16,7 @@ namespace FatGuysSpeak.Server.Controllers;
 public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : ControllerBase
 {
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private string Username => User.FindFirstValue(ClaimTypes.Name)!;
 
     [HttpGet]
     public async Task<List<ServerDto>> GetMyServers()
@@ -28,7 +29,8 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
                 sm.Server.Name,
                 sm.Server.Description,
                 sm.Server.OwnerId.ToString(),
-                sm.Server.Members.Count))
+                sm.Server.Members.Count,
+                sm.Role))
             .ToListAsync();
     }
 
@@ -44,7 +46,7 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
         db.Channels.Add(new Channel { Name = "General", Type = ChannelType.Voice, ServerId = server.Id, Position = 1 });
         await db.SaveChangesAsync();
 
-        return Ok(new ServerDto(server.Id, server.Name, server.Description, server.OwnerId.ToString(), 1));
+        return Ok(new ServerDto(server.Id, server.Name, server.Description, server.OwnerId.ToString(), 1, ServerRole.Admin));
     }
 
     [HttpPost("{serverId}/join")]
@@ -96,15 +98,42 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
     {
         var member = await db.ServerMembers.FindAsync(serverId, UserId);
         if (member is null) return Forbid();
+        if (member.Role < ServerRole.Admin) return Forbid();
 
         var pos = await db.Channels.Where(c => c.ServerId == serverId).CountAsync();
         var channel = new Channel { Name = req.Name, Type = req.Type, ServerId = serverId, Position = pos };
         db.Channels.Add(channel);
+        db.AuditLogs.Add(new AuditLog
+        {
+            ServerId = serverId, ActorId = UserId, ActorUsername = Username,
+            Action = "ChannelCreated", Detail = $"#{req.Name} ({req.Type})"
+        });
         await db.SaveChangesAsync();
 
         var dto = new ChannelDto(channel.Id, channel.Name, channel.Type, channel.ServerId, channel.Position);
         await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelCreated", dto);
         return Ok(dto);
+    }
+
+    [HttpDelete("{serverId}/channels/{channelId}")]
+    public async Task<IActionResult> DeleteChannel(int serverId, int channelId)
+    {
+        var member = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (member is null || member.Role < ServerRole.Admin) return Forbid();
+
+        var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
+        if (channel is null) return NotFound();
+
+        db.Channels.Remove(channel);
+        db.AuditLogs.Add(new AuditLog
+        {
+            ServerId = serverId, ActorId = UserId, ActorUsername = Username,
+            Action = "ChannelDeleted", Detail = $"#{channel.Name} ({channel.Type})"
+        });
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelDeleted", channelId);
+        return NoContent();
     }
 
     [HttpGet("{serverId}/members")]
@@ -116,7 +145,82 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
         return await db.ServerMembers
             .Where(sm => sm.ServerId == serverId)
             .Include(sm => sm.User)
-            .Select(sm => new UserDto(sm.User.Id, sm.User.Username, sm.User.Status))
+            .Select(sm => new UserDto(sm.User.Id, sm.User.Username, sm.User.Status, sm.User.AvatarUrl))
             .ToListAsync();
+    }
+
+    [HttpGet("{serverId}/members/details")]
+    public async Task<ActionResult<List<ServerMemberDto>>> GetMembersWithRoles(int serverId)
+    {
+        var caller = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (caller is null || caller.Role < ServerRole.Admin) return Forbid();
+
+        return await db.ServerMembers
+            .Where(sm => sm.ServerId == serverId)
+            .Include(sm => sm.User)
+            .Select(sm => new ServerMemberDto(sm.User.Id, sm.User.Username, sm.User.Status, sm.Role, sm.JoinedAt))
+            .ToListAsync();
+    }
+
+    [HttpPut("{serverId}/members/{targetUserId}/role")]
+    public async Task<IActionResult> SetMemberRole(int serverId, int targetUserId, SetRoleRequest req)
+    {
+        var actor = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (actor is null || actor.Role < ServerRole.Admin) return Forbid();
+
+        if (targetUserId == UserId) return BadRequest("Cannot change your own role.");
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
+
+        // Owner-only: only the server owner can promote to Admin or demote from Admin
+        if (req.Role == ServerRole.Admin && UserId != server.OwnerId)
+            return Forbid();
+
+        var target = await db.ServerMembers.Include(sm => sm.User).FirstOrDefaultAsync(sm => sm.ServerId == serverId && sm.UserId == targetUserId);
+        if (target is null) return NotFound();
+
+        if (target.Role == ServerRole.Admin && UserId != server.OwnerId)
+            return Forbid();
+
+        var oldRole = target.Role;
+        target.Role = req.Role;
+        db.AuditLogs.Add(new AuditLog
+        {
+            ServerId = serverId, ActorId = UserId, ActorUsername = Username,
+            Action = "RoleChanged", TargetId = targetUserId, TargetUsername = target.User.Username,
+            Detail = $"{oldRole} → {req.Role}"
+        });
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("MemberRoleChanged", targetUserId, req.Role.ToString());
+        return NoContent();
+    }
+
+    [HttpDelete("{serverId}/members/{targetUserId}")]
+    public async Task<IActionResult> KickMember(int serverId, int targetUserId)
+    {
+        var actor = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (actor is null || actor.Role < ServerRole.Admin) return Forbid();
+
+        if (targetUserId == UserId) return BadRequest("Cannot kick yourself.");
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server?.OwnerId == targetUserId) return BadRequest("Cannot kick the server owner.");
+
+        var target = await db.ServerMembers.Include(sm => sm.User).FirstOrDefaultAsync(sm => sm.ServerId == serverId && sm.UserId == targetUserId);
+        if (target is null) return NotFound();
+
+        db.ServerMembers.Remove(target);
+        db.AuditLogs.Add(new AuditLog
+        {
+            ServerId = serverId, ActorId = UserId, ActorUsername = Username,
+            Action = "MemberKicked", TargetId = targetUserId, TargetUsername = target.User.Username
+        });
+        await db.SaveChangesAsync();
+
+        await hub.Clients.User(targetUserId.ToString()).SendAsync("KickedFromServer", serverId);
+        await hub.Clients.Group($"server-{serverId}").SendAsync("UserDisconnected", new UserDto(targetUserId, target.User.Username, UserStatus.Offline));
+        return NoContent();
     }
 }

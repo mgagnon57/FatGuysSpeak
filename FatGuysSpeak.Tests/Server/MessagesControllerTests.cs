@@ -30,7 +30,7 @@ public class MessagesControllerTests : IDisposable
         _hubMock = new Mock<IHubContext<ChatHub>>();
         _hubMock.Setup(h => h.Clients).Returns(clients.Object);
 
-        _controller = new MessagesController(_testDb.Db, _hubMock.Object);
+        _controller = new MessagesController(_testDb.Db, _hubMock.Object, new FatGuysSpeak.Server.Services.ServerMetricsService(), TestHelpers.NullBot());
     }
 
     public void Dispose() => _testDb.Dispose();

@@ -16,10 +16,16 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
     [ObservableProperty] private bool _isSettingPttKey;
     [ObservableProperty] private bool _adaptiveStreamQuality = true;
     [ObservableProperty] private string _serverUrl = "";
+    [ObservableProperty] private bool _isNoiseSuppressionEnabled;
+    [ObservableProperty] private double _noiseGateThreshold = 0.05;
+    [ObservableProperty] private bool _isAdaptiveThresholdEnabled;
+    [ObservableProperty] private string _giphyApiKey = "";
 
     public string Username => api.CurrentUsername;
     public string InputGainPercent => $"{(int)(InputGain * 100)}%";
     public string OutputVolumePercent => $"{(int)(OutputVolume * 100)}%";
+    public string NoiseGateThresholdPercent => $"{(int)(NoiseGateThreshold * 100)}%";
+    public bool IsThresholdSliderEnabled => IsNoiseSuppressionEnabled && !IsAdaptiveThresholdEnabled;
     public string PttButtonLabel => IsSettingPttKey ? "Press any key…" : "Rebind";
     public Color PttButtonColor => IsSettingPttKey ? Color.FromArgb("#f0a030") : Color.FromArgb("#4e5058");
     public bool IsPttNotSet => PttKeyName == "(not set)";
@@ -36,21 +42,31 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
         PttKeyName = ptt.PttKeyName;
         AdaptiveStreamQuality = Preferences.Get("adaptive_quality", true);
         ServerUrl = api.ServerUrl;
+        IsNoiseSuppressionEnabled = audio.NoiseGateEnabled;
+        NoiseGateThreshold = audio.NoiseGateThreshold;
+        IsAdaptiveThresholdEnabled = audio.AdaptiveThresholdEnabled;
+        GiphyApiKey = Preferences.Get("giphy_api_key", "");
+        audio.ThresholdChanged += OnThresholdChanged;
         ptt.KeyLearned += OnKeyLearned;
     }
 
     public void Unload()
     {
+        audio.ThresholdChanged -= OnThresholdChanged;
         ptt.KeyLearned -= OnKeyLearned;
         ptt.CancelLearning();
         IsSettingPttKey = false;
     }
 
+    private void OnThresholdChanged(double value) =>
+        MainThread.BeginInvokeOnMainThread(() => NoiseGateThreshold = value);
+
+    partial void OnPttKeyNameChanged(string value) => OnPropertyChanged(nameof(IsPttNotSet));
+
     private void OnKeyLearned(string name)
     {
         PttKeyName = name;
         IsSettingPttKey = false;
-        OnPropertyChanged(nameof(IsPttNotSet));
     }
 
     partial void OnSelectedInputDeviceChanged(AudioDevice? value)
@@ -84,8 +100,33 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
     partial void OnAdaptiveStreamQualityChanged(bool value) =>
         Preferences.Set("adaptive_quality", value);
 
+    partial void OnGiphyApiKeyChanged(string value) =>
+        Preferences.Set("giphy_api_key", value);
+
     partial void OnServerUrlChanged(string value) =>
         Preferences.Set("server_url", value.TrimEnd('/'));
+
+    partial void OnIsNoiseSuppressionEnabledChanged(bool value)
+    {
+        audio.NoiseGateEnabled = value;
+        Preferences.Set("noise_gate_enabled", value);
+        OnPropertyChanged(nameof(IsThresholdSliderEnabled));
+    }
+
+    partial void OnNoiseGateThresholdChanged(double value)
+    {
+        audio.NoiseGateThreshold = value;
+        if (!IsAdaptiveThresholdEnabled)
+            Preferences.Set("noise_gate_threshold", (float)value);
+        OnPropertyChanged(nameof(NoiseGateThresholdPercent));
+    }
+
+    partial void OnIsAdaptiveThresholdEnabledChanged(bool value)
+    {
+        audio.AdaptiveThresholdEnabled = value;
+        Preferences.Set("adaptive_threshold_enabled", value);
+        OnPropertyChanged(nameof(IsThresholdSliderEnabled));
+    }
 
     partial void OnIsSettingPttKeyChanged(bool value)
     {

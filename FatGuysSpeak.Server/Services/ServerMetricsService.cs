@@ -9,6 +9,39 @@ public class ServerMetricsService
     private readonly ConcurrentQueue<DateTime> _messageTimestamps = new();
     private long _totalMessages;
 
+    // Rate limit hit tracking
+    private readonly ConcurrentQueue<(DateTime Time, string Who)> _rateLimitHits = new();
+
+    public void RecordRateLimitHit(string who)
+    {
+        var now = DateTime.UtcNow;
+        _rateLimitHits.Enqueue((now, who));
+        while (_rateLimitHits.TryPeek(out var oldest) && (now - oldest.Time).TotalMinutes > 61)
+            _rateLimitHits.TryDequeue(out _);
+    }
+
+    public RateLimitSnapshot GetRateLimitSnapshot()
+    {
+        var now = DateTime.UtcNow;
+        var hits = _rateLimitHits.ToArray();
+
+        var lastMin  = hits.Count(h => (now - h.Time).TotalSeconds <= 60);
+        var lastHour = hits.Length;
+
+        var history = new int[60];
+        for (int i = 0; i < 60; i++)
+            history[i] = hits.Count(h => { var age = (now - h.Time).TotalMinutes; return age >= i && age < i + 1; });
+
+        var topOffenders = hits
+            .GroupBy(h => h.Who)
+            .Select(g => new RateLimitOffender(g.Key, g.Count(), g.Max(h => h.Time)))
+            .OrderByDescending(o => o.Hits)
+            .Take(10)
+            .ToList();
+
+        return new RateLimitSnapshot(lastMin, lastHour, history, topOffenders);
+    }
+
     private TimeSpan _prevCpuTime = TimeSpan.Zero;
     private DateTime _prevCpuCheck;
     private double _lastCpuPercent;
@@ -84,4 +117,12 @@ public record MetricSnapshot(
     double CpuPercent,
     long UptimeSeconds,
     string UptimeFormatted
+);
+
+public record RateLimitOffender(string Who, int Hits, DateTime LastSeen);
+public record RateLimitSnapshot(
+    int HitsLastMinute,
+    int HitsLastHour,
+    int[] HitHistory,
+    List<RateLimitOffender> TopOffenders
 );

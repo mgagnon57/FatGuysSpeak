@@ -34,6 +34,14 @@ else
 
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.ServerMetricsService>();
+builder.Services.AddHttpClient("anthropic", c =>
+{
+    c.BaseAddress = new Uri("https://api.anthropic.com/v1/");
+    c.DefaultRequestHeaders.Add("x-api-key", builder.Configuration["Anthropic:ApiKey"] ?? "");
+    c.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+    c.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddSingleton<FatGuysSpeak.Server.Services.BotService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey))
@@ -64,7 +72,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// 10 auth attempts per minute per IP
+// Rate limiters: auth (per-IP) + messages (per-user)
 builder.Services.AddRateLimiter(opt =>
 {
     opt.AddFixedWindowLimiter("auth", limiter =>
@@ -74,6 +82,32 @@ builder.Services.AddRateLimiter(opt =>
         limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
         limiter.QueueLimit = 0;
     });
+
+    opt.AddPolicy("messages", httpContext =>
+    {
+        var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                     ?? "unknown";
+        return RateLimitPartition.GetSlidingWindowLimiter(userId, _ => new SlidingWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = 30,
+            SegmentsPerWindow = 6,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0,
+        });
+    });
+
+    opt.OnRejected = async (context, token) =>
+    {
+        var svc = context.HttpContext.RequestServices.GetRequiredService<ServerMetricsService>();
+        var username = context.HttpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        var ip = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        svc.RecordRateLimitHit(username is not null ? $"{username} ({ip})" : ip);
+        context.HttpContext.Response.StatusCode = 429;
+        await context.HttpContext.Response.WriteAsync("Rate limit exceeded. Slow down.", token);
+    };
+
     opt.RejectionStatusCode = 429;
 });
 
@@ -123,6 +157,14 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='EditedAt'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"EditedAt\" TIMESTAMP");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='AvatarUrl'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"AvatarUrl\" TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='ReplyToId'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"ReplyToId\" INTEGER");
     }
     else
     {
@@ -141,7 +183,97 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='EditedAt'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN EditedAt TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='AvatarUrl'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN AvatarUrl TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='ReplyToId'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN ReplyToId INTEGER");
     }
+
+    // MessageReactions table (added for reactions feature)
+    if (isPostgres)
+    {
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""MessageReactions"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""MessageId"" INTEGER NOT NULL REFERENCES ""Messages""(""Id"") ON DELETE CASCADE,
+                ""UserId"" INTEGER NOT NULL,
+                ""Username"" TEXT NOT NULL,
+                ""Emoji"" TEXT NOT NULL,
+                UNIQUE(""MessageId"", ""UserId"", ""Emoji"")
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""AuditLogs"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""ServerId"" INTEGER NOT NULL,
+                ""ActorId"" INTEGER NOT NULL,
+                ""ActorUsername"" TEXT NOT NULL,
+                ""Action"" TEXT NOT NULL,
+                ""TargetId"" INTEGER,
+                ""TargetUsername"" TEXT,
+                ""Detail"" TEXT,
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""ChannelPermissions"" (
+                ""ChannelId"" INTEGER PRIMARY KEY NOT NULL,
+                ""MinRoleToRead"" INTEGER NOT NULL DEFAULT 0,
+                ""MinRoleToWrite"" INTEGER NOT NULL DEFAULT 0
+            )");
+    }
+    else
+    {
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS MessageReactions (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                MessageId INTEGER NOT NULL REFERENCES Messages(Id) ON DELETE CASCADE,
+                UserId INTEGER NOT NULL,
+                Username TEXT NOT NULL,
+                Emoji TEXT NOT NULL,
+                UNIQUE(MessageId, UserId, Emoji)
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS AuditLogs (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ServerId INTEGER NOT NULL,
+                ActorId INTEGER NOT NULL,
+                ActorUsername TEXT NOT NULL,
+                Action TEXT NOT NULL,
+                TargetId INTEGER,
+                TargetUsername TEXT,
+                Detail TEXT,
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ChannelPermissions (
+                ChannelId INTEGER PRIMARY KEY NOT NULL,
+                MinRoleToRead INTEGER NOT NULL DEFAULT 0,
+                MinRoleToWrite INTEGER NOT NULL DEFAULT 0
+            )");
+    }
+
+    // Seed bot user
+    var botUser = ctx.Users.FirstOrDefault(u => u.Username == FatGuysSpeak.Server.Services.BotService.BotUsername);
+    if (botUser is null)
+    {
+        botUser = new FatGuysSpeak.Server.Models.User
+        {
+            Username     = FatGuysSpeak.Server.Services.BotService.BotUsername,
+            Email        = "bot@system.local",
+            PasswordHash = "!",
+            Status       = FatGuysSpeak.Shared.UserStatus.Online,
+        };
+        ctx.Users.Add(botUser);
+        ctx.SaveChanges();
+    }
+    FatGuysSpeak.Server.Services.BotService.BotUserId = botUser.Id;
 
     if (!ctx.Servers.Any())
     {

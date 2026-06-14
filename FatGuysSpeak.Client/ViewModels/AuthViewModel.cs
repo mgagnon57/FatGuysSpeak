@@ -26,7 +26,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
             if (result is null) { ErrorMessage = "Login failed."; return; }
 
             api.SetToken(result.Token);
-            api.SetCurrentUser(result.UserId, result.Username);
+            api.SetCurrentUser(result.UserId, result.Username, result.AvatarUrl);
             ptt.LoadForUser(result.UserId);
             await hub.ConnectAsync(result.Token, api.ServerUrl);
             await Shell.Current.GoToAsync("//main");
@@ -47,7 +47,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
             if (result is null) { ErrorMessage = "Registration failed."; return; }
 
             api.SetToken(result.Token);
-            api.SetCurrentUser(result.UserId, result.Username);
+            api.SetCurrentUser(result.UserId, result.Username, result.AvatarUrl);
             ptt.LoadForUser(result.UserId);
             await hub.ConnectAsync(result.Token, api.ServerUrl);
             await Shell.Current.GoToAsync("//main");

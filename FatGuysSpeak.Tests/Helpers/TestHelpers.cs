@@ -7,6 +7,7 @@ using FatGuysSpeak.Shared;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -66,6 +67,14 @@ public static class TestHelpers
                 User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))
             }
         };
+    }
+
+    public static FatGuysSpeak.Server.Services.BotService NullBot()
+    {
+        var config = new ConfigurationBuilder().Build(); // ApiKey empty → RespondAsync returns immediately
+        var httpFactory = new Mock<IHttpClientFactory>().Object;
+        var scopeFactory = new Mock<IServiceScopeFactory>().Object;
+        return new FatGuysSpeak.Server.Services.BotService(httpFactory, config, scopeFactory, MockHub());
     }
 
     public static IHubContext<ChatHub> MockHub()

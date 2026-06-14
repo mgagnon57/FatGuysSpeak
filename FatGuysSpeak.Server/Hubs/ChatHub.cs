@@ -26,6 +26,8 @@ public class ChatHub(AppDbContext db) : Hub
     internal static int OnlineUserCount       => OnlineUsers.Count;
     internal static int VoiceParticipantCount => VoiceChannelMap.Count;
     internal static int ActiveStreamCount     => ActiveStreamers.Count;
+    internal static IReadOnlyDictionary<int, string> OnlineUserSnapshot => OnlineUsers;
+    internal static IReadOnlyDictionary<int, int>    VoiceChannelSnapshot => VoiceChannelMap;
 
     private int UserId => int.Parse(Context.User!.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string Username => Context.User!.FindFirstValue(ClaimTypes.Name)!;
@@ -37,6 +39,14 @@ public class ChatHub(AppDbContext db) : Hub
             .FirstOrDefaultAsync(c => c.Id == channelId);
         if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId))
             return;
+
+        // Enforce channel read permission
+        var perm = await db.ChannelPermissions.FindAsync(channelId);
+        if (perm is not null && perm.MinRoleToRead > ServerRole.Member)
+        {
+            var member = channel.Server.Members.FirstOrDefault(m => m.UserId == UserId);
+            if (member is null || member.Role < perm.MinRoleToRead) return;
+        }
 
         // Atomically leave previous channel so a user can only be in one at a time
         if (UserTextChannelMap.TryRemove(UserId, out var oldChannelId))
@@ -117,7 +127,9 @@ public class ChatHub(AppDbContext db) : Hub
     {
         if (data.Length > MaxVoicePacketBytes) return;
         if (!VoiceChannelMap.TryGetValue(UserId, out var channelId)) return;
-        await Clients.OthersInGroup($"voice-{channelId}").SendAsync("ReceiveVoiceData", data);
+        var group = Clients.OthersInGroup($"voice-{channelId}");
+        await group.SendAsync("ReceiveVoiceData", data);
+        await group.SendAsync("UserSpeaking", UserId);
     }
 
     public async Task LeaveVoiceChannel()
@@ -140,9 +152,13 @@ public class ChatHub(AppDbContext db) : Hub
             .Select(sm => sm.UserId)
             .ToListAsync();
 
-        return memberIds
-            .Where(id => OnlineUsers.ContainsKey(id))
-            .Select(id => new UserDto(id, OnlineUsers[id], UserStatus.Online))
+        var onlineIds = memberIds.Where(id => OnlineUsers.ContainsKey(id)).ToList();
+        var statusMap = await db.Users
+            .Where(u => onlineIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.Status);
+
+        return onlineIds
+            .Select(id => new UserDto(id, OnlineUsers[id], statusMap.GetValueOrDefault(id, UserStatus.Online)))
             .ToList();
     }
 
@@ -172,12 +188,19 @@ public class ChatHub(AppDbContext db) : Hub
     {
         OnlineUsers[UserId] = Username;
 
+        var user = await db.Users.FindAsync(UserId);
+        if (user is not null)
+        {
+            user.Status = UserStatus.Online;
+            await db.SaveChangesAsync();
+        }
+
         var serverIds = await db.ServerMembers
             .Where(sm => sm.UserId == UserId)
             .Select(sm => sm.ServerId)
             .ToListAsync();
 
-        var userDto = new UserDto(UserId, Username, UserStatus.Online);
+        var userDto = new UserDto(UserId, Username, user?.Status ?? UserStatus.Online);
         foreach (var sid in serverIds)
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"server-{sid}");

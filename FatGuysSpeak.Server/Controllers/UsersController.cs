@@ -1,0 +1,89 @@
+using System.Security.Claims;
+using FatGuysSpeak.Server.Data;
+using FatGuysSpeak.Server.Hubs;
+using FatGuysSpeak.Shared;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+
+namespace FatGuysSpeak.Server.Controllers;
+
+[ApiController]
+[Route("api/users")]
+[Authorize]
+public class UsersController(AppDbContext db) : ControllerBase
+{
+    private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    private static readonly string[] AllowedImageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+
+    [HttpGet("{userId}/profile")]
+    public async Task<ActionResult<UserProfileDto>> GetProfile(int userId, [FromQuery] int? serverId)
+    {
+        var user = await db.Users.FindAsync(userId);
+        if (user is null) return NotFound();
+
+        ServerRole? role = null;
+        DateTime? joinedAt = null;
+        if (serverId.HasValue)
+        {
+            var member = await db.ServerMembers
+                .FirstOrDefaultAsync(m => m.ServerId == serverId.Value && m.UserId == userId);
+            if (member is not null)
+            {
+                role = member.Role;
+                joinedAt = member.JoinedAt;
+            }
+        }
+
+        return new UserProfileDto(user.Id, user.Username, user.Status, user.CreatedAt, role, joinedAt, user.Id == UserId, user.AvatarUrl);
+    }
+
+    [HttpPost("me/avatar")]
+    [RequestSizeLimit(8 * 1024 * 1024 + 1024)]
+    public async Task<ActionResult<AttachmentDto>> UploadAvatar(IFormFile file, [FromServices] IWebHostEnvironment env)
+    {
+        if (file is null || file.Length == 0) return BadRequest("No file provided.");
+        if (file.Length > 8 * 1024 * 1024) return BadRequest("File too large. Maximum is 8 MB.");
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!AllowedImageExtensions.Contains(ext))
+            return BadRequest($"File type not allowed. Allowed: {string.Join(", ", AllowedImageExtensions)}");
+
+        var filename = $"avatar_{UserId}_{Guid.NewGuid():N}{ext}";
+        var uploadsDir = Path.Combine(env.ContentRootPath, "uploads");
+        Directory.CreateDirectory(uploadsDir);
+
+        using (var stream = System.IO.File.Create(Path.Combine(uploadsDir, filename)))
+            await file.CopyToAsync(stream);
+
+        var url = $"{Request.Scheme}://{Request.Host}/uploads/{filename}";
+        var user = await db.Users.FindAsync(UserId);
+        if (user is null) return NotFound();
+        user.AvatarUrl = url;
+        await db.SaveChangesAsync();
+
+        return Ok(new AttachmentDto(url));
+    }
+
+    [HttpPut("me/status")]
+    public async Task<IActionResult> UpdateStatus(UpdateStatusRequest req, [FromServices] IHubContext<ChatHub> hub)
+    {
+        var user = await db.Users.FindAsync(UserId);
+        if (user is null) return NotFound();
+        user.Status = req.Status;
+        await db.SaveChangesAsync();
+
+        var serverIds = await db.ServerMembers
+            .Where(m => m.UserId == UserId)
+            .Select(m => m.ServerId)
+            .ToListAsync();
+
+        foreach (var sid in serverIds)
+            await hub.Clients.Group($"server-{sid}").SendAsync("UserStatusChanged", UserId, req.Status);
+
+        return NoContent();
+    }
+}

@@ -1,4 +1,5 @@
 using FatGuysSpeak.Client.ViewModels;
+using Microsoft.Maui.Controls;
 
 namespace FatGuysSpeak.Client.Pages;
 
@@ -17,15 +18,15 @@ public partial class MainPage : ContentPage
     {
         base.OnAppearing();
         _vm.Initialize();
-        _vm.Messages.CollectionChanged += (_, _) => ScrollToBottom();
+
+        // ViewModel fires this when a new message arrives and user is already at the bottom
+        _vm.ScrollToLatestRequested += ScrollToBottom;
+
+        // When the Messages collection is replaced (tab switch / channel change), re-scroll to bottom
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(_vm.Messages))
-            {
-                _vm.Messages.CollectionChanged += (_, _) => ScrollToBottom();
-                // Defer until after the CollectionView has rendered the new item set
                 Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(80), ScrollToBottom);
-            }
         };
 
         await _vm.LoadServersAsync();
@@ -43,5 +44,10 @@ public partial class MainPage : ContentPage
     {
         if (_vm.Messages.Count > 0)
             MessagesView.ScrollTo(_vm.Messages[^1], animate: false);
+    }
+
+    private void OnMessagesScrolled(object? sender, ItemsViewScrolledEventArgs e)
+    {
+        _vm.OnScrollPositionChanged(e.LastVisibleItemIndex);
     }
 }
