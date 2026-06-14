@@ -43,7 +43,22 @@ public partial class MessageViewItem : ObservableObject
 
     public bool HasAttachment => Message.AttachmentUrl is not null;
     public bool HasGifAttachment => IsGifUrl(Message.AttachmentUrl);
-    public bool HasStaticAttachment => HasAttachment && !HasGifAttachment;
+    public bool IsImageAttachment => HasAttachment && IsImageUrl(Message.AttachmentUrl);
+    public bool HasStaticAttachment => IsImageAttachment && !HasGifAttachment;
+    public bool IsFileAttachment => HasAttachment && !IsImageAttachment;
+    public string AttachmentFileName => Message.AttachmentFileName
+        ?? (Message.AttachmentUrl is not null ? Path.GetFileName(new Uri(Message.AttachmentUrl).LocalPath) : "");
+    public string AttachmentFileIcon => Path.GetExtension(AttachmentFileName).ToLowerInvariant() switch
+    {
+        ".pdf"  => "📄",
+        ".zip" or ".7z" or ".rar" or ".tar" or ".gz" => "🗜",
+        ".mp3" or ".wav" or ".ogg" => "🎵",
+        ".mp4" or ".mov" or ".mkv" or ".webm" => "🎬",
+        ".doc" or ".docx" => "📝",
+        ".xls" or ".xlsx" => "📊",
+        ".ppt" or ".pptx" => "📋",
+        _ => "📁"
+    };
     public bool IsGifPlaying => HasGifAttachment && _attachmentDisplayUrl is not null;
     public bool GifPaused => HasGifAttachment && _attachmentDisplayUrl is null;
 
@@ -101,11 +116,21 @@ public partial class MessageViewItem : ObservableObject
             StartGifTimer();
     }
 
+    private static readonly HashSet<string> ImageExts =
+        [".jpg", ".jpeg", ".png", ".gif", ".webp"];
+
     private static bool IsGifUrl(string? url)
     {
         if (url is null) return false;
         var path = url.Split('?')[0];
         return path.EndsWith(".gif", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsImageUrl(string? url)
+    {
+        if (url is null) return false;
+        var ext = Path.GetExtension(url.Split('?')[0]).ToLowerInvariant();
+        return ImageExts.Contains(ext);
     }
 
     private void StartGifTimer()
@@ -125,6 +150,14 @@ public partial class MessageViewItem : ObservableObject
         await Task.Delay(50);                 // one render pass so MAUI releases the source
         AttachmentDisplayUrl = Message.AttachmentUrl;
         StartGifTimer();
+    }
+
+    [RelayCommand]
+    public async Task OpenFile()
+    {
+        if (Message.AttachmentUrl is null) return;
+        try { await Launcher.OpenAsync(Message.AttachmentUrl); }
+        catch { }
     }
 
     [RelayCommand]
@@ -193,7 +226,10 @@ public partial class MessageViewItem : ObservableObject
     {
         OnPropertyChanged(nameof(HasAttachment));
         OnPropertyChanged(nameof(HasGifAttachment));
+        OnPropertyChanged(nameof(IsImageAttachment));
         OnPropertyChanged(nameof(HasStaticAttachment));
+        OnPropertyChanged(nameof(IsFileAttachment));
+        OnPropertyChanged(nameof(AttachmentFileName));
         OnPropertyChanged(nameof(HasAvatarImage));
         OnPropertyChanged(nameof(HasReply));
         OnPropertyChanged(nameof(ReplyAuthor));

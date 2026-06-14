@@ -11,7 +11,7 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 10 * 1024 * 1024); // 10 MB for file uploads
+builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 26 * 1024 * 1024); // 26 MB — covers 25 MB file uploads
 
 // Railway (and most cloud hosts) set DATABASE_URL as a postgres:// URI.
 // Fall back to the config connection string (SQLite for local dev).
@@ -169,6 +169,10 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Servers' AND column_name='InviteCode'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Servers\" ADD COLUMN \"InviteCode\" TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='AttachmentFileName'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"AttachmentFileName\" TEXT");
     }
     else
     {
@@ -199,6 +203,10 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Servers') WHERE name='InviteCode'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Servers ADD COLUMN InviteCode TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='AttachmentFileName'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN AttachmentFileName TEXT");
     }
 
     // MessageReactions table (added for reactions feature)

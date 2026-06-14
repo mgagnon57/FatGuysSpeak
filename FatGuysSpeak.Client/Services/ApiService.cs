@@ -105,8 +105,8 @@ public class ApiService
         _http.GetFromJsonAsync<List<MessageDto>>(
             $"api/channels/{channelId}/messages/search?q={Uri.EscapeDataString(query)}");
 
-    public Task<MessageDto?> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text, string? attachmentUrl = null, int? replyToId = null) =>
-        _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source, attachmentUrl, replyToId))
+    public Task<MessageDto?> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text, string? attachmentUrl = null, int? replyToId = null, string? attachmentFileName = null) =>
+        _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source, attachmentUrl, replyToId, attachmentFileName))
              .ContinueWith(t => t.Result.Content.ReadFromJsonAsync<MessageDto>().Result);
 
     public async Task<string?> UploadAvatarAsync(Stream stream, string fileName, string contentType)
@@ -121,16 +121,19 @@ public class ApiService
         return dto?.Url;
     }
 
-    public async Task<string?> UploadAttachmentAsync(Stream stream, string fileName, string contentType)
+    public async Task<AttachmentDto?> UploadAttachmentAsync(Stream stream, string fileName, string contentType)
     {
         using var content = new MultipartFormDataContent();
         var fileContent = new StreamContent(stream);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
         content.Add(fileContent, "file", fileName);
         var resp = await _http.PostAsync("api/attachments", content);
-        if (!resp.IsSuccessStatusCode) return null;
-        var dto = await resp.Content.ReadFromJsonAsync<AttachmentDto>();
-        return dto?.Url;
+        if (!resp.IsSuccessStatusCode)
+        {
+            var err = await resp.Content.ReadAsStringAsync();
+            throw new Exception(err.Trim('"'));
+        }
+        return await resp.Content.ReadFromJsonAsync<AttachmentDto>();
     }
 
     public async Task<MessageDto?> EditMessageAsync(int channelId, int messageId, string newContent)

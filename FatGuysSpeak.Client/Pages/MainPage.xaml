@@ -570,6 +570,31 @@
                                                 TextColor="#8ab4d4" FontSize="11"
                                                 Padding="0" HeightRequest="38" />
                                     </Border>
+                                    <!-- File attachment card (non-image files) -->
+                                    <Border Grid.Row="3" Grid.Column="1"
+                                            IsVisible="{Binding IsFileAttachment}"
+                                            BackgroundColor="#1e1e2e"
+                                            StrokeThickness="1" Stroke="#333355"
+                                            StrokeShape="RoundRectangle 6"
+                                            HorizontalOptions="Start"
+                                            Margin="0,4,0,0" Padding="10,8">
+                                        <HorizontalStackLayout Spacing="10">
+                                            <Label Text="{Binding AttachmentFileIcon}"
+                                                   FontSize="28" VerticalOptions="Center" />
+                                            <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                                                <Label Text="{Binding AttachmentFileName}"
+                                                       TextColor="#d0d0d0" FontSize="12"
+                                                       FontAttributes="Bold"
+                                                       MaximumWidthRequest="260"
+                                                       LineBreakMode="TailTruncation" />
+                                                <Button Text="Open File"
+                                                        Command="{Binding OpenFileCommand}"
+                                                        BackgroundColor="#2d5f9e" TextColor="White"
+                                                        FontSize="10" CornerRadius="3"
+                                                        Padding="8,2" HeightRequest="24" />
+                                            </VerticalStackLayout>
+                                        </HorizontalStackLayout>
+                                    </Border>
                                     <!-- Reactions row -->
                                     <FlexLayout Grid.Row="4" Grid.Column="1"
                                                 BindableLayout.ItemsSource="{Binding Reactions}"
@@ -735,10 +760,30 @@
                     <!-- Pending attachment preview -->
                     <Grid Grid.Row="3" IsVisible="{Binding HasPendingAttachment}" Padding="0,4,0,4">
                         <HorizontalStackLayout Spacing="8">
+                            <!-- Image thumbnail (only when pending is an image) -->
                             <Image Source="{Binding PendingAttachmentUrl}"
                                    HeightRequest="48" WidthRequest="64"
-                                   Aspect="AspectFill" />
-                            <Label Text="📎 Image attached" TextColor="#8ab4d4" FontSize="11" VerticalOptions="Center" />
+                                   Aspect="AspectFill"
+                                   IsVisible="{Binding PendingIsImage}" />
+                            <!-- File icon (only when pending is a non-image file) -->
+                            <Border IsVisible="{Binding PendingIsImage, Converter={StaticResource InvertBoolConverter}}"
+                                    BackgroundColor="#1e1e2e" StrokeThickness="1" Stroke="#333355"
+                                    StrokeShape="RoundRectangle 4" Padding="8,4">
+                                <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
+                                    <Label Text="📁" FontSize="20" VerticalOptions="Center" />
+                                    <Label Text="{Binding PendingAttachmentFileName}"
+                                           TextColor="#d0d0d0" FontSize="11"
+                                           VerticalOptions="Center"
+                                           MaximumWidthRequest="200"
+                                           LineBreakMode="TailTruncation" />
+                                </HorizontalStackLayout>
+                            </Border>
+                            <Label Text="📎 Image attached" TextColor="#8ab4d4" FontSize="11"
+                                   VerticalOptions="Center"
+                                   IsVisible="{Binding PendingIsImage}" />
+                            <Label Text="📎 File attached" TextColor="#8ab4d4" FontSize="11"
+                                   VerticalOptions="Center"
+                                   IsVisible="{Binding PendingIsImage, Converter={StaticResource InvertBoolConverter}}" />
                             <Button Text="✕" Command="{Binding ClearAttachmentCommand}"
                                     BackgroundColor="Transparent" TextColor="#888888"
                                     FontSize="14" Padding="4,0" HeightRequest="28" WidthRequest="28" />

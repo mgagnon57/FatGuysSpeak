@@ -66,6 +66,7 @@ public class Message
     public DateTime? EditedAt { get; set; }
     public int? ReplyToId { get; set; }
     public Message? ReplyTo { get; set; }
+    public string? AttachmentFileName { get; set; }
 }
 
 public class AuditLog

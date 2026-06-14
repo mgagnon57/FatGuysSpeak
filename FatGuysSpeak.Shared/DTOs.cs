@@ -34,11 +34,12 @@ public record MessageDto(
     string? AuthorAvatarUrl = null,
     int? ReplyToId = null,
     string? ReplyToUsername = null,
-    string? ReplyPreview = null);
+    string? ReplyPreview = null,
+    string? AttachmentFileName = null);
 
-public record SendMessageRequest(string Content, MessageSource Source = MessageSource.Text, string? AttachmentUrl = null, int? ReplyToMessageId = null);
+public record SendMessageRequest(string Content, MessageSource Source = MessageSource.Text, string? AttachmentUrl = null, int? ReplyToMessageId = null, string? AttachmentFileName = null);
 public record EditMessageRequest(string Content);
-public record AttachmentDto(string Url);
+public record AttachmentDto(string Url, string? OriginalFileName = null, string? ContentType = null);
 
 public enum MessageSource { Text, Voice, Stream, AI }
 public enum ServerRole { Member, Moderator, Admin }

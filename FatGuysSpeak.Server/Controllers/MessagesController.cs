@@ -28,7 +28,8 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
         m.ReplyTo?.Author?.Username,
         m.ReplyToId.HasValue && m.ReplyTo is { IsDeleted: false }
             ? (m.ReplyTo.Content.Length > 100 ? m.ReplyTo.Content[..100] + "…" : m.ReplyTo.Content)
-            : null);
+            : null,
+        m.AttachmentFileName);
 
     private async Task<(bool isMember, bool hasReadAccess)> CheckChannelAccessAsync(int channelId)
     {
@@ -124,6 +125,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
             ChannelId = channelId,
             Source = req.Source,
             AttachmentUrl = req.AttachmentUrl,
+            AttachmentFileName = req.AttachmentFileName,
             ReplyToId = req.ReplyToMessageId
         };
         db.Messages.Add(message);

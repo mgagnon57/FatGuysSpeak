@@ -60,6 +60,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private int _activeStreamerId;
     [ObservableProperty] private ImageSource? _streamFrame;
     [ObservableProperty] private string? _pendingAttachmentUrl;
+    [ObservableProperty] private string? _pendingAttachmentFileName;
     [ObservableProperty] private bool _isEmojiPickerOpen;
     [ObservableProperty] private bool _isGifPickerOpen;
     [ObservableProperty] private string _gifSearchQuery = "";
@@ -124,6 +125,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public bool IsWaitingForStream => HasActiveStream && !HasStreamFrame;
     public bool StreamViewerVisible => IsStreamTab && !IsFullScreen;
     public bool HasPendingAttachment => PendingAttachmentUrl is not null;
+    public bool PendingIsImage => PendingAttachmentFileName is null ||
+        new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" }
+            .Contains(Path.GetExtension(PendingAttachmentFileName).ToLowerInvariant());
     public string CameraButtonLabel => IsCameraOn ? "📷 Stop Camera" : "📷 Camera";
     public Color  CameraButtonColor => IsCameraOn ? Color.FromArgb("#ed4245") : Color.FromArgb("#3a3a3a");
     public string StreamButtonLabel => IsStreaming ? "⏹ Stop Sharing" : "📺 Share Screen";
@@ -321,8 +325,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         OnPropertyChanged(nameof(StreamLatencyColor));
         OnPropertyChanged(nameof(StreamLatencyText));
     }
-    partial void OnPendingAttachmentUrlChanged(string? value) =>
+    partial void OnPendingAttachmentUrlChanged(string? value)
+    {
         OnPropertyChanged(nameof(HasPendingAttachment));
+        OnPropertyChanged(nameof(PendingIsImage));
+    }
 
     partial void OnMessageInputChanged(string value)
     {
@@ -637,7 +644,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (SelectedChannel is null) return;
         IsGifPickerOpen = false;
         var source = IsStreamTab ? MessageSource.Stream : MessageSource.Text;
-        await PostMessageAsync("", source, gifResult.Url);
+        await PostMessageAsync("", source, gifResult.Url, null);
     }
 
     [RelayCommand]
@@ -651,20 +658,22 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
         var text = MessageInput.Trim();
         var attachmentUrl = PendingAttachmentUrl;
+        var attachmentFileName = PendingAttachmentFileName;
         MessageInput = "";
         PendingAttachmentUrl = null;
+        PendingAttachmentFileName = null;
 
         var source = IsStreamTab ? MessageSource.Stream : MessageSource.Text;
-        await PostMessageAsync(text, source, attachmentUrl);
+        await PostMessageAsync(text, source, attachmentUrl, attachmentFileName);
     }
 
-    private async Task PostMessageAsync(string text, MessageSource source, string? attachmentUrl = null)
+    private async Task PostMessageAsync(string text, MessageSource source, string? attachmentUrl = null, string? attachmentFileName = null)
     {
         if (SelectedChannel is null) return;
         if (string.IsNullOrWhiteSpace(text) && attachmentUrl is null) return;
         var replyToId = _replyingToItem?.Message.Id;
         CancelReply();
-        var msg = await api.SendMessageAsync(SelectedChannel.Id, text, source, attachmentUrl, replyToId);
+        var msg = await api.SendMessageAsync(SelectedChannel.Id, text, source, attachmentUrl, replyToId, attachmentFileName);
         if (msg is not null)
         {
             var item = Wire(new MessageViewItem(msg, api.CurrentUsername, api.CurrentUserId));
@@ -680,18 +689,18 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         {
             var result = await FilePicker.PickAsync(new PickOptions
             {
-                PickerTitle = "Choose an image to share",
-                FileTypes = FilePickerFileType.Images,
+                PickerTitle = "Choose a file or image to share",
             });
             if (result is null) return;
 
             using var stream = await result.OpenReadAsync();
-            var contentType = result.ContentType ?? "image/jpeg";
-            var url = await api.UploadAttachmentAsync(stream, result.FileName, contentType);
-            if (url is not null)
-                PendingAttachmentUrl = url;
-            else
-                await Shell.Current.DisplayAlert("Upload Failed", "Could not upload the file.", "OK");
+            var contentType = result.ContentType ?? "application/octet-stream";
+            var dto = await api.UploadAttachmentAsync(stream, result.FileName, contentType);
+            if (dto is not null)
+            {
+                PendingAttachmentUrl = dto.Url;
+                PendingAttachmentFileName = dto.OriginalFileName ?? result.FileName;
+            }
         }
         catch (Exception ex)
         {
@@ -700,7 +709,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     }
 
     [RelayCommand]
-    public void ClearAttachment() => PendingAttachmentUrl = null;
+    public void ClearAttachment()
+    {
+        PendingAttachmentUrl = null;
+        PendingAttachmentFileName = null;
+    }
 
     [RelayCommand]
     public void Reply(MessageViewItem item)

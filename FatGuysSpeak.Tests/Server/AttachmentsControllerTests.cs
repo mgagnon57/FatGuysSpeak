@@ -52,15 +52,26 @@ public class AttachmentsControllerTests : IDisposable
         ctrl.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
 
-    private static IFormFile MakeFile(string filename, string content = "fake image bytes", long? overrideLength = null)
+    private static IFormFile MakeFile(string filename, string content = "fake image bytes", long? overrideLength = null, string? contentType = null)
     {
         var bytes = System.Text.Encoding.UTF8.GetBytes(content);
         var stream = new MemoryStream(bytes);
         long length = overrideLength ?? bytes.Length;
+        var ext = Path.GetExtension(filename).ToLowerInvariant();
+        var ct = contentType ?? ext switch
+        {
+            ".pdf"  => "application/pdf",
+            ".zip"  => "application/zip",
+            ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".mp4"  => "video/mp4",
+            ".mp3"  => "audio/mpeg",
+            _       => "image/" + ext.TrimStart('.')
+        };
 
         var fileMock = new Mock<IFormFile>();
         fileMock.Setup(f => f.FileName).Returns(filename);
         fileMock.Setup(f => f.Length).Returns(length);
+        fileMock.Setup(f => f.ContentType).Returns(ct);
         fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
             .Callback<Stream, CancellationToken>((dest, _) => stream.CopyTo(dest))
             .Returns(Task.CompletedTask);
@@ -177,9 +188,9 @@ public class AttachmentsControllerTests : IDisposable
     [Theory]
     [InlineData("virus.exe")]
     [InlineData("script.js")]
-    [InlineData("archive.zip")]
-    [InlineData("document.pdf")]
     [InlineData("file.bmp")]
+    [InlineData("hack.sh")]
+    [InlineData("data.xml")]
     public async Task Upload_DisallowedExtension_ReturnsBadRequest(string filename)
     {
         var result = await _controller.Upload(MakeFile(filename));
@@ -206,5 +217,108 @@ public class AttachmentsControllerTests : IDisposable
         await _controller.Upload(MakeFile("hack.exe"));
 
         Assert.Empty(Directory.GetFiles(_uploadsDir));
+    }
+
+    // ── Non-image file types ──────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("report.pdf")]
+    [InlineData("archive.zip")]
+    [InlineData("data.csv")]
+    [InlineData("notes.docx")]
+    [InlineData("sheet.xlsx")]
+    [InlineData("video.mp4")]
+    [InlineData("audio.mp3")]
+    public async Task Upload_AllowedNonImageFile_ReturnsOk(string filename)
+    {
+        var result = await _controller.Upload(MakeFile(filename));
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Upload_PdfFile_OriginalFileNameReturnedInDto()
+    {
+        var result = await _controller.Upload(MakeFile("my-report.pdf"));
+
+        var dto = ((OkObjectResult)result.Result!).Value as AttachmentDto;
+        Assert.Equal("my-report.pdf", dto!.OriginalFileName);
+    }
+
+    [Fact]
+    public async Task Upload_ZipFile_ContentTypeReturnedInDto()
+    {
+        var result = await _controller.Upload(MakeFile("data.zip"));
+
+        var dto = ((OkObjectResult)result.Result!).Value as AttachmentDto;
+        Assert.Equal("application/zip", dto!.ContentType);
+    }
+
+    [Fact]
+    public async Task Upload_NonImageFile_StoredWithUuidName()
+    {
+        await _controller.Upload(MakeFile("secret.pdf"));
+
+        var files = Directory.GetFiles(_uploadsDir);
+        Assert.Single(files);
+        // Stored name should be a UUID (32 hex chars) + ".pdf", not the original name
+        var storedName = Path.GetFileNameWithoutExtension(files[0]);
+        Assert.Equal(32, storedName.Length);
+        Assert.All(storedName, c => Assert.True(char.IsAsciiHexDigit(c)));
+    }
+
+    [Fact]
+    public async Task Upload_OversizedNonImageFile_ReturnsBadRequest()
+    {
+        // 26 MB exceeds 25 MB limit for non-image files
+        var oversized = MakeFile("huge.zip", overrideLength: 26 * 1024 * 1024L);
+
+        var result = await _controller.Upload(oversized);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Upload_NonImageFileBelowLimit_ReturnsOk()
+    {
+        // 24 MB is under the 25 MB limit for non-image files
+        var file = MakeFile("big-but-ok.zip", overrideLength: 24 * 1024 * 1024L);
+
+        var result = await _controller.Upload(file);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Upload_ImageAtImageLimit_ReturnsOk()
+    {
+        // Exactly 8 MB — right at the image cap
+        var file = MakeFile("maximage.png", overrideLength: 8 * 1024 * 1024L);
+
+        var result = await _controller.Upload(file);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Upload_ImageOneByteOverLimit_ReturnsBadRequest()
+    {
+        var file = MakeFile("toobig.png", overrideLength: 8 * 1024 * 1024L + 1);
+
+        var result = await _controller.Upload(file);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task Upload_FileWithPathSeparatorsInName_StrippedSafely()
+    {
+        // filename with path traversal characters should have them stripped, not stored
+        var file = MakeFile("../../etc/passwd.pdf");
+
+        var result = await _controller.Upload(file);
+
+        var dto = ((OkObjectResult)result.Result!).Value as AttachmentDto;
+        Assert.DoesNotContain("..", dto!.OriginalFileName ?? "");
     }
 }
