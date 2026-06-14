@@ -10,6 +10,7 @@ using Moq;
 
 namespace FatGuysSpeak.Tests.Server;
 
+[Collection("HubTests")]
 public class ChatHubStreamTests : IDisposable
 {
     private readonly TestDb _testDb;

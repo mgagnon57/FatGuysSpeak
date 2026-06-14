@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Net.Mime;
 using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.Services;
@@ -92,9 +93,33 @@ public class ApiService
     public Task<List<MessageDto>?> GetMessagesAsync(int channelId) =>
         _http.GetFromJsonAsync<List<MessageDto>>($"api/channels/{channelId}/messages");
 
-    public Task<MessageDto?> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text) =>
-        _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source))
+    public Task<MessageDto?> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text, string? attachmentUrl = null) =>
+        _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source, attachmentUrl))
              .ContinueWith(t => t.Result.Content.ReadFromJsonAsync<MessageDto>().Result);
+
+    public async Task<string?> UploadAttachmentAsync(Stream stream, string fileName, string contentType)
+    {
+        using var content = new MultipartFormDataContent();
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        content.Add(fileContent, "file", fileName);
+        var resp = await _http.PostAsync("api/attachments", content);
+        if (!resp.IsSuccessStatusCode) return null;
+        var dto = await resp.Content.ReadFromJsonAsync<AttachmentDto>();
+        return dto?.Url;
+    }
+
+    public async Task<MessageDto?> EditMessageAsync(int channelId, int messageId, string newContent)
+    {
+        var resp = await _http.PutAsJsonAsync($"api/channels/{channelId}/messages/{messageId}", new EditMessageRequest(newContent));
+        return resp.IsSuccessStatusCode ? await resp.Content.ReadFromJsonAsync<MessageDto>() : null;
+    }
+
+    public async Task<bool> DeleteMessageAsync(int channelId, int messageId)
+    {
+        var resp = await _http.DeleteAsync($"api/channels/{channelId}/messages/{messageId}");
+        return resp.IsSuccessStatusCode;
+    }
 
     public async Task<bool> JoinServerAsync(int serverId)
     {

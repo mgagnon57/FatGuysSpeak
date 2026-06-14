@@ -32,9 +32,10 @@ public partial class MainPage : ContentPage
         if (_vm.Servers.Count > 0)
         {
             await _vm.SelectServerAsync(_vm.Servers[0]);
-            var general = _vm.Channels.FirstOrDefault(c => c.Channel.Name == "general");
-            if (general is not null)
-                await _vm.SelectChannelAsync(general);
+            var lobby = _vm.Channels.FirstOrDefault(c => c.Channel.Name == "lobby")
+                        ?? _vm.Channels.FirstOrDefault();
+            if (lobby is not null)
+                await _vm.SelectChannelAsync(lobby);
         }
     }
 

@@ -159,3 +159,19 @@ public class TabBgConverter : IValueConverter
         Color.FromArgb(value is true ? "#2d5f9e" : "#1a1a2a");
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }
+
+// @mention messages get a subtle amber tint
+public class MentionBgConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        Color.FromArgb(value is true ? "#2a240a" : "Transparent");
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
+}
+
+// Unread badge: red pill if there are unread messages
+public class UnreadBadgeBgConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        Color.FromArgb(value is true ? "#ed4245" : "Transparent");
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
+}

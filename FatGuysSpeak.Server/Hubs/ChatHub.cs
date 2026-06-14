@@ -257,6 +257,21 @@ public class ChatHub(AppDbContext db) : Hub
     public Task StopWatching(int channelId) =>
         Groups.RemoveFromGroupAsync(Context.ConnectionId, $"stream-{channelId}");
 
+    // ─── Typing Indicators ────────────────────────────────────────────────────
+
+    public async Task StartTyping(int channelId)
+    {
+        if (!UserTextChannelMap.TryGetValue(UserId, out var current) || current != channelId) return;
+        await Clients.OthersInGroup($"channel-{channelId}")
+            .SendAsync("UserTyping", UserId, Username, channelId);
+    }
+
+    public async Task StopTyping(int channelId)
+    {
+        await Clients.OthersInGroup($"channel-{channelId}")
+            .SendAsync("UserStoppedTyping", UserId, channelId);
+    }
+
     // Echo back immediately so the client can measure round-trip time
     public Task Ping() => Task.CompletedTask;
 

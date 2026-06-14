@@ -10,7 +10,7 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, SettingsViewModel settings) : ObservableObject
+public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, SettingsViewModel settings, ToastNotificationService toast) : ObservableObject
 {
     private bool _initialized;
     private static readonly ConcurrentDictionary<string, LinkPreviewDto?> PreviewCache = new();
@@ -45,12 +45,19 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private string? _activeStreamerName;
     [ObservableProperty] private int _activeStreamerId;
     [ObservableProperty] private ImageSource? _streamFrame;
+    [ObservableProperty] private string? _pendingAttachmentUrl;
 
     private Window? _streamWindow;
     private Window? _settingsWindow;
     private int _streamSending; // Interlocked — drop frames rather than queue when link is busy
     private Timer? _latencyTimer;
     private int _streamChannelId; // which channel the active stream is in
+    private volatile byte[]? _pendingFrame; // latest received frame waiting to be shown
+
+    // Typing indicator state
+    private bool _isTyping;
+    private CancellationTokenSource? _typingCts;
+    private readonly Dictionary<int, string> _typingUsersInChannel = new(); // userId -> username
 
     [ObservableProperty] private int _streamLatencyMs;
     [ObservableProperty] private string _streamQualityLabel = "1080p 20fps";
@@ -62,6 +69,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public bool HasStreamFrame => StreamFrame is not null;
     public bool IsWaitingForStream => HasActiveStream && !HasStreamFrame;
     public bool StreamViewerVisible => IsStreamTab && !IsFullScreen;
+    public bool HasPendingAttachment => PendingAttachmentUrl is not null;
     public string StreamButtonLabel => IsStreaming ? "⏹ Stop Sharing" : "📺 Share Screen";
     public double StreamTabOpacity => HasActiveStream ? 1.0 : 0.5;
     public string StreamHeaderText => IsStreaming
@@ -77,6 +85,21 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         : Color.FromArgb("#ed4245");
     public string StreamLatencyText => StreamLatencyMs <= 0 ? "—" : $"{StreamLatencyMs}ms";
 
+    public string TypingText
+    {
+        get
+        {
+            var names = _typingUsersInChannel.Values.ToList();
+            return names.Count switch
+            {
+                0 => "",
+                1 => $"{names[0]} is typing…",
+                2 => $"{names[0]} and {names[1]} are typing…",
+                _ => "Several people are typing…"
+            };
+        }
+    }
+
     public string PttButtonLabel => IsSettingPttKey ? "Press any key…"
         : ptt.PttKey == 0 ? "⚠ Push to Talk (not set)"
         : $"🎙 Push to Talk: {PttKeyName}";
@@ -86,7 +109,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         : IsPttActive
             ? Color.FromArgb("#23a55a")
             : ptt.PttKey == 0
-                ? Color.FromArgb("#c0392b")  // red — mandatory, not configured
+                ? Color.FromArgb("#c0392b")
                 : Color.FromArgb("#4e5058");
 
     public string VoiceHintText => ptt.PttKey == 0
@@ -151,6 +174,43 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         OnPropertyChanged(nameof(StreamLatencyColor));
         OnPropertyChanged(nameof(StreamLatencyText));
     }
+    partial void OnPendingAttachmentUrlChanged(string? value) =>
+        OnPropertyChanged(nameof(HasPendingAttachment));
+
+    partial void OnMessageInputChanged(string value)
+    {
+        if (SelectedChannel is null || !hub.IsConnected) return;
+
+        if (string.IsNullOrEmpty(value))
+        {
+            StopTypingDebounced();
+            return;
+        }
+
+        if (!_isTyping)
+        {
+            _isTyping = true;
+            _ = hub.StartTypingAsync(SelectedChannel.Id);
+        }
+
+        _typingCts?.Cancel();
+        _typingCts = new CancellationTokenSource();
+        var token = _typingCts.Token;
+        _ = Task.Delay(2000, token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled) StopTypingDebounced();
+        }, TaskScheduler.Default);
+    }
+
+    private void StopTypingDebounced()
+    {
+        if (!_isTyping) return;
+        _isTyping = false;
+        _typingCts?.Cancel();
+        _typingCts = null;
+        if (hub.IsConnected && SelectedChannel is not null)
+            _ = hub.StopTypingAsync(SelectedChannel.Id);
+    }
 
     public void Initialize()
     {
@@ -170,6 +230,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.StreamStopped        += OnStreamStopped;
         hub.StreamFrameReceived  += OnStreamFrameReceived;
         hub.StreamNotification   += OnStreamNotification;
+        hub.UserTyping              += OnUserTyping;
+        hub.UserStoppedTyping       += OnUserStoppedTyping;
+        hub.MessageEdited           += OnMessageEdited;
+        hub.MessageDeleted          += OnMessageDeleted;
+        hub.NewMessageNotification  += OnNewMessageNotification;
         screen.FrameCaptured  += OnScreenFrameCaptured;
         audio.MicLevelChanged += level => MainThread.BeginInvokeOnMainThread(() => MicLevel = level);
         speech.TextRecognized  += OnSpeechRecognized;
@@ -214,11 +279,17 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         ActiveStreamerId = 0;
         StreamFrame = null;
 
+        // Clear typing state from previous channel
+        StopTypingDebounced();
+        _typingUsersInChannel.Clear();
+        OnPropertyChanged(nameof(TypingText));
+
         if (InVoice)
             await LeaveVoiceAsync();
 
         foreach (var c in Channels) c.IsSelected = false;
         item.IsSelected = true;
+        item.UnreadCount = 0;
         SelectedChannel = item.Channel;
         await hub.JoinChannelAsync(item.Channel.Id);
 
@@ -239,7 +310,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         _voiceMsgs.Clear();
         foreach (var m in (msgs ?? []).OrderBy(m => m.CreatedAt))
         {
-            var mi = new MessageViewItem(m);
+            var mi = new MessageViewItem(m, api.CurrentUsername, api.CurrentUserId);
             if (m.Source == MessageSource.Voice) _voiceMsgs.Add(mi);
             else _textMsgs.Add(mi);
         }
@@ -263,22 +334,84 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [RelayCommand]
     public async Task SendMessageAsync()
     {
-        if (SelectedChannel is null || string.IsNullOrWhiteSpace(MessageInput)) return;
+        if (SelectedChannel is null) return;
+        if (string.IsNullOrWhiteSpace(MessageInput) && PendingAttachmentUrl is null) return;
+
+        StopTypingDebounced();
+
         var text = MessageInput.Trim();
+        var attachmentUrl = PendingAttachmentUrl;
         MessageInput = "";
-        await PostMessageAsync(text, MessageSource.Text);
+        PendingAttachmentUrl = null;
+
+        await PostMessageAsync(text, MessageSource.Text, attachmentUrl);
     }
 
-    private async Task PostMessageAsync(string text, MessageSource source)
+    private async Task PostMessageAsync(string text, MessageSource source, string? attachmentUrl = null)
     {
-        if (SelectedChannel is null || string.IsNullOrWhiteSpace(text)) return;
-        var msg = await api.SendMessageAsync(SelectedChannel.Id, text, source);
+        if (SelectedChannel is null) return;
+        if (string.IsNullOrWhiteSpace(text) && attachmentUrl is null) return;
+        var msg = await api.SendMessageAsync(SelectedChannel.Id, text, source, attachmentUrl);
         if (msg is not null)
         {
-            var item = new MessageViewItem(msg);
+            var item = new MessageViewItem(msg, api.CurrentUsername, api.CurrentUserId);
             AddToStore(item);
             _ = LoadPreviewAsync(item);
         }
+    }
+
+    [RelayCommand]
+    public async Task PickAttachmentAsync()
+    {
+        try
+        {
+            var result = await FilePicker.PickAsync(new PickOptions
+            {
+                PickerTitle = "Choose an image to share",
+                FileTypes = FilePickerFileType.Images,
+            });
+            if (result is null) return;
+
+            using var stream = await result.OpenReadAsync();
+            var contentType = result.ContentType ?? "image/jpeg";
+            var url = await api.UploadAttachmentAsync(stream, result.FileName, contentType);
+            if (url is not null)
+                PendingAttachmentUrl = url;
+            else
+                await Shell.Current.DisplayAlert("Upload Failed", "Could not upload the file.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlert("Upload Error", ex.Message, "OK");
+        }
+    }
+
+    [RelayCommand]
+    public void ClearAttachment() => PendingAttachmentUrl = null;
+
+    [RelayCommand]
+    public async Task EditMessageAsync(MessageViewItem item)
+    {
+        if (item.IsSystemMessage || item.Message.AuthorId != api.CurrentUserId) return;
+        if (item.Message.IsDeleted) return;
+        var result = await Shell.Current.DisplayPromptAsync(
+            "Edit Message", "Edit your message:",
+            initialValue: item.Message.Content, maxLength: 2000);
+        if (result is null || result.Trim() == item.Message.Content) return;
+        var updated = await api.EditMessageAsync(item.Message.ChannelId, item.Message.Id, result.Trim());
+        if (updated is not null)
+            item.ApplyEdit(updated);
+    }
+
+    [RelayCommand]
+    public async Task DeleteMessageAsync(MessageViewItem item)
+    {
+        if (item.IsSystemMessage || item.Message.AuthorId != api.CurrentUserId) return;
+        var confirm = await Shell.Current.DisplayAlert(
+            "Delete Message", "Delete this message? This cannot be undone.", "Delete", "Cancel");
+        if (!confirm) return;
+        var ok = await api.DeleteMessageAsync(item.Message.ChannelId, item.Message.Id);
+        if (ok) item.ApplyDelete();
     }
 
     private void AddToStore(MessageViewItem item)
@@ -351,7 +484,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         IsTestMic = !IsTestMic;
         audio.StopCapture();
         if (IsTestMic) audio.StartCapture(testMic: true);
-        // when off, PTT controls capture
     }
 
     [RelayCommand]
@@ -402,6 +534,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public async Task LogoutAsync()
     {
         if (IsStreaming) { screen.StopCapture(); await hub.StopStreamAsync(); IsStreaming = false; }
+        StopTypingDebounced();
         ptt.CancelLearning();
         ptt.ClearUser();
         speech.StopListening();
@@ -416,7 +549,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         await hub.JoinVoiceChannelAsync(channel.Id);
         audio.AudioCaptured += OnAudioCaptured;
-        audio.StartPlayback(); // capture is PTT-controlled
+        audio.StartPlayback();
         InVoice = true;
     }
 
@@ -435,10 +568,75 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private void OnMessageReceived(MessageDto msg)
     {
+        // Only fires for the channel the user is currently in (server sends to channel-{id} group).
+        // Unread tracking for background channels is handled by OnNewMessageNotification.
         if (SelectedChannel?.Id != msg.ChannelId) return;
-        var item = new MessageViewItem(msg);
+
+        var item = new MessageViewItem(msg, api.CurrentUsername, api.CurrentUserId);
         AddToStore(item);
         _ = LoadPreviewAsync(item);
+
+        if (item.IsMention)
+        {
+            var preview = msg.Content.Length > 80 ? msg.Content[..80] + "…" : msg.Content;
+            toast.Show($"@Mention from {msg.AuthorUsername}", preview);
+        }
+    }
+
+    private void OnNewMessageNotification(MessageDto msg)
+    {
+        // Server broadcasts this to server-{id} group so every connected client hears about
+        // every new message, regardless of which channel they are currently viewing.
+        // We use it exclusively for unread badge tracking and background toasts.
+        if (SelectedChannel?.Id == msg.ChannelId) return; // already shown via ReceiveMessage
+
+        var channelItem = Channels.FirstOrDefault(c => c.Channel.Id == msg.ChannelId);
+        if (channelItem is not null)
+            MainThread.BeginInvokeOnMainThread(() => channelItem.UnreadCount++);
+
+        if (msg.AuthorId != api.CurrentUserId)
+        {
+            var preview = msg.Content.Length > 80 ? msg.Content[..80] + "…" : msg.Content;
+            toast.Show(msg.AuthorUsername, preview);
+        }
+    }
+
+    private void OnMessageEdited(MessageDto updated)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var item = _textMsgs.Concat(_voiceMsgs).FirstOrDefault(m => m.Message.Id == updated.Id);
+            item?.ApplyEdit(updated);
+        });
+    }
+
+    private void OnMessageDeleted(int messageId, int channelId)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var item = _textMsgs.Concat(_voiceMsgs).FirstOrDefault(m => m.Message.Id == messageId);
+            item?.ApplyDelete();
+        });
+    }
+
+    private void OnUserTyping(int userId, string username, int channelId)
+    {
+        if (SelectedChannel?.Id != channelId || userId == api.CurrentUserId) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _typingUsersInChannel[userId] = username;
+            OnPropertyChanged(nameof(TypingText));
+        });
+    }
+
+    private void OnUserStoppedTyping(int userId, int channelId)
+    {
+        if (SelectedChannel?.Id != channelId) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _typingUsersInChannel.Remove(userId);
+            OnPropertyChanged(nameof(TypingText));
+        });
     }
 
     private async Task LoadPreviewAsync(MessageViewItem item)
@@ -547,11 +745,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         }
 
         var selected = await ShowWindowPickerAsync();
-        if (selected is null) return; // user cancelled
+        if (selected is null) return;
 
         try
         {
-            // Use first available text channel if none is selected
             var channelId = SelectedChannel?.Id
                 ?? Channels.FirstOrDefault(c => c.Channel.Type == ChannelType.Text)?.Channel.Id;
             if (channelId is null)
@@ -588,12 +785,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         };
         pickerVm.Completed += chosen =>
         {
-            // Set result BEFORE closing — CloseWindow fires Destroying synchronously on WinUI,
-            // which would otherwise set the TCS to null first and discard the chosen window.
+            // Set result BEFORE closing — CloseWindow fires Destroying synchronously on WinUI
             tcs.TrySetResult(chosen);
             Application.Current!.CloseWindow(pickerWindow);
         };
-        pickerWindow.Destroying += (_, _) => tcs.TrySetResult(null); // handles direct X-close
+        pickerWindow.Destroying += (_, _) => tcs.TrySetResult(null);
         Application.Current!.OpenWindow(pickerWindow);
         return tcs.Task;
     }
@@ -623,12 +819,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [RelayCommand]
     public void OpenSettings()
     {
-        if (_settingsWindow is not null)
-        {
-            // Bring existing window to front — just close and reopen isn't ideal,
-            // so we activate it by doing nothing; user sees it already open
-            return;
-        }
+        if (_settingsWindow is not null) return;
         var page = new Pages.SettingsPage { BindingContext = settings };
         _settingsWindow = new Window(page)
         {
@@ -672,7 +863,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         MainThread.BeginInvokeOnMainThread(() =>
         {
             var item = MessageViewItem.CreateSystem(text, channelId);
-            // Add to text store so it appears regardless of which text channel is active
             _textMsgs.Add(item);
             if (SelectedTab == "Text")
                 Messages.Add(item);
@@ -711,7 +901,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         if (_streamWindow is not null)
             Application.Current!.CloseWindow(_streamWindow);
-        // IsFullScreen = false is handled by the Destroying event
     }
 
     private void OnStreamStopped(int userId, int channelId)
@@ -732,9 +921,13 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private void OnStreamFrameReceived(byte[] data)
     {
-        var ms = new MemoryStream(data);
-        var source = ImageSource.FromStream(() => ms);
-        MainThread.BeginInvokeOnMainThread(() => StreamFrame = source);
+        Interlocked.Exchange(ref _pendingFrame, data);
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var latest = Interlocked.Exchange(ref _pendingFrame, null);
+            if (latest is null) return;
+            StreamFrame = ImageSource.FromStream(() => new MemoryStream(latest));
+        });
     }
 
     private void OnScreenFrameCaptured(byte[] data)

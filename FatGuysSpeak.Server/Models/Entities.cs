@@ -59,6 +59,9 @@ public class Message
     public Channel Channel { get; set; } = null!;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public MessageSource Source { get; set; } = MessageSource.Text;
+    public string? AttachmentUrl { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? EditedAt { get; set; }
 }
 
 public enum ServerRole { Member, Moderator, Admin }

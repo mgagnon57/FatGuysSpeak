@@ -6,9 +6,12 @@ using FatGuysSpeak.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 10 * 1024 * 1024); // 10 MB for file uploads
 
 // Railway (and most cloud hosts) set DATABASE_URL as a postgres:// URI.
 // Fall back to the config connection string (SQLite for local dev).
@@ -107,12 +110,36 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='Source'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"Source\" INTEGER NOT NULL DEFAULT 0");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='AttachmentUrl'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"AttachmentUrl\" TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='IsDeleted'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"IsDeleted\" BOOLEAN NOT NULL DEFAULT FALSE");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='EditedAt'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"EditedAt\" TIMESTAMP");
     }
     else
     {
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='Source'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN Source INTEGER NOT NULL DEFAULT 0");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='AttachmentUrl'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN AttachmentUrl TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='IsDeleted'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='EditedAt'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN EditedAt TEXT");
     }
 
     if (!ctx.Servers.Any())
@@ -147,6 +174,14 @@ using (var scope = app.Services.CreateScope())
 
 app.UseCors();
 app.UseRateLimiter();
+
+var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
+Directory.CreateDirectory(uploadsPath);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsPath),
+    RequestPath = "/uploads"
+});
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

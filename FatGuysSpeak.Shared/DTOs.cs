@@ -10,8 +10,21 @@ public record CreateServerRequest(string Name, string? Description);
 public record ChannelDto(int Id, string Name, ChannelType Type, int ServerId, int Position);
 public record CreateChannelRequest(string Name, ChannelType Type);
 
-public record MessageDto(int Id, string Content, string AuthorUsername, int AuthorId, DateTime CreatedAt, int ChannelId, MessageSource Source = MessageSource.Text);
-public record SendMessageRequest(string Content, MessageSource Source = MessageSource.Text);
+public record MessageDto(
+    int Id,
+    string Content,
+    string AuthorUsername,
+    int AuthorId,
+    DateTime CreatedAt,
+    int ChannelId,
+    MessageSource Source = MessageSource.Text,
+    string? AttachmentUrl = null,
+    bool IsDeleted = false,
+    DateTime? EditedAt = null);
+
+public record SendMessageRequest(string Content, MessageSource Source = MessageSource.Text, string? AttachmentUrl = null);
+public record EditMessageRequest(string Content);
+public record AttachmentDto(string Url);
 
 public enum MessageSource { Text, Voice }
 

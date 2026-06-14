@@ -24,6 +24,11 @@ public class ChatHubService
     public event Action<int, int>? StreamStopped;            // (streamerId, channelId)
     public event Action<byte[]>? StreamFrameReceived;
     public event Action<int, string>? StreamNotification;   // (channelId, text)
+    public event Action<int, string, int>? UserTyping;       // (userId, username, channelId)
+    public event Action<int, int>? UserStoppedTyping;        // (userId, channelId)
+    public event Action<MessageDto>? MessageEdited;
+    public event Action<int, int>? MessageDeleted;           // (messageId, channelId)
+    public event Action<MessageDto>? NewMessageNotification; // server-wide, for unread badge tracking
 
     public bool IsConnected => _connection?.State == HubConnectionState.Connected;
 
@@ -51,6 +56,11 @@ public class ChatHubService
         _connection.On<int, int>("StreamStopped", (uid, cid) => StreamStopped?.Invoke(uid, cid));
         _connection.On<byte[]>("ReceiveStreamFrame", data => StreamFrameReceived?.Invoke(data));
         _connection.On<int, string>("StreamNotification", (cid, text) => StreamNotification?.Invoke(cid, text));
+        _connection.On<int, string, int>("UserTyping", (uid, name, cid) => UserTyping?.Invoke(uid, name, cid));
+        _connection.On<int, int>("UserStoppedTyping", (uid, cid) => UserStoppedTyping?.Invoke(uid, cid));
+        _connection.On<MessageDto>("MessageEdited", dto => MessageEdited?.Invoke(dto));
+        _connection.On<int, int>("MessageDeleted", (mid, cid) => MessageDeleted?.Invoke(mid, cid));
+        _connection.On<MessageDto>("NewMessageNotification", dto => NewMessageNotification?.Invoke(dto));
 
         await _connection.StartAsync();
     }
@@ -87,9 +97,15 @@ public class ChatHubService
 
     public Task StartStreamAsync(int channelId) => _connection!.InvokeAsync("StartStream", channelId);
     public Task StopStreamAsync() => _connection!.InvokeAsync("StopStream");
-    public Task SendStreamFrameAsync(byte[] data) => _connection?.InvokeAsync("SendStreamFrame", data) ?? Task.CompletedTask;
+    public Task SendStreamFrameAsync(byte[] data) => _connection?.SendAsync("SendStreamFrame", data) ?? Task.CompletedTask;
     public Task WatchStreamAsync(int channelId) => _connection!.InvokeAsync("WatchStream", channelId);
     public Task StopWatchingAsync(int channelId) => _connection!.InvokeAsync("StopWatching", channelId);
+
+    public Task StartTypingAsync(int channelId) =>
+        _connection?.SendAsync("StartTyping", channelId) ?? Task.CompletedTask;
+
+    public Task StopTypingAsync(int channelId) =>
+        _connection?.SendAsync("StopTyping", channelId) ?? Task.CompletedTask;
 
     public async Task<int> MeasureLatencyAsync()
     {
