@@ -178,11 +178,10 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
         var target = await db.ServerMembers.Include(sm => sm.User).FirstOrDefaultAsync(sm => sm.ServerId == serverId && sm.UserId == targetUserId);
         if (target is null) return NotFound();
 
-        // Defence-in-depth: reject promoting someone who is already Admin
-        if (req.Role == ServerRole.Admin && target.Role == ServerRole.Admin)
-            return BadRequest("User is already an Admin.");
+        // General no-op guard — no write, no broadcast when role doesn't change
+        if (req.Role == target.Role) return BadRequest("User already has that role.");
 
-        // Only the server owner can demote an existing Admin
+        // Only the server owner can demote an existing Admin (OwnerId=0 means dashboard handles this)
         if (target.Role == ServerRole.Admin && UserId != server.OwnerId)
             return Forbid();
 
