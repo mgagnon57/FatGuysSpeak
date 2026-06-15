@@ -36,6 +36,8 @@ public class ChatHubService
     public event Action<int, string, int>? CameraStarted;   // (userId, username, channelId)
     public event Action<int, int>? CameraStopped;            // (userId, channelId)
     public event Action<int, byte[]>? CameraFrameReceived;  // (userId, frame)
+    public event Action<DirectMessageDto>? DirectMessageReceived;
+    public event Action<int, int>? DirectMessageDeleted;    // (conversationId, messageId)
     public event Action<Exception?>? Reconnecting;
     public event Action<string?>?    Reconnected;
     public event Action<Exception?>? Disconnected;
@@ -78,6 +80,8 @@ public class ChatHubService
         _connection.On<int, string, int>("CameraStarted", (uid, name, cid) => CameraStarted?.Invoke(uid, name, cid));
         _connection.On<int, int>("CameraStopped", (uid, cid) => CameraStopped?.Invoke(uid, cid));
         _connection.On<int, byte[]>("ReceiveCameraFrame", (uid, frame) => CameraFrameReceived?.Invoke(uid, frame));
+        _connection.On<DirectMessageDto>("ReceiveDirectMessage", dto => DirectMessageReceived?.Invoke(dto));
+        _connection.On<int, int>("DirectMessageDeleted", (cid, mid) => DirectMessageDeleted?.Invoke(cid, mid));
 
         _connection.Reconnecting  += ex  => { Reconnecting?.Invoke(ex);  return Task.CompletedTask; };
         _connection.Reconnected   += cid => { Reconnected?.Invoke(cid);  return Task.CompletedTask; };

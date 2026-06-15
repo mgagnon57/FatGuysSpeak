@@ -46,8 +46,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private int _unreadBelowCount;
     [ObservableProperty] private bool _isStreaming;
     [ObservableProperty] private bool _isCameraOn;
+    [ObservableProperty] private bool _isDmMode;
+    [ObservableProperty] private DmConversationItem? _selectedDmConversation;
 
     public ObservableCollection<VideoTileViewModel> VideoTiles { get; } = [];
+    public ObservableCollection<DmConversationItem> DmConversations { get; } = [];
     public bool HasVideoTiles => VideoTiles.Count > 0;
 
     private bool _isAtBottom = true;
@@ -113,6 +116,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public bool IsVoiceTab => SelectedTab == "Voice";
     public bool IsStreamTab => SelectedTab == "Stream";
     public bool IsTextOrStreamTab => IsTextTab || IsStreamTab;
+    public bool ShowMessageInput => IsTextOrStreamTab || IsDmMode;
 
     public string  ConnectionStatusText  => HubConnectionState switch { "Reconnecting" => "Reconnecting…", "Disconnected" => "Disconnected", _ => "Connected" };
     public Color   ConnectionDotColor    => HubConnectionState switch { "Reconnecting" => Color.FromArgb("#f0a030"), "Disconnected" => Color.FromArgb("#ed4245"), _ => Color.FromArgb("#44bb44") };
@@ -130,6 +134,12 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             .Contains(Path.GetExtension(PendingAttachmentFileName).ToLowerInvariant());
     public string CameraButtonLabel => IsCameraOn ? "📷 Stop Camera" : "📷 Camera";
     public Color  CameraButtonColor => IsCameraOn ? Color.FromArgb("#ed4245") : Color.FromArgb("#3a3a3a");
+    public bool IsNotDmMode => !IsDmMode;
+    public bool ShowChannelUiElements => !IsDmMode && SelectedChannel is not null;
+    public string DmHeaderTitle => SelectedDmConversation?.OtherUsername ?? "Direct Messages";
+    public string MessagePlaceholderText => IsDmMode && SelectedDmConversation is not null
+        ? $"Message @{SelectedDmConversation.OtherUsername}"
+        : SelectedChannel is not null ? $"Message #{SelectedChannel.Name}" : "Select a channel";
     public string StreamButtonLabel => IsStreaming ? "⏹ Stop Sharing" : "📺 Share Screen";
     public double StreamTabOpacity => HasActiveStream ? 1.0 : 0.5;
     public string StreamHeaderText => IsStreaming
@@ -239,6 +249,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         OnPropertyChanged(nameof(IsVoiceTab));
         OnPropertyChanged(nameof(IsStreamTab));
         OnPropertyChanged(nameof(IsTextOrStreamTab));
+        OnPropertyChanged(nameof(ShowMessageInput));
         OnPropertyChanged(nameof(StreamViewerVisible));
         OnPropertyChanged(nameof(ShowMessages));
         if (value == "Stream")
@@ -290,6 +301,46 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         OnPropertyChanged(nameof(CameraButtonLabel));
         OnPropertyChanged(nameof(CameraButtonColor));
+    }
+
+    partial void OnIsDmModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsNotDmMode));
+        OnPropertyChanged(nameof(ShowChannelUiElements));
+        OnPropertyChanged(nameof(DmHeaderTitle));
+        OnPropertyChanged(nameof(MessagePlaceholderText));
+        OnPropertyChanged(nameof(ShowMessageInput));
+        if (value)
+        {
+            _ = LoadDmConversationsAsync();
+        }
+        else
+        {
+            SelectedDmConversation = null;
+            // Restore channel messages if a channel is selected
+            if (SelectedChannel is not null)
+                Messages = new ObservableCollection<MessageViewItem>(_textMsgs);
+            else
+                Messages.Clear();
+        }
+    }
+
+    partial void OnSelectedDmConversationChanged(DmConversationItem? value)
+    {
+        foreach (var dc in DmConversations) dc.IsSelected = false;
+        if (value is not null) value.IsSelected = true;
+        OnPropertyChanged(nameof(DmHeaderTitle));
+        OnPropertyChanged(nameof(MessagePlaceholderText));
+        if (value is not null)
+            _ = LoadDmMessagesAsync(value.ConversationId);
+        else
+            Messages.Clear();
+    }
+
+    partial void OnSelectedChannelChanged(ChannelDto? value)
+    {
+        OnPropertyChanged(nameof(ShowChannelUiElements));
+        OnPropertyChanged(nameof(MessagePlaceholderText));
     }
     partial void OnIsStreamingChanged(bool value)
     {
@@ -396,6 +447,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.CameraStarted           += OnCameraStarted;
         hub.CameraStopped           += OnCameraStopped;
         hub.CameraFrameReceived     += OnCameraFrameReceived;
+        hub.DirectMessageReceived   += OnDirectMessageReceived;
+        hub.DirectMessageDeleted    += OnDirectMessageDeleted;
         hub.Reconnecting += _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Reconnecting");
         hub.Reconnected  += _ => MainThread.BeginInvokeOnMainThread(async () =>
         {
@@ -650,6 +703,12 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [RelayCommand]
     public async Task SendMessageAsync()
     {
+        if (IsDmMode && SelectedDmConversation is not null)
+        {
+            await SendDmMessageAsync();
+            return;
+        }
+
         if (SelectedChannel is null) return;
         if (string.IsNullOrWhiteSpace(MessageInput) && PendingAttachmentUrl is null) return;
 
@@ -665,6 +724,20 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
         var source = IsStreamTab ? MessageSource.Stream : MessageSource.Text;
         await PostMessageAsync(text, source, attachmentUrl, attachmentFileName);
+    }
+
+    private async Task SendDmMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(MessageInput) && PendingAttachmentUrl is null) return;
+        IsEmojiPickerOpen = false;
+        var text = MessageInput.Trim();
+        var url = PendingAttachmentUrl;
+        var fname = PendingAttachmentFileName;
+        MessageInput = "";
+        PendingAttachmentUrl = null;
+        PendingAttachmentFileName = null;
+        await api.SendDmAsync(SelectedDmConversation!.ConversationId,
+            text.Length > 0 ? text : null, url, fname);
     }
 
     private async Task PostMessageAsync(string text, MessageSource source, string? attachmentUrl = null, string? attachmentFileName = null)
@@ -785,7 +858,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         var confirm = await Shell.Current.DisplayAlert(
             "Delete Message", "Delete this message? This cannot be undone.", "Delete", "Cancel");
         if (!confirm) return;
-        var ok = await api.DeleteMessageAsync(item.Message.ChannelId, item.Message.Id);
+        bool ok;
+        if (IsDmMode && SelectedDmConversation is not null)
+            ok = await api.DeleteDmMessageAsync(SelectedDmConversation.ConversationId, item.Message.Id);
+        else
+            ok = await api.DeleteMessageAsync(item.Message.ChannelId, item.Message.Id);
         if (ok) item.ApplyDelete();
     }
 
@@ -1320,6 +1397,104 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         var local = VideoTiles.FirstOrDefault(t => t.IsLocal);
         local?.UpdateFrame(jpeg);
     }
+
+    // ── Direct Messages ───────────────────────────────────────────────────────
+
+    [RelayCommand]
+    public void ToggleDmMode() => IsDmMode = !IsDmMode;
+
+    [RelayCommand]
+    public void SelectDmConversation(DmConversationItem item)
+    {
+        item.UnreadCount = 0;
+        SelectedDmConversation = item;
+    }
+
+    [RelayCommand]
+    public async Task StartDmWithUser(int userId)
+    {
+        var dto = await api.OpenDmConversationAsync(userId);
+        if (dto is null) return;
+        IsDmMode = true;
+        var existing = DmConversations.FirstOrDefault(dc => dc.ConversationId == dto.Id);
+        if (existing is null)
+        {
+            await LoadDmConversationsAsync();
+            existing = DmConversations.FirstOrDefault(dc => dc.ConversationId == dto.Id);
+        }
+        if (existing is not null)
+        {
+            existing.UnreadCount = 0;
+            SelectedDmConversation = existing;
+        }
+    }
+
+    private async Task LoadDmConversationsAsync()
+    {
+        var convos = await api.GetDmConversationsAsync();
+        if (convos is null) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            DmConversations.Clear();
+            foreach (var dto in convos)
+                DmConversations.Add(DmConversationItem.FromDto(dto));
+        });
+    }
+
+    private async Task LoadDmMessagesAsync(int conversationId)
+    {
+        var dtos = await api.GetDmMessagesAsync(conversationId);
+        if (dtos is null) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            Messages.Clear();
+            foreach (var dto in dtos)
+                Messages.Add(new MessageViewItem(DmToMessageDto(dto), api.CurrentUsername, api.CurrentUserId));
+            ScrollToLatestRequested?.Invoke();
+        });
+    }
+
+    private void OnDirectMessageReceived(DirectMessageDto dto)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (IsDmMode && SelectedDmConversation?.ConversationId == dto.ConversationId)
+            {
+                var item = new MessageViewItem(DmToMessageDto(dto), api.CurrentUsername, api.CurrentUserId);
+                Messages.Add(item);
+                if (_isAtBottom) ScrollToLatestRequested?.Invoke();
+            }
+
+            var convo = DmConversations.FirstOrDefault(dc => dc.ConversationId == dto.ConversationId);
+            if (convo is not null)
+            {
+                convo.LastMessagePreview = dto.IsDeleted ? "(message deleted)" : dto.Content;
+                convo.LastMessageAt = dto.CreatedAt;
+                bool isActiveConvo = IsDmMode && SelectedDmConversation?.ConversationId == dto.ConversationId;
+                if (!isActiveConvo && dto.AuthorId != api.CurrentUserId)
+                    convo.UnreadCount++;
+            }
+            else if (IsDmMode && dto.AuthorId != api.CurrentUserId)
+            {
+                _ = LoadDmConversationsAsync();
+            }
+        });
+    }
+
+    private void OnDirectMessageDeleted(int conversationId, int messageId)
+    {
+        if (!IsDmMode || SelectedDmConversation?.ConversationId != conversationId) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var item = Messages.FirstOrDefault(m => m.Message.Id == messageId);
+            item?.ApplyDelete();
+        });
+    }
+
+    private static MessageDto DmToMessageDto(DirectMessageDto dm) => new(
+        dm.Id, dm.Content, dm.AuthorUsername, dm.AuthorId, dm.CreatedAt,
+        dm.ConversationId, MessageSource.Text, dm.AttachmentUrl, dm.IsDeleted,
+        null, null, dm.AuthorAvatarUrl, null, null, null, dm.AttachmentFileName);
 
     private void OnCameraStarted(int userId, string username, int channelId)
     {

@@ -239,6 +239,9 @@ public class ChatHub(AppDbContext db) : Hub
             await Clients.OthersInGroup($"server-{sid}").SendAsync("UserConnected", userDto);
         }
 
+        // Personal group so DM notifications can be pushed to this user
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{UserId}");
+
         await base.OnConnectedAsync();
     }
 

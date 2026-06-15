@@ -72,21 +72,95 @@
             <Grid Grid.Column="0" BackgroundColor="#1e1e1e" RowDefinitions="Auto,*,Auto">
 
                 <Grid Grid.Row="0" BackgroundColor="#252525" Padding="8,7"
-                      ColumnDefinitions="Auto,*,Auto,Auto">
-                    <Label Grid.Column="0" Text="▼" TextColor="#8ab4d4" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0" />
-                    <Label Grid.Column="1" Text="{Binding SelectedServer.Name, FallbackValue='FatGuysSpeak'}" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="12" VerticalOptions="Center" />
+                      ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                    <Label Grid.Column="0" Text="▼" TextColor="#8ab4d4" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0"
+                           IsVisible="{Binding IsNotDmMode}" />
+                    <Label Grid.Column="0" Text="💬" TextColor="#8ab4d4" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0"
+                           IsVisible="{Binding IsDmMode}" />
+                    <Label Grid.Column="1" Text="{Binding SelectedServer.Name, FallbackValue='FatGuysSpeak'}" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="12" VerticalOptions="Center"
+                           IsVisible="{Binding IsNotDmMode}" />
+                    <Label Grid.Column="1" Text="Direct Messages" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="12" VerticalOptions="Center"
+                           IsVisible="{Binding IsDmMode}" />
                     <Label Grid.Column="2" Text="{Binding Members.Count, StringFormat='{0} online'}"
-                           TextColor="#666666" FontSize="10" VerticalOptions="Center" Margin="0,0,4,0" />
+                           TextColor="#666666" FontSize="10" VerticalOptions="Center" Margin="0,0,4,0"
+                           IsVisible="{Binding IsNotDmMode}" />
                     <Button Grid.Column="3" Text="🔗"
                             Command="{Binding CopyInviteLinkCommand}"
                             IsVisible="{Binding IsServerAdmin}"
                             BackgroundColor="Transparent" TextColor="#8ab4d4"
                             FontSize="13" HeightRequest="26" WidthRequest="30" Padding="0"
                             ToolTipProperties.Text="Copy invite link" />
+                    <Button Grid.Column="4" Text="💬"
+                            Command="{Binding ToggleDmModeCommand}"
+                            BackgroundColor="Transparent" TextColor="#8ab4d4"
+                            FontSize="13" HeightRequest="26" WidthRequest="30" Padding="0"
+                            ToolTipProperties.Text="Direct Messages" />
                 </Grid>
 
                 <ScrollView Grid.Row="1">
                     <VerticalStackLayout Spacing="0">
+
+                        <!-- DM conversations list (visible in DM mode) -->
+                        <VerticalStackLayout IsVisible="{Binding IsDmMode}" Spacing="0">
+                            <Label Text="  MESSAGES" TextColor="#666666" FontSize="10"
+                                   FontAttributes="Bold" Padding="8,8,8,4" />
+                            <StackLayout BindableLayout.ItemsSource="{Binding DmConversations}" Spacing="0">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DmConversationItem">
+                                        <Grid Padding="8,6,8,6"
+                                              BackgroundColor="{Binding IsSelected, Converter={StaticResource ChannelSelectionConverter}}">
+                                            <Grid.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectDmConversationCommand}"
+                                                    CommandParameter="{Binding .}" />
+                                            </Grid.GestureRecognizers>
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <!-- Avatar initials circle -->
+                                                <Frame Grid.Column="0" CornerRadius="14" WidthRequest="28" HeightRequest="28"
+                                                       BackgroundColor="#3a5f9e" Padding="0" Margin="0,0,8,0">
+                                                    <Grid>
+                                                        <Label Text="{Binding Initials}"
+                                                               TextColor="White" FontSize="10" FontAttributes="Bold"
+                                                               HorizontalOptions="Center" VerticalOptions="Center"
+                                                               IsVisible="{Binding HasOtherAvatar, Converter={StaticResource InvertBoolConverter}}" />
+                                                        <Image Source="{Binding OtherAvatarUrl}"
+                                                               IsVisible="{Binding HasOtherAvatar}"
+                                                               Aspect="AspectFill" />
+                                                    </Grid>
+                                                </Frame>
+                                                <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                                                    <Label Text="{Binding OtherUsername}"
+                                                           FontSize="12" FontAttributes="Bold"
+                                                           TextColor="{Binding IsSelected, Converter={StaticResource ChannelTextConverter}}"
+                                                           LineBreakMode="TailTruncation" />
+                                                    <Label Text="{Binding LastMessagePreview}"
+                                                           TextColor="#888888" FontSize="10"
+                                                           LineBreakMode="TailTruncation"
+                                                           IsVisible="{Binding LastMessagePreview, Converter={StaticResource StringToBoolConverter}}" />
+                                                </VerticalStackLayout>
+                                                <!-- Unread badge -->
+                                                <Border Grid.Column="2"
+                                                        BackgroundColor="#ed4245"
+                                                        StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                                                        Padding="5,1" MinimumWidthRequest="18"
+                                                        IsVisible="{Binding HasUnread}"
+                                                        VerticalOptions="Center">
+                                                    <Label Text="{Binding UnreadCount}"
+                                                           TextColor="White" FontSize="10" FontAttributes="Bold"
+                                                           HorizontalOptions="Center" VerticalOptions="Center" />
+                                                </Border>
+                                            </Grid>
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </StackLayout>
+                            <Label Text="Right-click any user to start a direct message."
+                                   TextColor="#555555" FontSize="11"
+                                   Padding="16,12" />
+                        </VerticalStackLayout>
+
+                        <!-- Server content (hidden in DM mode) -->
+                        <VerticalStackLayout IsVisible="{Binding IsNotDmMode}" Spacing="0">
 
                         <!-- Connected users -->
                         <Label Text="  CONNECTED" TextColor="#666666" FontSize="10"
@@ -98,6 +172,9 @@
                                     <Grid Padding="16,3,8,3" BackgroundColor="Transparent">
                                         <FlyoutBase.ContextFlyout>
                                             <MenuFlyout>
+                                                <MenuFlyoutItem Text="💬 Send Message"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.StartDmWithUserCommand}"
+                                                    CommandParameter="{Binding Id}" />
                                                 <MenuFlyoutItem Text="🎤 Test My Mic (Loopback)"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ToggleMicLoopbackCommand}" />
                                             </MenuFlyout>
@@ -192,6 +269,8 @@
                                 HorizontalOptions="Start"
                                 ToolTipProperties.Text="Invalidate current link and generate a new one" />
 
+                        </VerticalStackLayout><!-- end server content -->
+
                     </VerticalStackLayout>
                 </ScrollView>
 
@@ -224,9 +303,11 @@
             <!-- RIGHT: Chat panel -->
             <Grid Grid.Column="1" BackgroundColor="#1a1a1a" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto">
 
-                <!-- Channel header -->
+                <!-- Channel header / DM header -->
                 <Grid Grid.Row="0" BackgroundColor="#252525" RowDefinitions="Auto,Auto">
-                    <Grid Grid.Row="0" Padding="14,8" ColumnDefinitions="Auto,*,Auto">
+                    <!-- Channel header (hidden in DM mode) -->
+                    <Grid Grid.Row="0" Padding="14,8" ColumnDefinitions="Auto,*,Auto"
+                          IsVisible="{Binding IsNotDmMode}">
                         <Label Grid.Column="0" Text="#" TextColor="#555555" FontSize="16" VerticalOptions="Center" />
                         <Label Grid.Column="1" Text="{Binding SelectedChannel.Name, FallbackValue='Select a channel'}"
                                TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13"
@@ -236,6 +317,17 @@
                                 BackgroundColor="Transparent" TextColor="#888888"
                                 FontSize="14" HeightRequest="34" WidthRequest="36" Padding="0"
                                 IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}" />
+                    </Grid>
+                    <!-- DM header (visible in DM mode) -->
+                    <Grid Grid.Row="0" Padding="8,8" ColumnDefinitions="Auto,*"
+                          IsVisible="{Binding IsDmMode}">
+                        <Button Grid.Column="0" Text="←"
+                                Command="{Binding ToggleDmModeCommand}"
+                                BackgroundColor="Transparent" TextColor="#8ab4d4"
+                                FontSize="14" HeightRequest="30" WidthRequest="34" Padding="0" />
+                        <Label Grid.Column="1" Text="{Binding DmHeaderTitle, StringFormat='💬  {0}'}"
+                               TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13"
+                               VerticalOptions="Center" Margin="4,0,0,0" />
                     </Grid>
                     <Grid Grid.Row="1" IsVisible="{Binding IsSearchOpen}"
                           Padding="10,4,10,6" ColumnDefinitions="*,Auto,Auto" BackgroundColor="#1e1e1e">
@@ -260,7 +352,7 @@
 
                 <!-- Tab bar -->
                 <Grid Grid.Row="1" ColumnDefinitions="*,*,*" HeightRequest="34" BackgroundColor="#141420"
-                      IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}">
+                      IsVisible="{Binding ShowChannelUiElements}">
                     <Button Grid.Column="0" Text="💬 Chat"
                             Command="{Binding SelectTabCommand}" CommandParameter="Text"
                             BackgroundColor="{Binding IsTextTab, Converter={StaticResource TabBgConverter}}"
@@ -281,7 +373,7 @@
 
                 <!-- Voice participants strip + video tiles -->
                 <VerticalStackLayout Grid.Row="2"
-                                     IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}">
+                                     IsVisible="{Binding ShowChannelUiElements}">
                     <!-- Voice participants row -->
                     <Grid BackgroundColor="#1a2f1a" Padding="12,5">
                         <HorizontalStackLayout Spacing="14">
@@ -724,9 +816,9 @@
                        FontSize="11" FontAttributes="Italic"
                        VerticalOptions="Center" />
 
-                <!-- Message input area (Text and Stream tabs) -->
+                <!-- Message input area (Text, Stream, and DM) -->
                 <Grid Grid.Row="5" BackgroundColor="#252525" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Padding="12,4,12,8"
-                      IsVisible="{Binding IsTextOrStreamTab}">
+                      IsVisible="{Binding ShowMessageInput}">
                     <!-- Reply bar -->
                     <Grid Grid.Row="0" IsVisible="{Binding IsReplying}"
                           BackgroundColor="#1e1e2e" Margin="-12,0,-12,4" Padding="12,5"
@@ -883,7 +975,7 @@
                                 HeightRequest="36" WidthRequest="40" Padding="0" Margin="0,0,4,0"
                                 ToolTipProperties.Text="GIF picker" />
                         <Entry Grid.Column="3"
-                               Placeholder="{Binding SelectedChannel.Name, StringFormat='Message #{0}', FallbackValue='Select a channel'}"
+                               Placeholder="{Binding MessagePlaceholderText}"
                                BackgroundColor="#1a1a1a" PlaceholderColor="#555555" TextColor="#d0d0d0"
                                Text="{Binding MessageInput}" ReturnCommand="{Binding SendMessageCommand}" />
                         <Button Grid.Column="4" Text="Send" Command="{Binding SendMessageCommand}"

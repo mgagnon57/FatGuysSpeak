@@ -67,3 +67,25 @@ public record JoinVoiceRequest(int ChannelId);
 public record LinkPreviewDto(string Url, string? Title, string? Description, string? ImageUrl, string? SiteName);
 
 public record ServerInviteDto(string Code, int ServerId, string ServerName, int MemberCount);
+
+public record DirectConversationDto(
+    int Id,
+    int OtherUserId,
+    string OtherUsername,
+    string? OtherAvatarUrl,
+    string? LastMessagePreview,
+    DateTime? LastMessageAt);
+
+public record DirectMessageDto(
+    int Id,
+    string Content,
+    string AuthorUsername,
+    int AuthorId,
+    DateTime CreatedAt,
+    int ConversationId,
+    bool IsDeleted = false,
+    string? AttachmentUrl = null,
+    string? AuthorAvatarUrl = null,
+    string? AttachmentFileName = null);
+
+public record SendDirectMessageRequest(string? Content, string? AttachmentUrl = null, string? AttachmentFileName = null);

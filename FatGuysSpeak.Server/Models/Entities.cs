@@ -69,6 +69,31 @@ public class Message
     public string? AttachmentFileName { get; set; }
 }
 
+public class DirectConversation
+{
+    public int Id { get; set; }
+    public int User1Id { get; set; }  // always smaller userId
+    public User User1 { get; set; } = null!;
+    public int User2Id { get; set; }  // always larger userId
+    public User User2 { get; set; } = null!;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public List<DirectMessage> Messages { get; set; } = [];
+}
+
+public class DirectMessage
+{
+    public int Id { get; set; }
+    public int ConversationId { get; set; }
+    public DirectConversation Conversation { get; set; } = null!;
+    public int AuthorId { get; set; }
+    public User Author { get; set; } = null!;
+    public string Content { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool IsDeleted { get; set; }
+    public string? AttachmentUrl { get; set; }
+    public string? AttachmentFileName { get; set; }
+}
+
 public class AuditLog
 {
     public int Id { get; set; }

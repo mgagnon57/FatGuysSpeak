@@ -192,6 +192,31 @@ public class ApiService
             : null;
     }
 
+    public Task<List<DirectConversationDto>?> GetDmConversationsAsync() =>
+        _http.GetFromJsonAsync<List<DirectConversationDto>>("api/dm");
+
+    public async Task<DirectConversationDto?> OpenDmConversationAsync(int userId)
+    {
+        var resp = await _http.PostAsync($"api/dm/open/{userId}", null);
+        return resp.IsSuccessStatusCode ? await resp.Content.ReadFromJsonAsync<DirectConversationDto>() : null;
+    }
+
+    public Task<List<DirectMessageDto>?> GetDmMessagesAsync(int conversationId) =>
+        _http.GetFromJsonAsync<List<DirectMessageDto>>($"api/dm/{conversationId}/messages");
+
+    public async Task<DirectMessageDto?> SendDmAsync(int conversationId, string? content, string? attachmentUrl = null, string? attachmentFileName = null)
+    {
+        var resp = await _http.PostAsJsonAsync($"api/dm/{conversationId}/messages",
+            new SendDirectMessageRequest(content, attachmentUrl, attachmentFileName));
+        return resp.IsSuccessStatusCode ? await resp.Content.ReadFromJsonAsync<DirectMessageDto>() : null;
+    }
+
+    public async Task<bool> DeleteDmMessageAsync(int conversationId, int messageId)
+    {
+        var resp = await _http.DeleteAsync($"api/dm/{conversationId}/messages/{messageId}");
+        return resp.IsSuccessStatusCode;
+    }
+
     public async Task<LinkPreviewDto?> GetLinkPreviewAsync(string url)
     {
         try

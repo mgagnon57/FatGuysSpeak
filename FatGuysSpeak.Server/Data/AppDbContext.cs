@@ -13,6 +13,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<MessageReaction> MessageReactions => Set<MessageReaction>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ChannelPermission> ChannelPermissions => Set<ChannelPermission>();
+    public DbSet<DirectConversation> DirectConversations => Set<DirectConversation>();
+    public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -35,5 +37,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(m => m.ReplyToId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<DirectConversation>()
+            .HasIndex(dc => new { dc.User1Id, dc.User2Id }).IsUnique();
+
+        b.Entity<DirectMessage>()
+            .HasOne(dm => dm.Conversation)
+            .WithMany(dc => dc.Messages)
+            .HasForeignKey(dm => dm.ConversationId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

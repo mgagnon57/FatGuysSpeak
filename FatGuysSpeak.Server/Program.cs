@@ -241,6 +241,27 @@ using (var scope = app.Services.CreateScope())
                 ""MinRoleToRead"" INTEGER NOT NULL DEFAULT 0,
                 ""MinRoleToWrite"" INTEGER NOT NULL DEFAULT 0
             )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""DirectConversations"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""User1Id"" INTEGER NOT NULL,
+                ""User2Id"" INTEGER NOT NULL,
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW(),
+                UNIQUE(""User1Id"", ""User2Id"")
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""DirectMessages"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""ConversationId"" INTEGER NOT NULL REFERENCES ""DirectConversations""(""Id"") ON DELETE CASCADE,
+                ""AuthorId"" INTEGER NOT NULL,
+                ""Content"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW(),
+                ""IsDeleted"" BOOLEAN NOT NULL DEFAULT FALSE,
+                ""AttachmentUrl"" TEXT,
+                ""AttachmentFileName"" TEXT
+            )");
     }
     else
     {
@@ -272,6 +293,27 @@ using (var scope = app.Services.CreateScope())
                 ChannelId INTEGER PRIMARY KEY NOT NULL,
                 MinRoleToRead INTEGER NOT NULL DEFAULT 0,
                 MinRoleToWrite INTEGER NOT NULL DEFAULT 0
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS DirectConversations (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                User1Id INTEGER NOT NULL,
+                User2Id INTEGER NOT NULL,
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(User1Id, User2Id)
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS DirectMessages (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ConversationId INTEGER NOT NULL REFERENCES DirectConversations(Id) ON DELETE CASCADE,
+                AuthorId INTEGER NOT NULL,
+                Content TEXT NOT NULL DEFAULT '',
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                IsDeleted INTEGER NOT NULL DEFAULT 0,
+                AttachmentUrl TEXT,
+                AttachmentFileName TEXT
             )");
     }
 
