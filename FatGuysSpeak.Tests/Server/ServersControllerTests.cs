@@ -173,4 +173,79 @@ public class ServersControllerTests : IDisposable
         Assert.NotNull(members);
         Assert.Equal(2, members.Count);
     }
+
+    [Fact]
+    public async Task SetMemberRole_AdminPromotesNonAdminToAdmin_Succeeds()
+    {
+        await SeedAsync();
+        var member = new User { Username = "member2", Email = "m2@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(member);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.Add(new ServerMember
+            { ServerId = _server.Id, UserId = member.Id, Role = ServerRole.Member });
+        await _testDb.Db.SaveChangesAsync();
+        // _user is already Admin (seeded by SeedServerAsync)
+
+        var result = await _controller.SetMemberRole(_server.Id, member.Id,
+            new SetRoleRequest(ServerRole.Admin));
+
+        Assert.IsType<NoContentResult>(result);
+        var updated = await _testDb.Db.ServerMembers.FindAsync(_server.Id, member.Id);
+        Assert.Equal(ServerRole.Admin, updated!.Role);
+    }
+
+    [Fact]
+    public async Task SetMemberRole_PromoteAlreadyAdmin_ReturnsBadRequest()
+    {
+        await SeedAsync();
+        var admin2 = new User { Username = "admin2", Email = "a2@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(admin2);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.Add(new ServerMember
+            { ServerId = _server.Id, UserId = admin2.Id, Role = ServerRole.Admin });
+        await _testDb.Db.SaveChangesAsync();
+
+        var result = await _controller.SetMemberRole(_server.Id, admin2.Id,
+            new SetRoleRequest(ServerRole.Admin));
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task SetMemberRole_NonAdminCannotPromote_ReturnsForbid()
+    {
+        await SeedAsync();
+        var member = new User { Username = "member2", Email = "m2@test.com", PasswordHash = "*" };
+        var target = new User { Username = "target", Email = "target@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.AddRange(member, target);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.AddRange(
+            new ServerMember { ServerId = _server.Id, UserId = member.Id, Role = ServerRole.Member },
+            new ServerMember { ServerId = _server.Id, UserId = target.Id, Role = ServerRole.Member }
+        );
+        await _testDb.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_controller, member.Id, member.Username);
+
+        var result = await _controller.SetMemberRole(_server.Id, target.Id,
+            new SetRoleRequest(ServerRole.Admin));
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
+    public async Task GetMembersWithRoles_AsRegularMember_Succeeds()
+    {
+        await SeedAsync();
+        var member = new User { Username = "member2", Email = "m2@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(member);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.Add(new ServerMember
+            { ServerId = _server.Id, UserId = member.Id, Role = ServerRole.Member });
+        await _testDb.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_controller, member.Id, member.Username);
+
+        var result = await _controller.GetMembersWithRoles(_server.Id);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
 }

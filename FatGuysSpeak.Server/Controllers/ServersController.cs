@@ -154,13 +154,14 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
     public async Task<ActionResult<List<ServerMemberDto>>> GetMembersWithRoles(int serverId)
     {
         var caller = await db.ServerMembers.FindAsync(serverId, UserId);
-        if (caller is null || caller.Role < ServerRole.Admin) return Forbid();
+        if (caller is null) return Forbid();
 
-        return await db.ServerMembers
+        var members = await db.ServerMembers
             .Where(sm => sm.ServerId == serverId)
             .Include(sm => sm.User)
             .Select(sm => new ServerMemberDto(sm.User.Id, sm.User.Username, sm.User.Status, sm.Role, sm.JoinedAt))
             .ToListAsync();
+        return Ok(members);
     }
 
     [HttpPut("{serverId}/members/{targetUserId}/role")]
@@ -174,13 +175,14 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
         var server = await db.Servers.FindAsync(serverId);
         if (server is null) return NotFound();
 
-        // Owner-only: only the server owner can promote to Admin or demote from Admin
-        if (req.Role == ServerRole.Admin && UserId != server.OwnerId)
-            return Forbid();
-
         var target = await db.ServerMembers.Include(sm => sm.User).FirstOrDefaultAsync(sm => sm.ServerId == serverId && sm.UserId == targetUserId);
         if (target is null) return NotFound();
 
+        // Defence-in-depth: reject promoting someone who is already Admin
+        if (req.Role == ServerRole.Admin && target.Role == ServerRole.Admin)
+            return BadRequest("User is already an Admin.");
+
+        // Only the server owner can demote an existing Admin
         if (target.Role == ServerRole.Admin && UserId != server.OwnerId)
             return Forbid();
 
