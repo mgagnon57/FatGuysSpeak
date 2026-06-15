@@ -182,6 +182,27 @@ public class ApiService
         await _http.PutAsJsonAsync("api/users/me/status", new UpdateStatusRequest(status));
     }
 
+    public async Task<bool> UpdateBioAsync(string? bio)
+    {
+        var resp = await _http.PutAsJsonAsync("api/users/me/bio", new UpdateBioRequest(bio));
+        return resp.IsSuccessStatusCode;
+    }
+
+    public Task<List<BlockedUserDto>?> GetBlockedUsersAsync() =>
+        _http.GetFromJsonAsync<List<BlockedUserDto>>("api/users/me/blocks");
+
+    public async Task<bool> BlockUserAsync(int userId)
+    {
+        var resp = await _http.PostAsync($"api/users/me/blocks/{userId}", null);
+        return resp.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UnblockUserAsync(int userId)
+    {
+        var resp = await _http.DeleteAsync($"api/users/me/blocks/{userId}");
+        return resp.IsSuccessStatusCode;
+    }
+
     public async Task<ReactionsUpdatedDto?> ToggleReactionAsync(int channelId, int messageId, string emoji)
     {
         var encoded = Uri.EscapeDataString(emoji);
@@ -216,6 +237,69 @@ public class ApiService
         var resp = await _http.DeleteAsync($"api/dm/{conversationId}/messages/{messageId}");
         return resp.IsSuccessStatusCode;
     }
+
+    public async Task<List<MessageDto>?> GetChannelPinsAsync(int channelId)
+    {
+        var resp = await _http.GetAsync($"api/channels/{channelId}/pins");
+        if (!resp.IsSuccessStatusCode) return null;
+        return await resp.Content.ReadFromJsonAsync<List<MessageDto>>();
+    }
+
+    public async Task<bool> PinChannelMessageAsync(int channelId, int messageId)
+    {
+        var resp = await _http.PostAsync($"api/channels/{channelId}/messages/{messageId}/pin", null);
+        return resp.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UnpinChannelMessageAsync(int channelId, int messageId)
+    {
+        var resp = await _http.DeleteAsync($"api/channels/{channelId}/messages/{messageId}/pin");
+        return resp.IsSuccessStatusCode;
+    }
+
+    public async Task<List<DirectMessageDto>?> GetDmPinsAsync(int conversationId)
+    {
+        var resp = await _http.GetAsync($"api/dm/{conversationId}/pins");
+        if (!resp.IsSuccessStatusCode) return null;
+        return await resp.Content.ReadFromJsonAsync<List<DirectMessageDto>>();
+    }
+
+    public async Task<bool> PinDmMessageAsync(int conversationId, int messageId)
+    {
+        var resp = await _http.PostAsync($"api/dm/{conversationId}/messages/{messageId}/pin", null);
+        return resp.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> UnpinDmMessageAsync(int conversationId, int messageId)
+    {
+        var resp = await _http.DeleteAsync($"api/dm/{conversationId}/messages/{messageId}/pin");
+        return resp.IsSuccessStatusCode;
+    }
+
+    public async Task<DmReadStateDto?> MarkDmAsReadAsync(int conversationId)
+    {
+        var resp = await _http.PostAsync($"api/dm/{conversationId}/read", null);
+        if (!resp.IsSuccessStatusCode) return null;
+        return await resp.Content.ReadFromJsonAsync<DmReadStateDto>();
+    }
+
+    public Task<List<CategoryDto>?> GetCategoriesAsync(int serverId) =>
+        _http.GetFromJsonAsync<List<CategoryDto>>($"api/servers/{serverId}/categories");
+
+    public async Task<CategoryDto?> CreateCategoryAsync(int serverId, CreateCategoryRequest req)
+    {
+        var r = await _http.PostAsJsonAsync($"api/servers/{serverId}/categories", req);
+        return r.IsSuccessStatusCode ? await r.Content.ReadFromJsonAsync<CategoryDto>() : null;
+    }
+
+    public Task RenameCategoryAsync(int serverId, int categoryId, RenameCategoryRequest req) =>
+        _http.PutAsJsonAsync($"api/servers/{serverId}/categories/{categoryId}", req);
+
+    public Task DeleteCategoryAsync(int serverId, int categoryId) =>
+        _http.DeleteAsync($"api/servers/{serverId}/categories/{categoryId}");
+
+    public Task SetChannelCategoryAsync(int serverId, int channelId, SetChannelCategoryRequest req) =>
+        _http.PutAsJsonAsync($"api/servers/{serverId}/channels/{channelId}/category", req);
 
     public async Task<LinkPreviewDto?> GetLinkPreviewAsync(string url)
     {

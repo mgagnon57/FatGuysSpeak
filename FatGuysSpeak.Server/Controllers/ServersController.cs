@@ -90,7 +90,7 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
         return await db.Channels
             .Where(c => c.ServerId == serverId)
             .OrderBy(c => c.Position)
-            .Select(c => new ChannelDto(c.Id, c.Name, c.Type, c.ServerId, c.Position))
+            .Select(c => new ChannelDto(c.Id, c.Name, c.Type, c.ServerId, c.Position, c.CategoryId))
             .ToListAsync();
     }
 

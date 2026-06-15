@@ -19,7 +19,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string BaseUrl => $"{Request.Scheme}://{Request.Host}";
 
-    private static MessageDto ToDto(Message m, List<ReactionDto>? reactions = null) => new(
+    private static MessageDto ToDto(Message m, List<ReactionDto>? reactions = null, bool isPinned = false) => new(
         m.Id, m.Content, m.Author.Username, m.AuthorId, m.CreatedAt, m.ChannelId, m.Source,
         m.AttachmentUrl, m.IsDeleted, m.EditedAt,
         reactions?.Count > 0 ? reactions : null,
@@ -29,7 +29,8 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
         m.ReplyToId.HasValue && m.ReplyTo is { IsDeleted: false }
             ? (m.ReplyTo.Content.Length > 100 ? m.ReplyTo.Content[..100] + "…" : m.ReplyTo.Content)
             : null,
-        m.AttachmentFileName);
+        m.AttachmentFileName,
+        isPinned);
 
     private async Task<(bool isMember, bool hasReadAccess)> CheckChannelAccessAsync(int channelId)
     {
@@ -83,16 +84,21 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
             .ToListAsync();
         var byMsg = allReactions.GroupBy(r => r.MessageId)
             .ToDictionary(g => g.Key, g => g.ToList());
+        var pinnedIds = (await db.PinnedMessages
+            .Where(p => p.ChannelId == channelId && ids.Contains(p.MessageId))
+            .Select(p => p.MessageId)
+            .ToListAsync()).ToHashSet();
 
         return messages.Select(m =>
         {
-            if (!byMsg.TryGetValue(m.Id, out var rs)) return ToDto(m);
+            var pinned = pinnedIds.Contains(m.Id);
+            if (!byMsg.TryGetValue(m.Id, out var rs)) return ToDto(m, isPinned: pinned);
             var reactions = rs
                 .GroupBy(r => r.Emoji)
                 .Select(g => new ReactionDto(g.Key, g.Count(), g.Any(r => r.UserId == UserId)))
                 .OrderBy(r => r.Emoji)
                 .ToList();
-            return ToDto(m, reactions);
+            return ToDto(m, reactions, pinned);
         }).ToList();
     }
 

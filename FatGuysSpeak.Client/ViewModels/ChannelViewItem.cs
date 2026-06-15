@@ -11,6 +11,7 @@ public partial class ChannelViewItem(ChannelDto channel) : ObservableObject
 
     [ObservableProperty] private bool _isSelected;
     [ObservableProperty] private int _unreadCount;
+    [ObservableProperty] private int? _categoryId = channel.CategoryId;
 
     public bool HasUnread => UnreadCount > 0;
     public string UnreadBadge => UnreadCount > 99 ? "99+" : UnreadCount.ToString();

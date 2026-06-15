@@ -32,12 +32,24 @@ public class ChatHubService
     public event Action<ReactionsUpdatedDto>? ReactionsUpdated;
     public event Action<int, UserStatus>? UserStatusChanged;  // (userId, newStatus)
     public event Action? KickedFromVoice;
+    public event Action<int>? KickedFromServer;  // serverId
     public event Action<int>? UserSpeaking;  // userId
     public event Action<int, string, int>? CameraStarted;   // (userId, username, channelId)
     public event Action<int, int>? CameraStopped;            // (userId, channelId)
     public event Action<int, byte[]>? CameraFrameReceived;  // (userId, frame)
     public event Action<DirectMessageDto>? DirectMessageReceived;
     public event Action<int, int>? DirectMessageDeleted;    // (conversationId, messageId)
+    public event Action<int, string, int>? DmUserTyping;    // (userId, username, conversationId)
+    public event Action<int, int>? DmUserStoppedTyping;     // (userId, conversationId)
+    public event Action<int, int, DateTime>? DmConversationRead; // (conversationId, readByUserId, readAt)
+    public event Action<int, int>? MessagePinned;              // (messageId, channelId)
+    public event Action<int, int>? MessageUnpinned;            // (messageId, channelId)
+    public event Action<int, int>? DmMessagePinned;            // (messageId, conversationId)
+    public event Action<int, int>? DmMessageUnpinned;          // (messageId, conversationId)
+    public event Action<CategoryDto>? CategoryCreated;
+    public event Action<int>? CategoryDeleted;                 // categoryId
+    public event Action<int, string>? CategoryRenamed;         // (categoryId, name)
+    public event Action<int, int?>? ChannelCategoryChanged;   // (channelId, categoryId?)
     public event Action<Exception?>? Reconnecting;
     public event Action<string?>?    Reconnected;
     public event Action<Exception?>? Disconnected;
@@ -76,12 +88,24 @@ public class ChatHubService
         _connection.On<ReactionsUpdatedDto>("ReactionsUpdated", dto => ReactionsUpdated?.Invoke(dto));
         _connection.On<int, UserStatus>("UserStatusChanged", (uid, s) => UserStatusChanged?.Invoke(uid, s));
         _connection.On("KickFromVoice", () => KickedFromVoice?.Invoke());
+        _connection.On<int>("KickedFromServer", sid => KickedFromServer?.Invoke(sid));
         _connection.On<int>("UserSpeaking", uid => UserSpeaking?.Invoke(uid));
         _connection.On<int, string, int>("CameraStarted", (uid, name, cid) => CameraStarted?.Invoke(uid, name, cid));
         _connection.On<int, int>("CameraStopped", (uid, cid) => CameraStopped?.Invoke(uid, cid));
         _connection.On<int, byte[]>("ReceiveCameraFrame", (uid, frame) => CameraFrameReceived?.Invoke(uid, frame));
         _connection.On<DirectMessageDto>("ReceiveDirectMessage", dto => DirectMessageReceived?.Invoke(dto));
         _connection.On<int, int>("DirectMessageDeleted", (cid, mid) => DirectMessageDeleted?.Invoke(cid, mid));
+        _connection.On<int, string, int>("DmUserTyping", (uid, name, cid) => DmUserTyping?.Invoke(uid, name, cid));
+        _connection.On<int, int>("DmUserStoppedTyping", (uid, cid) => DmUserStoppedTyping?.Invoke(uid, cid));
+        _connection.On<int, int, DateTime>("DmConversationRead", (cid, uid, at) => DmConversationRead?.Invoke(cid, uid, at));
+        _connection.On<int, int>("MessagePinned",    (mid, cid) => MessagePinned?.Invoke(mid, cid));
+        _connection.On<int, int>("MessageUnpinned",  (mid, cid) => MessageUnpinned?.Invoke(mid, cid));
+        _connection.On<int, int>("DmMessagePinned",  (mid, cid) => DmMessagePinned?.Invoke(mid, cid));
+        _connection.On<int, int>("DmMessageUnpinned",(mid, cid) => DmMessageUnpinned?.Invoke(mid, cid));
+        _connection.On<CategoryDto>("CategoryCreated", dto => CategoryCreated?.Invoke(dto));
+        _connection.On<int>("CategoryDeleted", id => CategoryDeleted?.Invoke(id));
+        _connection.On<int, string>("CategoryRenamed", (id, name) => CategoryRenamed?.Invoke(id, name));
+        _connection.On<int, int?>("ChannelCategoryChanged", (cid, catId) => ChannelCategoryChanged?.Invoke(cid, catId));
 
         _connection.Reconnecting  += ex  => { Reconnecting?.Invoke(ex);  return Task.CompletedTask; };
         _connection.Reconnected   += cid => { Reconnected?.Invoke(cid);  return Task.CompletedTask; };
@@ -136,6 +160,12 @@ public class ChatHubService
 
     public Task StopTypingAsync(int channelId) =>
         _connection?.SendAsync("StopTyping", channelId) ?? Task.CompletedTask;
+
+    public Task StartDmTypingAsync(int conversationId) =>
+        _connection?.SendAsync("StartDmTyping", conversationId) ?? Task.CompletedTask;
+
+    public Task StopDmTypingAsync(int conversationId) =>
+        _connection?.SendAsync("StopDmTyping", conversationId) ?? Task.CompletedTask;
 
     public async Task<int> MeasureLatencyAsync()
     {

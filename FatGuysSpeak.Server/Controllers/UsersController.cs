@@ -38,7 +38,7 @@ public class UsersController(AppDbContext db) : ControllerBase
             }
         }
 
-        return new UserProfileDto(user.Id, user.Username, user.Status, user.CreatedAt, role, joinedAt, user.Id == UserId, user.AvatarUrl);
+        return new UserProfileDto(user.Id, user.Username, user.Status, user.CreatedAt, role, joinedAt, user.Id == UserId, user.AvatarUrl, user.Bio);
     }
 
     [HttpPost("me/avatar")]
@@ -66,6 +66,18 @@ public class UsersController(AppDbContext db) : ControllerBase
         await db.SaveChangesAsync();
 
         return Ok(new AttachmentDto(url));
+    }
+
+    [HttpPut("me/bio")]
+    public async Task<IActionResult> UpdateBio(UpdateBioRequest req)
+    {
+        if (req.Bio is not null && req.Bio.Length > 300)
+            return BadRequest("Bio must be 300 characters or fewer.");
+        var user = await db.Users.FindAsync(UserId);
+        if (user is null) return NotFound();
+        user.Bio = req.Bio?.Trim().Length == 0 ? null : req.Bio?.Trim();
+        await db.SaveChangesAsync();
+        return NoContent();
     }
 
     [HttpPut("me/status")]

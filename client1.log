@@ -1,0 +1,12 @@
+﻿Using launch settings from C:\FatGuysSpeak\FatGuysSpeak.Client\Properties\launchSettings.json...
+C:\FatGuysSpeak\FatGuysSpeak.Client\ViewModels\CategoryViewItem.cs(14,18): warning CS8826: Partial method declarations 'void CategoryViewItem.OnIsCollapsedChanged(bool value)' and 'void CategoryViewItem.OnIsCollapsedChanged(bool _)' have signature differences. [C:\FatGuysSpeak\FatGuysSpeak.Client\FatGuysSpeak.Client.csproj::TargetFramework=net9.0-windows10.0.19041.0]
+C:\FatGuysSpeak\FatGuysSpeak.Client\ViewModels\MessageViewItem.cs(199,41): warning CS0618: 'Application.MainPage.get' is obsolete: 'This property has been deprecated. For single-window applications, use Windows[0].Page. For multi-window applications, identify and use the appropriate Window object to access the desired Page. Additionally, each element features a Window property, accessible when it's part of the current window.' [C:\FatGuysSpeak\FatGuysSpeak.Client\FatGuysSpeak.Client.csproj::TargetFramework=net9.0-windows10.0.19041.0]
+CSC : error CS2012: Cannot open 'C:\FatGuysSpeak\FatGuysSpeak.Client\obj\Debug\net9.0-windows10.0.19041.0\win10-x64\intermediatexaml\FatGuysSpeak.Client.dll' for writing -- The process cannot access the file 'C:\FatGuysSpeak\FatGuysSpeak.Client\obj\Debug\net9.0-windows10.0.19041.0\win10-x64\intermediatexaml\FatGuysSpeak.Client.dll' because it is being used by another process.; file may be locked by 'Microsoft Defender Antivirus Service' (5800) [C:\FatGuysSpeak\FatGuysSpeak.Client\FatGuysSpeak.Client.csproj::TargetFramework=net9.0-windows10.0.19041.0]
+dotnet : 
+At line:1 char:1
++ dotnet run --project C:\FatGuysSpeak\FatGuysSpeak.Client --framework  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+The build failed. Fix the build errors and run again.

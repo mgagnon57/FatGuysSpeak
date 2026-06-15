@@ -72,7 +72,13 @@ public class DirectMessagesController(AppDbContext db, IHubContext<ChatHub> hub)
             .OrderBy(dm => dm.CreatedAt)
             .ToListAsync();
 
-        return Ok(messages.Select(ToMsgDto).ToList());
+        var ids = messages.Select(m => m.Id).ToHashSet();
+        var pinnedIds = (await db.PinnedDirectMessages
+            .Where(p => p.ConversationId == conversationId && ids.Contains(p.DirectMessageId))
+            .Select(p => p.DirectMessageId)
+            .ToListAsync()).ToHashSet();
+
+        return Ok(messages.Select(m => ToMsgDto(m, pinnedIds.Contains(m.Id))).ToList());
     }
 
     [HttpPost("{conversationId}/messages")]
@@ -108,6 +114,37 @@ public class DirectMessagesController(AppDbContext db, IHubContext<ChatHub> hub)
         return Ok(dto);
     }
 
+    [HttpPost("{conversationId}/read")]
+    public async Task<ActionResult<DmReadStateDto>> MarkAsRead(int conversationId)
+    {
+        var convo = await db.DirectConversations.FindAsync(conversationId);
+        if (convo is null) return NotFound();
+        if (convo.User1Id != UserId && convo.User2Id != UserId) return Forbid();
+
+        var now = DateTime.UtcNow;
+        var record = await db.DirectConversationReads
+            .FirstOrDefaultAsync(r => r.ConversationId == conversationId && r.UserId == UserId);
+        if (record is null)
+        {
+            db.DirectConversationReads.Add(new DirectConversationRead
+                { ConversationId = conversationId, UserId = UserId, LastReadAt = now });
+        }
+        else
+        {
+            record.LastReadAt = now;
+        }
+        await db.SaveChangesAsync();
+
+        int recipientId = convo.User1Id == UserId ? convo.User2Id : convo.User1Id;
+        await hub.Clients.Group($"user-{recipientId}")
+            .SendAsync("DmConversationRead", conversationId, UserId, now);
+
+        var otherRead = await db.DirectConversationReads
+            .FirstOrDefaultAsync(r => r.ConversationId == conversationId && r.UserId == recipientId);
+
+        return Ok(new DmReadStateDto(conversationId, now, otherRead?.LastReadAt));
+    }
+
     [HttpDelete("{conversationId}/messages/{messageId}")]
     public async Task<ActionResult> DeleteMessage(int conversationId, int messageId)
     {
@@ -141,9 +178,9 @@ public class DirectMessagesController(AppDbContext db, IHubContext<ChatHub> hub)
         return new DirectConversationDto(dc.Id, other.Id, other.Username, other.AvatarUrl, preview, last?.CreatedAt);
     }
 
-    private static DirectMessageDto ToMsgDto(DirectMessage dm) => new(
+    private static DirectMessageDto ToMsgDto(DirectMessage dm, bool isPinned = false) => new(
         dm.Id, dm.Content, dm.Author.Username, dm.AuthorId, dm.CreatedAt,
-        dm.ConversationId, dm.IsDeleted, dm.AttachmentUrl, dm.Author.AvatarUrl, dm.AttachmentFileName);
+        dm.ConversationId, dm.IsDeleted, dm.AttachmentUrl, dm.Author.AvatarUrl, dm.AttachmentFileName, isPinned);
 
     private Task<bool> IsParticipantAsync(int conversationId) =>
         db.DirectConversations.AnyAsync(dc => dc.Id == conversationId

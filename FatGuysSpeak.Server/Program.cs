@@ -173,9 +173,18 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='AttachmentFileName'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"AttachmentFileName\" TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Channels' AND column_name='CategoryId'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Channels\" ADD COLUMN \"CategoryId\" INTEGER");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='Bio'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"Bio\" TEXT");
     }
     else
     {
+
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='Source'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN Source INTEGER NOT NULL DEFAULT 0");
@@ -207,6 +216,14 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='AttachmentFileName'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN AttachmentFileName TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Channels') WHERE name='CategoryId'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Channels ADD COLUMN CategoryId INTEGER");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='Bio'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN Bio TEXT");
     }
 
     // MessageReactions table (added for reactions feature)
@@ -262,6 +279,48 @@ using (var scope = app.Services.CreateScope())
                 ""AttachmentUrl"" TEXT,
                 ""AttachmentFileName"" TEXT
             )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""DirectConversationReads"" (
+                ""ConversationId"" INTEGER NOT NULL REFERENCES ""DirectConversations""(""Id"") ON DELETE CASCADE,
+                ""UserId"" INTEGER NOT NULL REFERENCES ""Users""(""Id"") ON DELETE CASCADE,
+                ""LastReadAt"" TIMESTAMP NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (""ConversationId"", ""UserId"")
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""PinnedMessages"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""MessageId"" INTEGER NOT NULL UNIQUE REFERENCES ""Messages""(""Id"") ON DELETE CASCADE,
+                ""ChannelId"" INTEGER NOT NULL,
+                ""PinnedById"" INTEGER NOT NULL,
+                ""PinnedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""PinnedDirectMessages"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""DirectMessageId"" INTEGER NOT NULL UNIQUE REFERENCES ""DirectMessages""(""Id"") ON DELETE CASCADE,
+                ""ConversationId"" INTEGER NOT NULL,
+                ""PinnedById"" INTEGER NOT NULL,
+                ""PinnedAt"" TIMESTAMP NOT NULL DEFAULT NOW()
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""Categories"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""ServerId"" INTEGER NOT NULL REFERENCES ""GuildServers""(""Id"") ON DELETE CASCADE,
+                ""Name"" TEXT NOT NULL,
+                ""Position"" INTEGER NOT NULL DEFAULT 0
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""UserBlocks"" (
+                ""BlockerId"" INTEGER NOT NULL REFERENCES ""Users""(""Id"") ON DELETE CASCADE,
+                ""BlockedId"" INTEGER NOT NULL REFERENCES ""Users""(""Id"") ON DELETE CASCADE,
+                ""CreatedAt"" TIMESTAMP NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (""BlockerId"", ""BlockedId"")
+            )");
     }
     else
     {
@@ -314,6 +373,48 @@ using (var scope = app.Services.CreateScope())
                 IsDeleted INTEGER NOT NULL DEFAULT 0,
                 AttachmentUrl TEXT,
                 AttachmentFileName TEXT
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS DirectConversationReads (
+                ConversationId INTEGER NOT NULL REFERENCES DirectConversations(Id) ON DELETE CASCADE,
+                UserId INTEGER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+                LastReadAt TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (ConversationId, UserId)
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS PinnedMessages (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                MessageId INTEGER NOT NULL UNIQUE REFERENCES Messages(Id) ON DELETE CASCADE,
+                ChannelId INTEGER NOT NULL,
+                PinnedById INTEGER NOT NULL,
+                PinnedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS PinnedDirectMessages (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                DirectMessageId INTEGER NOT NULL UNIQUE REFERENCES DirectMessages(Id) ON DELETE CASCADE,
+                ConversationId INTEGER NOT NULL,
+                PinnedById INTEGER NOT NULL,
+                PinnedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS Categories (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ServerId INTEGER NOT NULL REFERENCES GuildServers(Id) ON DELETE CASCADE,
+                Name TEXT NOT NULL,
+                Position INTEGER NOT NULL DEFAULT 0
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS UserBlocks (
+                BlockerId INTEGER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+                BlockedId INTEGER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (BlockerId, BlockedId)
             )");
     }
 

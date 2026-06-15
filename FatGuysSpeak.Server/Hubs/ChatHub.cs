@@ -338,6 +338,26 @@ public class ChatHub(AppDbContext db) : Hub
             .SendAsync("UserStoppedTyping", UserId, channelId);
     }
 
+    public async Task StartDmTyping(int conversationId)
+    {
+        var convo = await db.DirectConversations.FindAsync(conversationId);
+        if (convo is null) return;
+        if (convo.User1Id != UserId && convo.User2Id != UserId) return;
+        int recipientId = convo.User1Id == UserId ? convo.User2Id : convo.User1Id;
+        await Clients.Group($"user-{recipientId}")
+            .SendAsync("DmUserTyping", UserId, Username, conversationId);
+    }
+
+    public async Task StopDmTyping(int conversationId)
+    {
+        var convo = await db.DirectConversations.FindAsync(conversationId);
+        if (convo is null) return;
+        if (convo.User1Id != UserId && convo.User2Id != UserId) return;
+        int recipientId = convo.User1Id == UserId ? convo.User2Id : convo.User1Id;
+        await Clients.Group($"user-{recipientId}")
+            .SendAsync("DmUserStoppedTyping", UserId, conversationId);
+    }
+
     // Echo back immediately so the client can measure round-trip time
     public Task Ping() => Task.CompletedTask;
 

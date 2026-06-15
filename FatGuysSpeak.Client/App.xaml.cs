@@ -11,12 +11,13 @@ public partial class App : Application
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
+        bool phoneMode = Environment.GetEnvironmentVariable("FATGUYS_PHONE_MODE") == "1";
         var window = new Window(new AppShell())
         {
-            Width = 1000,
-            Height = 900,
-            MinimumWidth = 800,
-            MinimumHeight = 750,
+            Width  = phoneMode ? 390 : 1000,
+            Height = phoneMode ? 844 : 900,
+            MinimumWidth  = phoneMode ? 360 : 800,
+            MinimumHeight = phoneMode ? 640 : 750,
         };
 
         window.Destroying += async (_, _) =>

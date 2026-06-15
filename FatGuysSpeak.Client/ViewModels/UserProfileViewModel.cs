@@ -5,10 +5,24 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class UserProfileViewModel(ApiService api, int serverId) : ObservableObject
+public partial class UserProfileViewModel : ObservableObject
 {
+    private readonly ApiService _api;
+    private readonly int _serverId;
+
+    public UserProfileViewModel(ApiService api, int serverId, bool isBlocked = false)
+    {
+        _api = api;
+        _serverId = serverId;
+        _isBlocked = isBlocked;
+    }
+
     [ObservableProperty] private UserProfileDto? _profile;
     [ObservableProperty] private bool _isLoading = true;
+    [ObservableProperty] private bool _isEditingBio;
+    [ObservableProperty] private string _bioInput = "";
+    [ObservableProperty] private string _bioError = "";
+    [ObservableProperty] private bool _isBlocked;
 
     public string AvatarText => Profile is null ? "?"
         : Profile.Username.Length >= 2
@@ -48,26 +62,23 @@ public partial class UserProfileViewModel(ApiService api, int serverId) : Observ
             : "";
 
     public bool IsOwnProfile => Profile?.IsCurrentUser ?? false;
+    public bool HasBio => !string.IsNullOrWhiteSpace(Profile?.Bio);
+    public string BlockButtonText => IsBlocked ? "🔓 Unblock User" : "🚫 Block User";
 
     public async Task LoadAsync(int userId)
     {
         IsLoading = true;
-        Profile = await api.GetUserProfileAsync(userId, serverId);
+        Profile = await _api.GetUserProfileAsync(userId, _serverId);
+        BioInput = Profile?.Bio ?? "";
         IsLoading = false;
-        OnPropertyChanged(nameof(AvatarText));
-        OnPropertyChanged(nameof(StatusText));
-        OnPropertyChanged(nameof(StatusColor));
-        OnPropertyChanged(nameof(RoleText));
-        OnPropertyChanged(nameof(HasRole));
-        OnPropertyChanged(nameof(JoinedText));
-        OnPropertyChanged(nameof(IsOwnProfile));
+        NotifyAll();
     }
 
     [RelayCommand]
     public async Task SetStatus(string statusStr)
     {
         if (!Enum.TryParse<UserStatus>(statusStr, out var status)) return;
-        await api.UpdateStatusAsync(status);
+        await _api.UpdateStatusAsync(status);
         if (Profile is not null)
         {
             Profile = Profile with { Status = status };
@@ -76,7 +87,68 @@ public partial class UserProfileViewModel(ApiService api, int serverId) : Observ
         }
     }
 
-    partial void OnProfileChanged(UserProfileDto? value)
+    [RelayCommand]
+    public void StartEditBio()
+    {
+        BioInput = Profile?.Bio ?? "";
+        BioError = "";
+        IsEditingBio = true;
+    }
+
+    [RelayCommand]
+    public void CancelEditBio()
+    {
+        IsEditingBio = false;
+        BioError = "";
+    }
+
+    [RelayCommand]
+    public async Task SaveBioAsync()
+    {
+        if (BioInput.Length > 300)
+        {
+            BioError = "Bio must be 300 characters or fewer.";
+            return;
+        }
+        var ok = await _api.UpdateBioAsync(BioInput);
+        if (!ok)
+        {
+            BioError = "Failed to save bio.";
+            return;
+        }
+        Profile = Profile! with { Bio = string.IsNullOrWhiteSpace(BioInput) ? null : BioInput.Trim() };
+        IsEditingBio = false;
+        BioError = "";
+        OnPropertyChanged(nameof(HasBio));
+    }
+
+    [RelayCommand]
+    public async Task ToggleBlockAsync()
+    {
+        if (Profile is null) return;
+        if (IsBlocked)
+        {
+            var ok = await _api.UnblockUserAsync(Profile.Id);
+            if (ok)
+            {
+                IsBlocked = false;
+                OnPropertyChanged(nameof(BlockButtonText));
+            }
+        }
+        else
+        {
+            var ok = await _api.BlockUserAsync(Profile.Id);
+            if (ok)
+            {
+                IsBlocked = true;
+                OnPropertyChanged(nameof(BlockButtonText));
+            }
+        }
+    }
+
+    partial void OnProfileChanged(UserProfileDto? value) => NotifyAll();
+
+    private void NotifyAll()
     {
         OnPropertyChanged(nameof(AvatarText));
         OnPropertyChanged(nameof(StatusText));
@@ -85,5 +157,7 @@ public partial class UserProfileViewModel(ApiService api, int serverId) : Observ
         OnPropertyChanged(nameof(HasRole));
         OnPropertyChanged(nameof(JoinedText));
         OnPropertyChanged(nameof(IsOwnProfile));
+        OnPropertyChanged(nameof(HasBio));
+        OnPropertyChanged(nameof(BlockButtonText));
     }
 }

@@ -14,6 +14,8 @@ public partial class MessageViewItem : ObservableObject
     [ObservableProperty] private MessageDto _message;
     [ObservableProperty] private bool _isEdited;
     [ObservableProperty] private LinkPreviewDto? _preview;
+    [ObservableProperty] private bool _showSeenReceipt;
+    [ObservableProperty] private bool _isPinned;
 
     // GIF playback control
     private string? _attachmentDisplayUrl;
@@ -96,6 +98,7 @@ public partial class MessageViewItem : ObservableObject
     {
         _message = message;
         _isEdited = message.EditedAt.HasValue;
+        _isPinned = message.IsPinned;
         IsSystemMessage = false;
         IsOwnMessage = message.AuthorId != 0 && message.AuthorId == currentUserId;
         IsMention = !string.IsNullOrEmpty(currentUsername)

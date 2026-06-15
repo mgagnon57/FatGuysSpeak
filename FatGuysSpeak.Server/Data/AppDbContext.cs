@@ -8,6 +8,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<User> Users => Set<User>();
     public DbSet<GuildServer> Servers => Set<GuildServer>();
     public DbSet<ServerMember> ServerMembers => Set<ServerMember>();
+    public DbSet<Category> Categories => Set<Category>();
     public DbSet<Channel> Channels => Set<Channel>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<MessageReaction> MessageReactions => Set<MessageReaction>();
@@ -15,6 +16,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ChannelPermission> ChannelPermissions => Set<ChannelPermission>();
     public DbSet<DirectConversation> DirectConversations => Set<DirectConversation>();
     public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
+    public DbSet<DirectConversationRead> DirectConversationReads => Set<DirectConversationRead>();
+    public DbSet<PinnedMessage> PinnedMessages => Set<PinnedMessage>();
+    public DbSet<PinnedDirectMessage> PinnedDirectMessages => Set<PinnedDirectMessage>();
+    public DbSet<UserBlock> UserBlocks => Set<UserBlock>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -46,5 +51,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany(dc => dc.Messages)
             .HasForeignKey(dm => dm.ConversationId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<DirectConversationRead>()
+            .HasKey(r => new { r.ConversationId, r.UserId });
+
+        b.Entity<PinnedMessage>()
+            .HasIndex(p => p.MessageId).IsUnique();
+
+        b.Entity<PinnedDirectMessage>()
+            .HasIndex(p => p.DirectMessageId).IsUnique();
+
+        b.Entity<UserBlock>()
+            .HasKey(ub => new { ub.BlockerId, ub.BlockedId });
     }
 }

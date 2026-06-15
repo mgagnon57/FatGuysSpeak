@@ -1,0 +1,952 @@
+﻿Using launch settings from C:\FatGuysSpeak\FatGuysSpeak.Server\Properties\launchSettings.json...
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (5ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT COUNT(*) FROM "sqlite_master" WHERE "type" = 'table' AND "rootpage" IS NOT NULL;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      
+            CREATE TABLE IF NOT EXISTS MessageReactions (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                MessageId INTEGER NOT NULL REFERENCES Messages(Id) ON DELETE CASCADE,
+                UserId INTEGER NOT NULL,
+                Username TEXT NOT NULL,
+                Emoji TEXT NOT NULL,
+                UNIQUE(MessageId, UserId, Emoji)
+            )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      
+            CREATE TABLE IF NOT EXISTS AuditLogs (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ServerId INTEGER NOT NULL,
+                ActorId INTEGER NOT NULL,
+                ActorUsername TEXT NOT NULL,
+                Action TEXT NOT NULL,
+                TargetId INTEGER,
+                TargetUsername TEXT,
+                Detail TEXT,
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      
+            CREATE TABLE IF NOT EXISTS ChannelPermissions (
+                ChannelId INTEGER PRIMARY KEY NOT NULL,
+                MinRoleToRead INTEGER NOT NULL DEFAULT 0,
+                MinRoleToWrite INTEGER NOT NULL DEFAULT 0
+            )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      
+            CREATE TABLE IF NOT EXISTS DirectConversations (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                User1Id INTEGER NOT NULL,
+                User2Id INTEGER NOT NULL,
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(User1Id, User2Id)
+            )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      
+            CREATE TABLE IF NOT EXISTS DirectMessages (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ConversationId INTEGER NOT NULL REFERENCES DirectConversations(Id) ON DELETE CASCADE,
+                AuthorId INTEGER NOT NULL,
+                Content TEXT NOT NULL DEFAULT '',
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now')),
+                IsDeleted INTEGER NOT NULL DEFAULT 0,
+                AttachmentUrl TEXT,
+                AttachmentFileName TEXT
+            )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      
+            CREATE TABLE IF NOT EXISTS DirectConversationReads (
+                ConversationId INTEGER NOT NULL REFERENCES DirectConversations(Id) ON DELETE CASCADE,
+                UserId INTEGER NOT NULL REFERENCES Users(Id) ON DELETE CASCADE,
+                LastReadAt TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (ConversationId, UserId)
+            )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      
+            CREATE TABLE IF NOT EXISTS PinnedMessages (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                MessageId INTEGER NOT NULL UNIQUE REFERENCES Messages(Id) ON DELETE CASCADE,
+                ChannelId INTEGER NOT NULL,
+                PinnedById INTEGER NOT NULL,
+                PinnedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      
+            CREATE TABLE IF NOT EXISTS PinnedDirectMessages (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                DirectMessageId INTEGER NOT NULL UNIQUE REFERENCES DirectMessages(Id) ON DELETE CASCADE,
+                ConversationId INTEGER NOT NULL,
+                PinnedById INTEGER NOT NULL,
+                PinnedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      
+            CREATE TABLE IF NOT EXISTS Categories (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ServerId INTEGER NOT NULL REFERENCES GuildServers(Id) ON DELETE CASCADE,
+                Name TEXT NOT NULL,
+                Position INTEGER NOT NULL DEFAULT 0
+            )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Username" = 'FatBot'
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "Servers" AS "s")
+warn: Microsoft.EntityFrameworkCore.Query[10103]
+      The query uses the 'First'/'FirstOrDefault' operator without 'OrderBy' and filter operators. This may lead to unpredictable results.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name", "s"."OwnerId"
+      FROM "Servers" AS "s"
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@__server_Id_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type"
+      FROM "Channels" AS "c"
+      WHERE "c"."ServerId" = @__server_Id_0 AND "c"."Name" = 'general'
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__server_Id_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "Channels" AS "c"
+          WHERE "c"."ServerId" = @__server_Id_0 AND "c"."Name" = 'angry-fat-guys')
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5238
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\FatGuysSpeak\FatGuysSpeak.Server
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@__req_Username_0='?' (Size = 1)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Username" = @__req_Username_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name", "s"."OwnerId"
+      FROM "Servers" AS "s"
+      ORDER BY "s"."Id"
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__defaultServer_Id_0='?' (DbType = Int32), @__userId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__defaultServer_Id_0 AND "s"."UserId" = @__userId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Id" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."ServerId"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."UserId" = @__UserId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s0"."Id", "s0"."Name", "s0"."Description", CAST("s0"."OwnerId" AS TEXT), (
+          SELECT COUNT(*)
+          FROM "ServerMembers" AS "s1"
+          WHERE "s0"."Id" = "s1"."ServerId"), "s"."Role"
+      FROM "ServerMembers" AS "s"
+      INNER JOIN "Servers" AS "s0" ON "s"."ServerId" = "s0"."Id"
+      WHERE "s"."UserId" = @__UserId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."ServerId", "c"."Name", "c"."Position"
+      FROM "Categories" AS "c"
+      WHERE "c"."ServerId" = @__serverId_0
+      ORDER BY "c"."Position"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."Name", "c"."Type", "c"."ServerId", "c"."Position", "c"."CategoryId"
+      FROM "Channels" AS "c"
+      WHERE "c"."ServerId" = @__serverId_0
+      ORDER BY "c"."Position"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."UserId"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."ServerId" = @__serverId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__onlineIds_0='?' (Size = 3)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Id" IN (
+          SELECT "o"."value"
+          FROM json_each(@__onlineIds_0) AS "o"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."ChannelId", "c"."MinRoleToRead", "c"."MinRoleToWrite"
+      FROM "ChannelPermissions" AS "c"
+      WHERE "c"."ChannelId" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."ChannelId", "c"."MinRoleToRead", "c"."MinRoleToWrite"
+      FROM "ChannelPermissions" AS "c"
+      WHERE "c"."ChannelId" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "m0"."Id", "m0"."AttachmentFileName", "m0"."AttachmentUrl", "m0"."AuthorId", "m0"."ChannelId", "m0"."Content", "m0"."CreatedAt", "m0"."EditedAt", "m0"."IsDeleted", "m0"."ReplyToId", "m0"."Source", "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username", "m1"."Id", "m1"."AttachmentFileName", "m1"."AttachmentUrl", "m1"."AuthorId", "m1"."ChannelId", "m1"."Content", "m1"."CreatedAt", "m1"."EditedAt", "m1"."IsDeleted", "m1"."ReplyToId", "m1"."Source", "u0"."Id", "u0"."AvatarUrl", "u0"."Bio", "u0"."CreatedAt", "u0"."Email", "u0"."PasswordHash", "u0"."Status", "u0"."Username"
+      FROM (
+          SELECT "m"."Id", "m"."AttachmentFileName", "m"."AttachmentUrl", "m"."AuthorId", "m"."ChannelId", "m"."Content", "m"."CreatedAt", "m"."EditedAt", "m"."IsDeleted", "m"."ReplyToId", "m"."Source"
+          FROM "Messages" AS "m"
+          WHERE "m"."ChannelId" = @__channelId_0
+          ORDER BY "m"."CreatedAt" DESC
+          LIMIT @__p_1
+      ) AS "m0"
+      INNER JOIN "Users" AS "u" ON "m0"."AuthorId" = "u"."Id"
+      LEFT JOIN "Messages" AS "m1" ON "m0"."ReplyToId" = "m1"."Id"
+      LEFT JOIN "Users" AS "u0" ON "m1"."AuthorId" = "u0"."Id"
+      ORDER BY "m0"."CreatedAt"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__ids_0='?' (Size = 201)], CommandType='Text', CommandTimeout='30']
+      SELECT "m"."Id", "m"."Emoji", "m"."MessageId", "m"."UserId", "m"."Username"
+      FROM "MessageReactions" AS "m"
+      WHERE "m"."MessageId" IN (
+          SELECT "i"."value"
+          FROM json_each(@__ids_0) AS "i"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32), @__ids_1='?' (Size = 201)], CommandType='Text', CommandTimeout='30']
+      SELECT "p"."MessageId"
+      FROM "PinnedMessages" AS "p"
+      WHERE "p"."ChannelId" = @__channelId_0 AND "p"."MessageId" IN (
+          SELECT "i"."value"
+          FROM json_each(@__ids_1) AS "i"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: System.Net.Http.HttpClient.preview.LogicalHandler[100]
+      Start processing HTTP request GET https://www.youtube.com/watch?*
+info: System.Net.Http.HttpClient.preview.LogicalHandler[100]
+      Start processing HTTP request GET https://www.pcgamer.com/
+info: System.Net.Http.HttpClient.preview.ClientHandler[100]
+      Sending HTTP request GET https://www.pcgamer.com/
+info: System.Net.Http.HttpClient.preview.ClientHandler[100]
+      Sending HTTP request GET https://www.youtube.com/watch?*
+info: System.Net.Http.HttpClient.preview.ClientHandler[101]
+      Received HTTP response headers after 96.3212ms - 200
+info: System.Net.Http.HttpClient.preview.LogicalHandler[101]
+      End processing HTTP request after 101.1106ms - 200
+info: System.Net.Http.HttpClient.preview.ClientHandler[101]
+      Received HTTP response headers after 185.2578ms - 200
+info: System.Net.Http.HttpClient.preview.LogicalHandler[101]
+      End processing HTTP request after 187.1251ms - 200
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__req_Username_0='?' (Size = 1)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Username" = @__req_Username_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name", "s"."OwnerId"
+      FROM "Servers" AS "s"
+      ORDER BY "s"."Id"
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__defaultServer_Id_0='?' (DbType = Int32), @__userId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__defaultServer_Id_0 AND "s"."UserId" = @__userId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Id" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."ServerId"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."UserId" = @__UserId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s0"."Id", "s0"."Name", "s0"."Description", CAST("s0"."OwnerId" AS TEXT), (
+          SELECT COUNT(*)
+          FROM "ServerMembers" AS "s1"
+          WHERE "s0"."Id" = "s1"."ServerId"), "s"."Role"
+      FROM "ServerMembers" AS "s"
+      INNER JOIN "Servers" AS "s0" ON "s"."ServerId" = "s0"."Id"
+      WHERE "s"."UserId" = @__UserId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."ServerId", "c"."Name", "c"."Position"
+      FROM "Categories" AS "c"
+      WHERE "c"."ServerId" = @__serverId_0
+      ORDER BY "c"."Position"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."Name", "c"."Type", "c"."ServerId", "c"."Position", "c"."CategoryId"
+      FROM "Channels" AS "c"
+      WHERE "c"."ServerId" = @__serverId_0
+      ORDER BY "c"."Position"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."UserId"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."ServerId" = @__serverId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__onlineIds_0='?' (Size = 5)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Id" IN (
+          SELECT "o"."value"
+          FROM json_each(@__onlineIds_0) AS "o"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."ChannelId", "c"."MinRoleToRead", "c"."MinRoleToWrite"
+      FROM "ChannelPermissions" AS "c"
+      WHERE "c"."ChannelId" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."ChannelId", "c"."MinRoleToRead", "c"."MinRoleToWrite"
+      FROM "ChannelPermissions" AS "c"
+      WHERE "c"."ChannelId" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "m0"."Id", "m0"."AttachmentFileName", "m0"."AttachmentUrl", "m0"."AuthorId", "m0"."ChannelId", "m0"."Content", "m0"."CreatedAt", "m0"."EditedAt", "m0"."IsDeleted", "m0"."ReplyToId", "m0"."Source", "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username", "m1"."Id", "m1"."AttachmentFileName", "m1"."AttachmentUrl", "m1"."AuthorId", "m1"."ChannelId", "m1"."Content", "m1"."CreatedAt", "m1"."EditedAt", "m1"."IsDeleted", "m1"."ReplyToId", "m1"."Source", "u0"."Id", "u0"."AvatarUrl", "u0"."Bio", "u0"."CreatedAt", "u0"."Email", "u0"."PasswordHash", "u0"."Status", "u0"."Username"
+      FROM (
+          SELECT "m"."Id", "m"."AttachmentFileName", "m"."AttachmentUrl", "m"."AuthorId", "m"."ChannelId", "m"."Content", "m"."CreatedAt", "m"."EditedAt", "m"."IsDeleted", "m"."ReplyToId", "m"."Source"
+          FROM "Messages" AS "m"
+          WHERE "m"."ChannelId" = @__channelId_0
+          ORDER BY "m"."CreatedAt" DESC
+          LIMIT @__p_1
+      ) AS "m0"
+      INNER JOIN "Users" AS "u" ON "m0"."AuthorId" = "u"."Id"
+      LEFT JOIN "Messages" AS "m1" ON "m0"."ReplyToId" = "m1"."Id"
+      LEFT JOIN "Users" AS "u0" ON "m1"."AuthorId" = "u0"."Id"
+      ORDER BY "m0"."CreatedAt"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__ids_0='?' (Size = 201)], CommandType='Text', CommandTimeout='30']
+      SELECT "m"."Id", "m"."Emoji", "m"."MessageId", "m"."UserId", "m"."Username"
+      FROM "MessageReactions" AS "m"
+      WHERE "m"."MessageId" IN (
+          SELECT "i"."value"
+          FROM json_each(@__ids_0) AS "i"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32), @__ids_1='?' (Size = 201)], CommandType='Text', CommandTimeout='30']
+      SELECT "p"."MessageId"
+      FROM "PinnedMessages" AS "p"
+      WHERE "p"."ChannelId" = @__channelId_0 AND "p"."MessageId" IN (
+          SELECT "i"."value"
+          FROM json_each(@__ids_1) AS "i"
+      )
+info: System.Net.Http.HttpClient.preview.LogicalHandler[100]
+      Start processing HTTP request GET https://www.youtube.com/watch?*
+info: System.Net.Http.HttpClient.preview.ClientHandler[100]
+      Sending HTTP request GET https://www.youtube.com/watch?*
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: System.Net.Http.HttpClient.preview.LogicalHandler[100]
+      Start processing HTTP request GET https://www.pcgamer.com/
+info: System.Net.Http.HttpClient.preview.ClientHandler[100]
+      Sending HTTP request GET https://www.pcgamer.com/
+info: System.Net.Http.HttpClient.preview.ClientHandler[101]
+      Received HTTP response headers after 27.1189ms - 200
+info: System.Net.Http.HttpClient.preview.LogicalHandler[101]
+      End processing HTTP request after 27.2278ms - 200
+info: System.Net.Http.HttpClient.preview.ClientHandler[101]
+      Received HTTP response headers after 99.5293ms - 200
+info: System.Net.Http.HttpClient.preview.LogicalHandler[101]
+      End processing HTTP request after 99.5976ms - 200
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."ServerId"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."UserId" = @__UserId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."ServerId"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."UserId" = @__UserId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__req_Username_0='?' (Size = 1)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Username" = @__req_Username_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name", "s"."OwnerId"
+      FROM "Servers" AS "s"
+      ORDER BY "s"."Id"
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__defaultServer_Id_0='?' (DbType = Int32), @__userId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__defaultServer_Id_0 AND "s"."UserId" = @__userId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Id" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."ServerId"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."UserId" = @__UserId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s0"."Id", "s0"."Name", "s0"."Description", CAST("s0"."OwnerId" AS TEXT), (
+          SELECT COUNT(*)
+          FROM "ServerMembers" AS "s1"
+          WHERE "s0"."Id" = "s1"."ServerId"), "s"."Role"
+      FROM "ServerMembers" AS "s"
+      INNER JOIN "Servers" AS "s0" ON "s"."ServerId" = "s0"."Id"
+      WHERE "s"."UserId" = @__UserId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."ServerId", "c"."Name", "c"."Position"
+      FROM "Categories" AS "c"
+      WHERE "c"."ServerId" = @__serverId_0
+      ORDER BY "c"."Position"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."Name", "c"."Type", "c"."ServerId", "c"."Position", "c"."CategoryId"
+      FROM "Channels" AS "c"
+      WHERE "c"."ServerId" = @__serverId_0
+      ORDER BY "c"."Position"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."UserId"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."ServerId" = @__serverId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__onlineIds_0='?' (Size = 3)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Id" IN (
+          SELECT "o"."value"
+          FROM json_each(@__onlineIds_0) AS "o"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."ChannelId", "c"."MinRoleToRead", "c"."MinRoleToWrite"
+      FROM "ChannelPermissions" AS "c"
+      WHERE "c"."ChannelId" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."ChannelId", "c"."MinRoleToRead", "c"."MinRoleToWrite"
+      FROM "ChannelPermissions" AS "c"
+      WHERE "c"."ChannelId" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "m0"."Id", "m0"."AttachmentFileName", "m0"."AttachmentUrl", "m0"."AuthorId", "m0"."ChannelId", "m0"."Content", "m0"."CreatedAt", "m0"."EditedAt", "m0"."IsDeleted", "m0"."ReplyToId", "m0"."Source", "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username", "m1"."Id", "m1"."AttachmentFileName", "m1"."AttachmentUrl", "m1"."AuthorId", "m1"."ChannelId", "m1"."Content", "m1"."CreatedAt", "m1"."EditedAt", "m1"."IsDeleted", "m1"."ReplyToId", "m1"."Source", "u0"."Id", "u0"."AvatarUrl", "u0"."Bio", "u0"."CreatedAt", "u0"."Email", "u0"."PasswordHash", "u0"."Status", "u0"."Username"
+      FROM (
+          SELECT "m"."Id", "m"."AttachmentFileName", "m"."AttachmentUrl", "m"."AuthorId", "m"."ChannelId", "m"."Content", "m"."CreatedAt", "m"."EditedAt", "m"."IsDeleted", "m"."ReplyToId", "m"."Source"
+          FROM "Messages" AS "m"
+          WHERE "m"."ChannelId" = @__channelId_0
+          ORDER BY "m"."CreatedAt" DESC
+          LIMIT @__p_1
+      ) AS "m0"
+      INNER JOIN "Users" AS "u" ON "m0"."AuthorId" = "u"."Id"
+      LEFT JOIN "Messages" AS "m1" ON "m0"."ReplyToId" = "m1"."Id"
+      LEFT JOIN "Users" AS "u0" ON "m1"."AuthorId" = "u0"."Id"
+      ORDER BY "m0"."CreatedAt"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__ids_0='?' (Size = 201)], CommandType='Text', CommandTimeout='30']
+      SELECT "m"."Id", "m"."Emoji", "m"."MessageId", "m"."UserId", "m"."Username"
+      FROM "MessageReactions" AS "m"
+      WHERE "m"."MessageId" IN (
+          SELECT "i"."value"
+          FROM json_each(@__ids_0) AS "i"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32), @__ids_1='?' (Size = 201)], CommandType='Text', CommandTimeout='30']
+      SELECT "p"."MessageId"
+      FROM "PinnedMessages" AS "p"
+      WHERE "p"."ChannelId" = @__channelId_0 AND "p"."MessageId" IN (
+          SELECT "i"."value"
+          FROM json_each(@__ids_1) AS "i"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: System.Net.Http.HttpClient.preview.LogicalHandler[100]
+      Start processing HTTP request GET https://www.youtube.com/watch?*
+info: System.Net.Http.HttpClient.preview.ClientHandler[100]
+      Sending HTTP request GET https://www.youtube.com/watch?*
+info: System.Net.Http.HttpClient.preview.LogicalHandler[100]
+      Start processing HTTP request GET https://www.pcgamer.com/
+info: System.Net.Http.HttpClient.preview.ClientHandler[100]
+      Sending HTTP request GET https://www.pcgamer.com/
+info: System.Net.Http.HttpClient.preview.ClientHandler[101]
+      Received HTTP response headers after 78.3092ms - 200
+info: System.Net.Http.HttpClient.preview.LogicalHandler[101]
+      End processing HTTP request after 78.367ms - 200
+info: System.Net.Http.HttpClient.preview.ClientHandler[101]
+      Received HTTP response headers after 134.6951ms - 200
+info: System.Net.Http.HttpClient.preview.LogicalHandler[101]
+      End processing HTTP request after 134.7477ms - 200
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__req_Username_0='?' (Size = 1)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Username" = @__req_Username_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name", "s"."OwnerId"
+      FROM "Servers" AS "s"
+      ORDER BY "s"."Id"
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__defaultServer_Id_0='?' (DbType = Int32), @__userId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__defaultServer_Id_0 AND "s"."UserId" = @__userId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Id" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."ServerId"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."UserId" = @__UserId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s0"."Id", "s0"."Name", "s0"."Description", CAST("s0"."OwnerId" AS TEXT), (
+          SELECT COUNT(*)
+          FROM "ServerMembers" AS "s1"
+          WHERE "s0"."Id" = "s1"."ServerId"), "s"."Role"
+      FROM "ServerMembers" AS "s"
+      INNER JOIN "Servers" AS "s0" ON "s"."ServerId" = "s0"."Id"
+      WHERE "s"."UserId" = @__UserId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."ServerId", "c"."Name", "c"."Position"
+      FROM "Categories" AS "c"
+      WHERE "c"."ServerId" = @__serverId_0
+      ORDER BY "c"."Position"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."Name", "c"."Type", "c"."ServerId", "c"."Position", "c"."CategoryId"
+      FROM "Channels" AS "c"
+      WHERE "c"."ServerId" = @__serverId_0
+      ORDER BY "c"."Position"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32), @__UserId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "ServerMembers" AS "s"
+          WHERE "s"."ServerId" = @__serverId_0 AND "s"."UserId" = @__UserId_1)
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."UserId"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."ServerId" = @__serverId_0
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__onlineIds_0='?' (Size = 5)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Id" IN (
+          SELECT "o"."value"
+          FROM json_each(@__onlineIds_0) AS "o"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."ChannelId", "c"."MinRoleToRead", "c"."MinRoleToWrite"
+      FROM "ChannelPermissions" AS "c"
+      WHERE "c"."ChannelId" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."ChannelId", "c"."MinRoleToRead", "c"."MinRoleToWrite"
+      FROM "ChannelPermissions" AS "c"
+      WHERE "c"."ChannelId" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "m0"."Id", "m0"."AttachmentFileName", "m0"."AttachmentUrl", "m0"."AuthorId", "m0"."ChannelId", "m0"."Content", "m0"."CreatedAt", "m0"."EditedAt", "m0"."IsDeleted", "m0"."ReplyToId", "m0"."Source", "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username", "m1"."Id", "m1"."AttachmentFileName", "m1"."AttachmentUrl", "m1"."AuthorId", "m1"."ChannelId", "m1"."Content", "m1"."CreatedAt", "m1"."EditedAt", "m1"."IsDeleted", "m1"."ReplyToId", "m1"."Source", "u0"."Id", "u0"."AvatarUrl", "u0"."Bio", "u0"."CreatedAt", "u0"."Email", "u0"."PasswordHash", "u0"."Status", "u0"."Username"
+      FROM (
+          SELECT "m"."Id", "m"."AttachmentFileName", "m"."AttachmentUrl", "m"."AuthorId", "m"."ChannelId", "m"."Content", "m"."CreatedAt", "m"."EditedAt", "m"."IsDeleted", "m"."ReplyToId", "m"."Source"
+          FROM "Messages" AS "m"
+          WHERE "m"."ChannelId" = @__channelId_0
+          ORDER BY "m"."CreatedAt" DESC
+          LIMIT @__p_1
+      ) AS "m0"
+      INNER JOIN "Users" AS "u" ON "m0"."AuthorId" = "u"."Id"
+      LEFT JOIN "Messages" AS "m1" ON "m0"."ReplyToId" = "m1"."Id"
+      LEFT JOIN "Users" AS "u0" ON "m1"."AuthorId" = "u0"."Id"
+      ORDER BY "m0"."CreatedAt"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__ids_0='?' (Size = 201)], CommandType='Text', CommandTimeout='30']
+      SELECT "m"."Id", "m"."Emoji", "m"."MessageId", "m"."UserId", "m"."Username"
+      FROM "MessageReactions" AS "m"
+      WHERE "m"."MessageId" IN (
+          SELECT "i"."value"
+          FROM json_each(@__ids_0) AS "i"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32), @__ids_1='?' (Size = 201)], CommandType='Text', CommandTimeout='30']
+      SELECT "p"."MessageId"
+      FROM "PinnedMessages" AS "p"
+      WHERE "p"."ChannelId" = @__channelId_0 AND "p"."MessageId" IN (
+          SELECT "i"."value"
+          FROM json_each(@__ids_1) AS "i"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: System.Net.Http.HttpClient.preview.LogicalHandler[100]
+      Start processing HTTP request GET https://www.youtube.com/watch?*
+info: System.Net.Http.HttpClient.preview.ClientHandler[100]
+      Sending HTTP request GET https://www.youtube.com/watch?*
+info: System.Net.Http.HttpClient.preview.LogicalHandler[100]
+      Start processing HTTP request GET https://www.pcgamer.com/
+info: System.Net.Http.HttpClient.preview.ClientHandler[100]
+      Sending HTTP request GET https://www.pcgamer.com/
+info: System.Net.Http.HttpClient.preview.ClientHandler[101]
+      Received HTTP response headers after 85.6401ms - 200
+info: System.Net.Http.HttpClient.preview.LogicalHandler[101]
+      End processing HTTP request after 85.6983ms - 200
+info: System.Net.Http.HttpClient.preview.ClientHandler[101]
+      Received HTTP response headers after 132.8343ms - 200
+info: System.Net.Http.HttpClient.preview.LogicalHandler[101]
+      End processing HTTP request after 132.8843ms - 200
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username"
+      FROM "Users" AS "u"
+      WHERE "u"."Id" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__serverId_Value_0='?' (DbType = Int32), @__userId_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."ServerId", "s"."UserId", "s"."JoinedAt", "s"."Role"
+      FROM "ServerMembers" AS "s"
+      WHERE "s"."ServerId" = @__serverId_Value_0 AND "s"."UserId" = @__userId_1
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."ChannelId", "c"."MinRoleToRead", "c"."MinRoleToWrite"
+      FROM "ChannelPermissions" AS "c"
+      WHERE "c"."ChannelId" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__p_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."ChannelId", "c"."MinRoleToRead", "c"."MinRoleToWrite"
+      FROM "ChannelPermissions" AS "c"
+      WHERE "c"."ChannelId" = @__p_0
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32), @__p_1='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "m0"."Id", "m0"."AttachmentFileName", "m0"."AttachmentUrl", "m0"."AuthorId", "m0"."ChannelId", "m0"."Content", "m0"."CreatedAt", "m0"."EditedAt", "m0"."IsDeleted", "m0"."ReplyToId", "m0"."Source", "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username", "m1"."Id", "m1"."AttachmentFileName", "m1"."AttachmentUrl", "m1"."AuthorId", "m1"."ChannelId", "m1"."Content", "m1"."CreatedAt", "m1"."EditedAt", "m1"."IsDeleted", "m1"."ReplyToId", "m1"."Source", "u0"."Id", "u0"."AvatarUrl", "u0"."Bio", "u0"."CreatedAt", "u0"."Email", "u0"."PasswordHash", "u0"."Status", "u0"."Username"
+      FROM (
+          SELECT "m"."Id", "m"."AttachmentFileName", "m"."AttachmentUrl", "m"."AuthorId", "m"."ChannelId", "m"."Content", "m"."CreatedAt", "m"."EditedAt", "m"."IsDeleted", "m"."ReplyToId", "m"."Source"
+          FROM "Messages" AS "m"
+          WHERE "m"."ChannelId" = @__channelId_0
+          ORDER BY "m"."CreatedAt" DESC
+          LIMIT @__p_1
+      ) AS "m0"
+      INNER JOIN "Users" AS "u" ON "m0"."AuthorId" = "u"."Id"
+      LEFT JOIN "Messages" AS "m1" ON "m0"."ReplyToId" = "m1"."Id"
+      LEFT JOIN "Users" AS "u0" ON "m1"."AuthorId" = "u0"."Id"
+      ORDER BY "m0"."CreatedAt"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__ids_0='?' (Size = 101)], CommandType='Text', CommandTimeout='30']
+      SELECT "m"."Id", "m"."Emoji", "m"."MessageId", "m"."UserId", "m"."Username"
+      FROM "MessageReactions" AS "m"
+      WHERE "m"."MessageId" IN (
+          SELECT "i"."value"
+          FROM json_each(@__ids_0) AS "i"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32), @__ids_1='?' (Size = 101)], CommandType='Text', CommandTimeout='30']
+      SELECT "p"."MessageId"
+      FROM "PinnedMessages" AS "p"
+      WHERE "p"."ChannelId" = @__channelId_0 AND "p"."MessageId" IN (
+          SELECT "i"."value"
+          FROM json_each(@__ids_1) AS "i"
+      )
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__channelId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "s1"."Id", "s1"."CategoryId", "s1"."Name", "s1"."Position", "s1"."ServerId", "s1"."Type", "s1"."Id0", "s1"."CreatedAt", "s1"."Description", "s1"."InviteCode", "s1"."Name0", "s1"."OwnerId", "s0"."ServerId", "s0"."UserId", "s0"."JoinedAt", "s0"."Role"
+      FROM (
+          SELECT "c"."Id", "c"."CategoryId", "c"."Name", "c"."Position", "c"."ServerId", "c"."Type", "s"."Id" AS "Id0", "s"."CreatedAt", "s"."Description", "s"."InviteCode", "s"."Name" AS "Name0", "s"."OwnerId"
+          FROM "Channels" AS "c"
+          INNER JOIN "Servers" AS "s" ON "c"."ServerId" = "s"."Id"
+          WHERE "c"."Id" = @__channelId_0
+          LIMIT 1
+      ) AS "s1"
+      LEFT JOIN "ServerMembers" AS "s0" ON "s1"."Id0" = "s0"."ServerId"
+      ORDER BY "s1"."Id", "s1"."Id0", "s0"."ServerId"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@__UserId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "d"."Id", "d"."CreatedAt", "d"."User1Id", "d"."User2Id", "u"."Id", "u"."AvatarUrl", "u"."Bio", "u"."CreatedAt", "u"."Email", "u"."PasswordHash", "u"."Status", "u"."Username", "u0"."Id", "u0"."AvatarUrl", "u0"."Bio", "u0"."CreatedAt", "u0"."Email", "u0"."PasswordHash", "u0"."Status", "u0"."Username", "d2"."Id", "d2"."AttachmentFileName", "d2"."AttachmentUrl", "d2"."AuthorId", "d2"."Content", "d2"."ConversationId", "d2"."CreatedAt", "d2"."IsDeleted"
+      FROM "DirectConversations" AS "d"
+      INNER JOIN "Users" AS "u" ON "d"."User1Id" = "u"."Id"
+      INNER JOIN "Users" AS "u0" ON "d"."User2Id" = "u0"."Id"
+      LEFT JOIN (
+          SELECT "d1"."Id", "d1"."AttachmentFileName", "d1"."AttachmentUrl", "d1"."AuthorId", "d1"."Content", "d1"."ConversationId", "d1"."CreatedAt", "d1"."IsDeleted"
+          FROM (
+              SELECT "d0"."Id", "d0"."AttachmentFileName", "d0"."AttachmentUrl", "d0"."AuthorId", "d0"."Content", "d0"."ConversationId", "d0"."CreatedAt", "d0"."IsDeleted", ROW_NUMBER() OVER(PARTITION BY "d0"."ConversationId" ORDER BY "d0"."Id" DESC) AS "row"
+              FROM "DirectMessages" AS "d0"
+          ) AS "d1"
+          WHERE "d1"."row" <= 1
+      ) AS "d2" ON "d"."Id" = "d2"."ConversationId"
+      WHERE "d"."User1Id" = @__UserId_0 OR "d"."User2Id" = @__UserId_0
+      ORDER BY "d"."Id", "u"."Id", "u0"."Id", "d2"."ConversationId", "d2"."Id" DESC

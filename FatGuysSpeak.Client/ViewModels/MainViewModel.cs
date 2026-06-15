@@ -21,8 +21,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private readonly List<MessageViewItem> _voiceMsgs = [];
     private readonly List<MessageViewItem> _streamMsgs = [];
 
-    [ObservableProperty] private ObservableCollection<ServerDto> _servers = [];
+    [ObservableProperty] private ObservableCollection<ServerViewItem> _servers = [];
     [ObservableProperty] private ObservableCollection<ChannelViewItem> _channels = [];
+    private List<CategoryDto> _serverCategories = [];
+    public ObservableCollection<CategoryViewItem> CategorizedChannels { get; } = [];
     [ObservableProperty] private ObservableCollection<MessageViewItem> _messages = [];
     [ObservableProperty] private ObservableCollection<UserDto> _members = [];
     [ObservableProperty] private string _selectedTab = "Text";
@@ -48,6 +50,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private bool _isCameraOn;
     [ObservableProperty] private bool _isDmMode;
     [ObservableProperty] private DmConversationItem? _selectedDmConversation;
+    [ObservableProperty] private bool _isSidebarOpen = Environment.GetEnvironmentVariable("FATGUYS_PHONE_MODE") != "1";
 
     public ObservableCollection<VideoTileViewModel> VideoTiles { get; } = [];
     public ObservableCollection<DmConversationItem> DmConversations { get; } = [];
@@ -75,6 +78,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private bool _isSearching;
     public ObservableCollection<MessageViewItem> SearchResults { get; } = [];
     private bool _searchExecuted;
+    [ObservableProperty] private bool _isPinsOpen;
+    public ObservableCollection<MessageViewItem> PinnedMessages { get; } = [];
 
     [ObservableProperty] private bool _isStreamChatOverlayVisible;
     public ObservableCollection<MessageViewItem> StreamOverlayMessages { get; } = [];
@@ -104,6 +109,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private bool _isTyping;
     private CancellationTokenSource? _typingCts;
     private readonly Dictionary<int, string> _typingUsersInChannel = new(); // userId -> username
+    private readonly HashSet<int> _blockedUserIds = [];
 
     [ObservableProperty] private int _streamLatencyMs;
     [ObservableProperty] private string _streamQualityLabel = "1080p 20fps";
@@ -122,7 +128,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public Color   ConnectionDotColor    => HubConnectionState switch { "Reconnecting" => Color.FromArgb("#f0a030"), "Disconnected" => Color.FromArgb("#ed4245"), _ => Color.FromArgb("#44bb44") };
     public Color   ConnectionStatusColor => ConnectionDotColor;
     public bool    IsConnectionBannerVisible => HubConnectionState != "Connected";
-    public bool ShowMessages => !IsSearchOpen;
+    public bool ShowMessages => !IsSearchOpen && !IsPinsOpen;
     public string SearchEmptyText => _searchExecuted ? "No messages found." : "Type a search term and press Search.";
     public bool HasActiveStream => ActiveStreamerName is not null || IsStreaming;
     public bool HasStreamFrame => StreamFrame is not null;
@@ -266,12 +272,21 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     partial void OnIsSearchOpenChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowMessages));
+        if (value) IsPinsOpen = false;
         if (!value)
         {
             SearchQuery = "";
             SearchResults.Clear();
             _searchExecuted = false;
         }
+    }
+
+    partial void OnIsPinsOpenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowMessages));
+        if (value) IsSearchOpen = false;
+        if (!value) PinnedMessages.Clear();
+        else _ = LoadPinnedMessagesAsync();
     }
 
     partial void OnSearchQueryChanged(string value)
@@ -331,6 +346,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (value is not null) value.IsSelected = true;
         OnPropertyChanged(nameof(DmHeaderTitle));
         OnPropertyChanged(nameof(MessagePlaceholderText));
+        IsPinsOpen = false;
+        StopTypingDebounced();
+        _typingUsersInChannel.Clear();
+        OnPropertyChanged(nameof(TypingText));
         if (value is not null)
             _ = LoadDmMessagesAsync(value.ConversationId);
         else
@@ -341,6 +360,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         OnPropertyChanged(nameof(ShowChannelUiElements));
         OnPropertyChanged(nameof(MessagePlaceholderText));
+        IsPinsOpen = false;
     }
     partial void OnIsStreamingChanged(bool value)
     {
@@ -384,7 +404,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     partial void OnMessageInputChanged(string value)
     {
-        if (SelectedChannel is null || !hub.IsConnected) return;
+        if (!hub.IsConnected) return;
+        bool inDm = IsDmMode && SelectedDmConversation is not null;
+        if (!inDm && SelectedChannel is null) return;
 
         if (string.IsNullOrEmpty(value))
         {
@@ -395,7 +417,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (!_isTyping)
         {
             _isTyping = true;
-            _ = hub.StartTypingAsync(SelectedChannel.Id);
+            if (inDm)
+                _ = hub.StartDmTypingAsync(SelectedDmConversation!.ConversationId);
+            else
+                _ = hub.StartTypingAsync(SelectedChannel!.Id);
         }
 
         _typingCts?.Cancel();
@@ -413,7 +438,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         _isTyping = false;
         _typingCts?.Cancel();
         _typingCts = null;
-        if (hub.IsConnected && SelectedChannel is not null)
+        if (!hub.IsConnected) return;
+        if (IsDmMode && SelectedDmConversation is not null)
+            _ = hub.StopDmTypingAsync(SelectedDmConversation.ConversationId);
+        else if (SelectedChannel is not null)
             _ = hub.StopTypingAsync(SelectedChannel.Id);
     }
 
@@ -449,6 +477,18 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.CameraFrameReceived     += OnCameraFrameReceived;
         hub.DirectMessageReceived   += OnDirectMessageReceived;
         hub.DirectMessageDeleted    += OnDirectMessageDeleted;
+        hub.DmUserTyping            += OnDmUserTyping;
+        hub.DmUserStoppedTyping     += OnDmUserStoppedTyping;
+        hub.DmConversationRead      += OnDmConversationRead;
+        hub.MessagePinned           += OnMessagePinned;
+        hub.MessageUnpinned         += OnMessageUnpinned;
+        hub.DmMessagePinned         += OnDmMessagePinned;
+        hub.DmMessageUnpinned       += OnDmMessageUnpinned;
+        hub.KickedFromServer        += OnKickedFromServer;
+        hub.CategoryCreated         += OnCategoryCreated;
+        hub.CategoryDeleted         += OnCategoryDeleted;
+        hub.CategoryRenamed         += OnCategoryRenamed;
+        hub.ChannelCategoryChanged  += OnChannelCategoryChanged;
         hub.Reconnecting += _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Reconnecting");
         hub.Reconnected  += _ => MainThread.BeginInvokeOnMainThread(async () =>
         {
@@ -476,16 +516,25 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public async Task LoadServersAsync()
     {
         var list = await api.GetServersAsync();
-        Servers = new ObservableCollection<ServerDto>(list ?? []);
+        Servers = new ObservableCollection<ServerViewItem>((list ?? []).Select(ServerViewItem.FromDto));
+        var blocks = await api.GetBlockedUsersAsync();
+        _blockedUserIds.Clear();
+        foreach (var b in blocks ?? [])
+            _blockedUserIds.Add(b.UserId);
     }
 
     [RelayCommand]
-    public async Task SelectServerAsync(ServerDto server)
+    public async Task SelectServerAsync(ServerViewItem item)
     {
-        SelectedServer = server;
-        var channelList = await api.GetChannelsAsync(server.Id);
+        foreach (var s in Servers) s.IsSelected = false;
+        item.IsSelected = true;
+        SelectedServer = item.Server;
+        var cats = await api.GetCategoriesAsync(item.Server.Id);
+        _serverCategories = cats ?? [];
+        var channelList = await api.GetChannelsAsync(item.Server.Id);
         Channels = new ObservableCollection<ChannelViewItem>((channelList ?? []).Select(c => new ChannelViewItem(c)));
-        var onlineList = hub.IsConnected ? await hub.GetOnlineUsersAsync(server.Id) : [];
+        RebuildCategorizedChannels();
+        var onlineList = hub.IsConnected ? await hub.GetOnlineUsersAsync(item.Server.Id) : [];
         Members = new ObservableCollection<UserDto>(onlineList);
         SelectedChannel = null;
         Messages.Clear();
@@ -538,6 +587,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         _streamMsgs.Clear();
         foreach (var m in (msgs ?? []).OrderBy(m => m.CreatedAt))
         {
+            if (_blockedUserIds.Contains(m.AuthorId)) continue;
             var mi = Wire(new MessageViewItem(m, api.CurrentUsername, api.CurrentUserId));
             if (m.Source == MessageSource.Voice) _voiceMsgs.Add(mi);
             else if (m.Source == MessageSource.Stream) _streamMsgs.Add(mi);
@@ -563,16 +613,16 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [RelayCommand]
     public async Task ViewProfileAsync(int userId)
     {
-        if (userId == 0 || SelectedServer is null) return;
-        var vm = new UserProfileViewModel(api, SelectedServer.Id);
+        if (userId == 0) return;
+        var vm = new UserProfileViewModel(api, SelectedServer?.Id ?? 0, _blockedUserIds.Contains(userId));
         var page = new Pages.UserProfilePage { BindingContext = vm };
         var window = new Window(page)
         {
             Title = "User Profile",
-            Width = 320,
-            Height = 440,
+            Width = 340,
+            Height = 520,
             MinimumWidth = 280,
-            MinimumHeight = 340,
+            MinimumHeight = 400,
         };
         Application.Current!.OpenWindow(window);
         await vm.LoadAsync(userId);
@@ -607,6 +657,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     }
 
     [RelayCommand]
+    public void ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
+
+    [RelayCommand]
     public void ToggleSearch() => IsSearchOpen = !IsSearchOpen;
 
     [RelayCommand]
@@ -631,6 +684,62 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         SearchResults.Clear();
         _searchExecuted = false;
         OnPropertyChanged(nameof(SearchEmptyText));
+    }
+
+    [RelayCommand]
+    public void TogglePins() => IsPinsOpen = !IsPinsOpen;
+
+    private async Task LoadPinnedMessagesAsync()
+    {
+        PinnedMessages.Clear();
+        if (IsDmMode && SelectedDmConversation is not null)
+        {
+            var dtos = await api.GetDmPinsAsync(SelectedDmConversation.ConversationId);
+            if (dtos is null) return;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                foreach (var dto in dtos)
+                    PinnedMessages.Add(new MessageViewItem(DmToMessageDto(dto), api.CurrentUsername, api.CurrentUserId));
+            });
+        }
+        else if (SelectedChannel is not null)
+        {
+            var dtos = await api.GetChannelPinsAsync(SelectedChannel.Id);
+            if (dtos is null) return;
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                foreach (var dto in dtos)
+                    PinnedMessages.Add(Wire(new MessageViewItem(dto, api.CurrentUsername, api.CurrentUserId)));
+            });
+        }
+    }
+
+    [RelayCommand]
+    public async Task TogglePinMessage(MessageViewItem item)
+    {
+        if (item.IsPinned)
+        {
+            if (IsDmMode && SelectedDmConversation is not null)
+                await api.UnpinDmMessageAsync(SelectedDmConversation.ConversationId, item.Message.Id);
+            else if (SelectedChannel is not null)
+                await api.UnpinChannelMessageAsync(SelectedChannel.Id, item.Message.Id);
+        }
+        else
+        {
+            if (IsDmMode && SelectedDmConversation is not null)
+                await api.PinDmMessageAsync(SelectedDmConversation.ConversationId, item.Message.Id);
+            else if (SelectedChannel is not null)
+                await api.PinChannelMessageAsync(SelectedChannel.Id, item.Message.Id);
+        }
+    }
+
+    [RelayCommand]
+    public async Task UnpinMessage(MessageViewItem item)
+    {
+        if (IsDmMode && SelectedDmConversation is not null)
+            await api.UnpinDmMessageAsync(SelectedDmConversation.ConversationId, item.Message.Id);
+        else if (SelectedChannel is not null)
+            await api.UnpinChannelMessageAsync(SelectedChannel.Id, item.Message.Id);
     }
 
     [RelayCommand]
@@ -729,6 +838,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private async Task SendDmMessageAsync()
     {
         if (string.IsNullOrWhiteSpace(MessageInput) && PendingAttachmentUrl is null) return;
+        StopTypingDebounced();
         IsEmojiPickerOpen = false;
         var text = MessageInput.Trim();
         var url = PendingAttachmentUrl;
@@ -866,6 +976,34 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (ok) item.ApplyDelete();
     }
 
+    [RelayCommand]
+    public async Task ToggleBlockUser(MessageViewItem item)
+    {
+        int targetId = item.Message.AuthorId;
+        if (targetId == 0 || targetId == api.CurrentUserId) return;
+        if (_blockedUserIds.Contains(targetId))
+        {
+            await api.UnblockUserAsync(targetId);
+            _blockedUserIds.Remove(targetId);
+        }
+        else
+        {
+            var ok = await api.BlockUserAsync(targetId);
+            if (!ok) return;
+            _blockedUserIds.Add(targetId);
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                var purge = _textMsgs.Where(m => m.Message.AuthorId == targetId).ToList();
+                foreach (var m in purge) _textMsgs.Remove(m);
+                purge = _voiceMsgs.Where(m => m.Message.AuthorId == targetId).ToList();
+                foreach (var m in purge) _voiceMsgs.Remove(m);
+                Messages = SelectedTab == "Voice"
+                    ? new ObservableCollection<MessageViewItem>(_voiceMsgs)
+                    : new ObservableCollection<MessageViewItem>(_textMsgs);
+            });
+        }
+    }
+
     // Must be called on MainThread
     private void AppendToMessages(MessageViewItem item)
     {
@@ -922,7 +1060,12 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public async Task CreateServerAsync(string name)
     {
         var server = await api.CreateServerAsync(new CreateServerRequest(name, null));
-        if (server is not null) Servers.Add(server);
+        if (server is not null)
+        {
+            var item = ServerViewItem.FromDto(server);
+            Servers.Add(item);
+            await SelectServerAsync(item);
+        }
     }
 
     [RelayCommand]
@@ -932,7 +1075,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (ok)
         {
             var list = await api.GetServersAsync();
-            Servers = new ObservableCollection<ServerDto>(list ?? []);
+            Servers = new ObservableCollection<ServerViewItem>((list ?? []).Select(ServerViewItem.FromDto));
         }
     }
 
@@ -999,13 +1142,25 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                 await Shell.Current.DisplayAlert("Invalid Code", "That invite link is invalid or has expired.", "OK");
                 return;
             }
-            Servers.Add(server);
-            await SelectServerAsync(server);
+            var item = ServerViewItem.FromDto(server);
+            Servers.Add(item);
+            await SelectServerAsync(item);
         }
         catch (Exception ex)
         {
             await Shell.Current.DisplayAlert("Error", ex.Message, "OK");
         }
+    }
+
+    [RelayCommand]
+    public async Task CreateServerPromptAsync()
+    {
+        var name = await Shell.Current.DisplayPromptAsync(
+            "Create Server",
+            "Enter a name for your new server:",
+            placeholder: "My Awesome Server");
+        if (!string.IsNullOrWhiteSpace(name))
+            await CreateServerAsync(name.Trim());
     }
 
     [RelayCommand]
@@ -1062,6 +1217,28 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         var n = missed.Count;
         toast.Show("FatGuysSpeak — Reconnected",
             $"{n} missed message{(n == 1 ? "" : "s")} in #{SelectedChannel.Name}");
+    }
+
+    private void OnKickedFromServer(int serverId)
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            var item = Servers.FirstOrDefault(s => s.Server.Id == serverId);
+            if (item is null) return;
+            Servers.Remove(item);
+            if (SelectedServer?.Id == serverId)
+            {
+                if (Servers.Count > 0)
+                    await SelectServerAsync(Servers[0]);
+                else
+                {
+                    SelectedServer = null;
+                    Channels.Clear();
+                    Members.Clear();
+                    Messages.Clear();
+                }
+            }
+        });
     }
 
     private void OnKickedFromVoice()
@@ -1189,6 +1366,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         // Only fires for the channel the user is currently in (server sends to channel-{id} group).
         // Unread tracking for background channels is handled by OnNewMessageNotification.
         if (SelectedChannel?.Id != msg.ChannelId) return;
+        if (_blockedUserIds.Contains(msg.AuthorId)) return;
 
         var item = Wire(new MessageViewItem(msg, api.CurrentUsername, api.CurrentUserId));
         AddToStore(item);
@@ -1287,6 +1465,78 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         {
             _typingUsersInChannel.Remove(userId);
             OnPropertyChanged(nameof(TypingText));
+        });
+    }
+
+    private void OnDmUserTyping(int userId, string username, int conversationId)
+    {
+        if (!IsDmMode || SelectedDmConversation?.ConversationId != conversationId) return;
+        if (userId == api.CurrentUserId) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _typingUsersInChannel[userId] = username;
+            OnPropertyChanged(nameof(TypingText));
+        });
+    }
+
+    private void OnDmUserStoppedTyping(int userId, int conversationId)
+    {
+        if (!IsDmMode || SelectedDmConversation?.ConversationId != conversationId) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _typingUsersInChannel.Remove(userId);
+            OnPropertyChanged(nameof(TypingText));
+        });
+    }
+
+    private void OnDmConversationRead(int conversationId, int readByUserId, DateTime readAt)
+    {
+        if (!IsDmMode || SelectedDmConversation?.ConversationId != conversationId) return;
+        if (readByUserId == api.CurrentUserId) return;
+        MainThread.BeginInvokeOnMainThread(() => UpdateSeenReceipts(readAt));
+    }
+
+    private void OnMessagePinned(int messageId, int channelId)
+    {
+        if (SelectedChannel?.Id != channelId) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var item = Messages.FirstOrDefault(m => m.Message.Id == messageId);
+            if (item is not null) item.IsPinned = true;
+            if (IsPinsOpen) _ = LoadPinnedMessagesAsync();
+        });
+    }
+
+    private void OnMessageUnpinned(int messageId, int channelId)
+    {
+        if (SelectedChannel?.Id != channelId) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var item = Messages.FirstOrDefault(m => m.Message.Id == messageId);
+            if (item is not null) item.IsPinned = false;
+            if (IsPinsOpen) _ = LoadPinnedMessagesAsync();
+        });
+    }
+
+    private void OnDmMessagePinned(int messageId, int conversationId)
+    {
+        if (!IsDmMode || SelectedDmConversation?.ConversationId != conversationId) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var item = Messages.FirstOrDefault(m => m.Message.Id == messageId);
+            if (item is not null) item.IsPinned = true;
+            if (IsPinsOpen) _ = LoadPinnedMessagesAsync();
+        });
+    }
+
+    private void OnDmMessageUnpinned(int messageId, int conversationId)
+    {
+        if (!IsDmMode || SelectedDmConversation?.ConversationId != conversationId) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var item = Messages.FirstOrDefault(m => m.Message.Id == messageId);
+            if (item is not null) item.IsPinned = false;
+            if (IsPinsOpen) _ = LoadPinnedMessagesAsync();
         });
     }
 
@@ -1445,17 +1695,30 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         var dtos = await api.GetDmMessagesAsync(conversationId);
         if (dtos is null) return;
+        var readState = await api.MarkDmAsReadAsync(conversationId);
         MainThread.BeginInvokeOnMainThread(() =>
         {
             Messages.Clear();
             foreach (var dto in dtos)
                 Messages.Add(new MessageViewItem(DmToMessageDto(dto), api.CurrentUsername, api.CurrentUserId));
+            if (readState is not null)
+                UpdateSeenReceipts(readState.OtherUserLastReadAt);
             ScrollToLatestRequested?.Invoke();
         });
     }
 
+    private void UpdateSeenReceipts(DateTime? otherUserReadAt)
+    {
+        foreach (var m in Messages) m.ShowSeenReceipt = false;
+        if (otherUserReadAt is null) return;
+        var last = Messages.LastOrDefault(m => m.IsOwnMessage && !m.Message.IsDeleted
+                                               && m.Message.CreatedAt <= otherUserReadAt);
+        if (last is not null) last.ShowSeenReceipt = true;
+    }
+
     private void OnDirectMessageReceived(DirectMessageDto dto)
     {
+        if (_blockedUserIds.Contains(dto.AuthorId)) return;
         MainThread.BeginInvokeOnMainThread(() =>
         {
             if (IsDmMode && SelectedDmConversation?.ConversationId == dto.ConversationId)
@@ -1463,20 +1726,28 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                 var item = new MessageViewItem(DmToMessageDto(dto), api.CurrentUsername, api.CurrentUserId);
                 Messages.Add(item);
                 if (_isAtBottom) ScrollToLatestRequested?.Invoke();
+                if (dto.AuthorId != api.CurrentUserId)
+                    _ = api.MarkDmAsReadAsync(dto.ConversationId);
             }
 
             var convo = DmConversations.FirstOrDefault(dc => dc.ConversationId == dto.ConversationId);
+            bool isActiveConvo = IsDmMode && SelectedDmConversation?.ConversationId == dto.ConversationId;
             if (convo is not null)
             {
                 convo.LastMessagePreview = dto.IsDeleted ? "(message deleted)" : dto.Content;
                 convo.LastMessageAt = dto.CreatedAt;
-                bool isActiveConvo = IsDmMode && SelectedDmConversation?.ConversationId == dto.ConversationId;
                 if (!isActiveConvo && dto.AuthorId != api.CurrentUserId)
                     convo.UnreadCount++;
             }
             else if (IsDmMode && dto.AuthorId != api.CurrentUserId)
             {
                 _ = LoadDmConversationsAsync();
+            }
+
+            if (NotificationRules.ShouldToastDm(dto.AuthorId, api.CurrentUserId, isActiveConvo))
+            {
+                var preview = dto.Content.Length > 80 ? dto.Content[..80] + "…" : dto.Content;
+                toast.Show($"DM from {dto.AuthorUsername}", preview);
             }
         });
     }
@@ -1495,6 +1766,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         dm.Id, dm.Content, dm.AuthorUsername, dm.AuthorId, dm.CreatedAt,
         dm.ConversationId, MessageSource.Text, dm.AttachmentUrl, dm.IsDeleted,
         null, null, dm.AuthorAvatarUrl, null, null, null, dm.AttachmentFileName);
+
 
     private void OnCameraStarted(int userId, string username, int channelId)
     {
@@ -1560,7 +1832,120 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             {
                 if (!Channels.Any(c => c.Channel.Id == channel.Id))
                     Channels.Add(new ChannelViewItem(channel));
+                RebuildCategorizedChannels();
             });
+    }
+
+    private void RebuildCategorizedChannels()
+    {
+        CategorizedChannels.Clear();
+        var catItems = _serverCategories
+            .OrderBy(c => c.Position)
+            .Select(CategoryViewItem.FromDto)
+            .ToList();
+        var uncategorized = CategoryViewItem.Uncategorized();
+        foreach (var ch in Channels)
+        {
+            if (ch.CategoryId.HasValue)
+            {
+                var cat = catItems.FirstOrDefault(c => c.Id == ch.CategoryId.Value);
+                (cat ?? uncategorized).Channels.Add(ch);
+            }
+            else
+                uncategorized.Channels.Add(ch);
+        }
+        if (uncategorized.Channels.Count > 0) CategorizedChannels.Add(uncategorized);
+        foreach (var cat in catItems) CategorizedChannels.Add(cat);
+    }
+
+    private void OnCategoryCreated(CategoryDto dto)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (SelectedServer?.Id != dto.ServerId) return;
+            if (!_serverCategories.Any(c => c.Id == dto.Id))
+                _serverCategories.Add(dto);
+            RebuildCategorizedChannels();
+        });
+    }
+
+    private void OnCategoryDeleted(int categoryId)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            _serverCategories.RemoveAll(c => c.Id == categoryId);
+            foreach (var ch in Channels.Where(c => c.CategoryId == categoryId))
+                ch.CategoryId = null;
+            RebuildCategorizedChannels();
+        });
+    }
+
+    private void OnCategoryRenamed(int categoryId, string name)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var dto = _serverCategories.FirstOrDefault(c => c.Id == categoryId);
+            if (dto is null) return;
+            _serverCategories.Remove(dto);
+            _serverCategories.Add(dto with { Name = name });
+            RebuildCategorizedChannels();
+        });
+    }
+
+    private void OnChannelCategoryChanged(int channelId, int? categoryId)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var item = Channels.FirstOrDefault(c => c.Channel.Id == channelId);
+            if (item is null) return;
+            item.CategoryId = categoryId;
+            RebuildCategorizedChannels();
+        });
+    }
+
+    [RelayCommand]
+    public void ToggleCategory(CategoryViewItem item) => item.IsCollapsed = !item.IsCollapsed;
+
+    [RelayCommand]
+    public async Task CreateCategoryPromptAsync()
+    {
+        if (SelectedServer is null || !IsServerAdmin) return;
+        var name = await Shell.Current.DisplayPromptAsync(
+            "New Category", "Category name:", placeholder: "e.g. General");
+        if (string.IsNullOrWhiteSpace(name)) return;
+        await api.CreateCategoryAsync(SelectedServer.Id, new CreateCategoryRequest(name.Trim()));
+    }
+
+    [RelayCommand]
+    public async Task RenameCategoryAsync(CategoryViewItem item)
+    {
+        if (SelectedServer is null || item.Id == 0) return;
+        var name = await Shell.Current.DisplayPromptAsync(
+            "Rename Category", "New name:", initialValue: item.Name);
+        if (string.IsNullOrWhiteSpace(name)) return;
+        await api.RenameCategoryAsync(SelectedServer.Id, item.Id, new RenameCategoryRequest(name.Trim()));
+    }
+
+    [RelayCommand]
+    public async Task DeleteCategoryAsync(CategoryViewItem item)
+    {
+        if (SelectedServer is null || item.Id == 0) return;
+        var confirm = await Shell.Current.DisplayAlert(
+            "Delete Category", $"Delete '{item.Name}'? Channels will become uncategorized.", "Delete", "Cancel");
+        if (!confirm) return;
+        await api.DeleteCategoryAsync(SelectedServer.Id, item.Id);
+    }
+
+    [RelayCommand]
+    public async Task SetChannelCategoryAsync(ChannelViewItem channelItem)
+    {
+        if (SelectedServer is null) return;
+        var choices = _serverCategories.Select(c => c.Name).Prepend("None").ToArray();
+        var picked = await Shell.Current.DisplayActionSheet("Move channel to:", "Cancel", null, choices);
+        if (picked is null or "Cancel") return;
+        int? catId = picked == "None" ? null : _serverCategories.FirstOrDefault(c => c.Name == picked)?.Id;
+        await api.SetChannelCategoryAsync(
+            SelectedServer.Id, channelItem.Channel.Id, new SetChannelCategoryRequest(catId));
     }
 
     [RelayCommand]

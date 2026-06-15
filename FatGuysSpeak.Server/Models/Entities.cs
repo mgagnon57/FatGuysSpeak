@@ -11,6 +11,7 @@ public class User
     public UserStatus Status { get; set; } = UserStatus.Offline;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? AvatarUrl { get; set; }
+    public string? Bio { get; set; }
 
     public List<ServerMember> ServerMemberships { get; set; } = [];
     public List<Message> Messages { get; set; } = [];
@@ -39,6 +40,15 @@ public class ServerMember
     public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
 }
 
+public class Category
+{
+    public int Id { get; set; }
+    public int ServerId { get; set; }
+    public GuildServer Server { get; set; } = null!;
+    public string Name { get; set; } = "";
+    public int Position { get; set; }
+}
+
 public class Channel
 {
     public int Id { get; set; }
@@ -47,6 +57,8 @@ public class Channel
     public int ServerId { get; set; }
     public GuildServer Server { get; set; } = null!;
     public int Position { get; set; }
+    public int? CategoryId { get; set; }
+    public Category? Category { get; set; }
 
     public List<Message> Messages { get; set; } = [];
 }
@@ -92,6 +104,46 @@ public class DirectMessage
     public bool IsDeleted { get; set; }
     public string? AttachmentUrl { get; set; }
     public string? AttachmentFileName { get; set; }
+}
+
+public class PinnedMessage
+{
+    public int Id { get; set; }
+    public int MessageId { get; set; }
+    public Message Message { get; set; } = null!;
+    public int ChannelId { get; set; }
+    public Channel Channel { get; set; } = null!;
+    public int PinnedById { get; set; }
+    public User PinnedBy { get; set; } = null!;
+    public DateTime PinnedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class PinnedDirectMessage
+{
+    public int Id { get; set; }
+    public int DirectMessageId { get; set; }
+    public DirectMessage DirectMessage { get; set; } = null!;
+    public int ConversationId { get; set; }
+    public DirectConversation Conversation { get; set; } = null!;
+    public int PinnedById { get; set; }
+    public User PinnedBy { get; set; } = null!;
+    public DateTime PinnedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class DirectConversationRead
+{
+    public int ConversationId { get; set; }
+    public int UserId { get; set; }
+    public DateTime LastReadAt { get; set; } = DateTime.UtcNow;
+}
+
+public class UserBlock
+{
+    public int BlockerId { get; set; }
+    public User Blocker { get; set; } = null!;
+    public int BlockedId { get; set; }
+    public User Blocked { get; set; } = null!;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class AuditLog

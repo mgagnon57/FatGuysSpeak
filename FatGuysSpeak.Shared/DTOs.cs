@@ -13,8 +13,13 @@ public record SetRoleRequest(ServerRole Role);
 public record SetChannelPermissionRequest(ServerRole MinRoleToRead, ServerRole MinRoleToWrite);
 public record CreateServerRequest(string Name, string? Description);
 
-public record ChannelDto(int Id, string Name, ChannelType Type, int ServerId, int Position);
+public record ChannelDto(int Id, string Name, ChannelType Type, int ServerId, int Position, int? CategoryId = null);
 public record CreateChannelRequest(string Name, ChannelType Type);
+
+public record CategoryDto(int Id, int ServerId, string Name, int Position);
+public record CreateCategoryRequest(string Name);
+public record RenameCategoryRequest(string Name);
+public record SetChannelCategoryRequest(int? CategoryId);
 
 public record ReactionDto(string Emoji, int Count, bool IsOwn);
 public record ReactionsUpdatedDto(int MessageId, List<ReactionDto> Reactions);
@@ -35,7 +40,8 @@ public record MessageDto(
     int? ReplyToId = null,
     string? ReplyToUsername = null,
     string? ReplyPreview = null,
-    string? AttachmentFileName = null);
+    string? AttachmentFileName = null,
+    bool IsPinned = false);
 
 public record SendMessageRequest(string Content, MessageSource Source = MessageSource.Text, string? AttachmentUrl = null, int? ReplyToMessageId = null, string? AttachmentFileName = null);
 public record EditMessageRequest(string Content);
@@ -52,9 +58,12 @@ public record UserProfileDto(
     ServerRole? Role,
     DateTime? JoinedAt,
     bool IsCurrentUser,
-    string? AvatarUrl = null);
+    string? AvatarUrl = null,
+    string? Bio = null);
 
 public record UpdateStatusRequest(UserStatus Status);
+public record UpdateBioRequest(string? Bio);
+public record BlockedUserDto(int UserId, string Username, DateTime BlockedAt);
 
 public record UserDto(int Id, string Username, UserStatus Status, string? AvatarUrl = null);
 
@@ -86,6 +95,9 @@ public record DirectMessageDto(
     bool IsDeleted = false,
     string? AttachmentUrl = null,
     string? AuthorAvatarUrl = null,
-    string? AttachmentFileName = null);
+    string? AttachmentFileName = null,
+    bool IsPinned = false);
 
 public record SendDirectMessageRequest(string? Content, string? AttachmentUrl = null, string? AttachmentFileName = null);
+
+public record DmReadStateDto(int ConversationId, DateTime MyLastReadAt, DateTime? OtherUserLastReadAt);
