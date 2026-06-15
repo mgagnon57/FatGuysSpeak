@@ -1834,6 +1834,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         {
             if (!Members.Any(m => m.Id == user.Id))
                 Members.Add(user);
+            if (!_memberRoles.ContainsKey(user.Id))
+                _memberRoles[user.Id] = ServerRole.Member;
         });
     }
 

@@ -233,6 +233,29 @@ public class ServersControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task SetMemberRole_AdminCannotDemoteAdmin_ReturnsForbid()
+    {
+        await SeedAsync();
+        // admin2 is the one being targeted for demotion
+        var admin2 = new User { Username = "admin2", Email = "a2@test.com", PasswordHash = "*" };
+        // nonOwnerAdmin is the actor — an Admin but NOT the server owner
+        var nonOwnerAdmin = new User { Username = "nonadmin", Email = "na@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.AddRange(admin2, nonOwnerAdmin);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.AddRange(
+            new ServerMember { ServerId = _server.Id, UserId = admin2.Id, Role = ServerRole.Admin },
+            new ServerMember { ServerId = _server.Id, UserId = nonOwnerAdmin.Id, Role = ServerRole.Admin });
+        await _testDb.Db.SaveChangesAsync();
+
+        // Switch actor to nonOwnerAdmin — they are Admin but NOT the server owner
+        TestHelpers.SetUser(_controller, nonOwnerAdmin.Id, nonOwnerAdmin.Username);
+        var result = await _controller.SetMemberRole(_server.Id, admin2.Id,
+            new SetRoleRequest(ServerRole.Member));
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
     public async Task GetMembersWithRoles_AsRegularMember_Succeeds()
     {
         await SeedAsync();
