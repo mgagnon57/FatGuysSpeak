@@ -95,6 +95,16 @@ public class ApiService
     public Task<List<UserDto>?> GetMembersAsync(int serverId) =>
         _http.GetFromJsonAsync<List<UserDto>>($"api/servers/{serverId}/members");
 
+    public Task<List<ServerMemberDto>?> GetMemberRolesAsync(int serverId) =>
+        _http.GetFromJsonAsync<List<ServerMemberDto>>($"api/servers/{serverId}/members/details");
+
+    public async Task<bool> SetMemberRoleAsync(int serverId, int userId, ServerRole role)
+    {
+        var resp = await _http.PutAsJsonAsync(
+            $"api/servers/{serverId}/members/{userId}/role", new SetRoleRequest(role));
+        return resp.IsSuccessStatusCode;
+    }
+
     public Task<List<MessageDto>?> GetMessagesAsync(int channelId) =>
         _http.GetFromJsonAsync<List<MessageDto>>($"api/channels/{channelId}/messages");
 
