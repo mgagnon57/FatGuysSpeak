@@ -223,7 +223,10 @@
                                                     CommandParameter="{Binding Id}" />
                                                 <MenuFlyoutItem Text="🎤 Test My Mic (Loopback)"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ToggleMicLoopbackCommand}" />
-
+                                                <MenuFlyoutItem Text="👑 Make Admin"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ElevateToAdminCommand}"
+                                                    CommandParameter="{Binding Id}"
+                                                    IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}" />
                                             </MenuFlyout>
                                         </FlyoutBase.ContextFlyout>
                                         <HorizontalStackLayout Spacing="7">
@@ -246,6 +249,13 @@
 
                         <!-- Channels grouped by category -->
                         <StackLayout BindableLayout.ItemsSource="{Binding CategorizedChannels}" Spacing="0">
+                            <FlyoutBase.ContextFlyout>
+                                <MenuFlyout>
+                                    <MenuFlyoutItem Text="+ Create Channel"
+                                        Command="{Binding CreateChannelCommand}"
+                                        IsEnabled="{Binding IsServerAdmin}" />
+                                </MenuFlyout>
+                            </FlyoutBase.ContextFlyout>
                             <BindableLayout.ItemTemplate>
                                 <DataTemplate x:DataType="vm:CategoryViewItem">
                                     <VerticalStackLayout Spacing="0">
@@ -338,6 +348,13 @@
                                 </DataTemplate>
                             </BindableLayout.ItemTemplate>
                         </StackLayout>
+                        <Button Text="+ New Channel"
+                                Command="{Binding CreateChannelCommand}"
+                                BackgroundColor="Transparent" TextColor="#555555"
+                                FontSize="11" HeightRequest="30" Padding="8,0"
+                                HorizontalOptions="Start"
+                                IsVisible="{Binding IsServerAdmin}"
+                                ToolTipProperties.Text="Create a new channel" />
                         <Button Text="+ New Category"
                                 Command="{Binding CreateCategoryPromptCommand}"
                                 BackgroundColor="Transparent" TextColor="#555555"
@@ -490,6 +507,14 @@
                                 <BindableLayout.ItemTemplate>
                                     <DataTemplate x:DataType="vm:VoiceParticipantViewModel">
                                         <HorizontalStackLayout Spacing="5" Padding="2,0">
+                                            <FlyoutBase.ContextFlyout>
+                                                <MenuFlyout>
+                                                    <MenuFlyoutItem Text="👑 Make Admin"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ElevateToAdminCommand}"
+                                                        CommandParameter="{Binding UserId}"
+                                                        IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}" />
+                                                </MenuFlyout>
+                                            </FlyoutBase.ContextFlyout>
                                             <Ellipse WidthRequest="7" HeightRequest="7"
                                                      Fill="{Binding DotColor}"
                                                      VerticalOptions="Center" />
