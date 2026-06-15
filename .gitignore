@@ -30,3 +30,6 @@ TestResults/
 
 ## Claude binary
 claude.exe
+
+## Runtime logs
+*.log
