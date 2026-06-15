@@ -50,6 +50,7 @@ public class ChatHubService
     public event Action<int>? CategoryDeleted;                 // categoryId
     public event Action<int, string>? CategoryRenamed;         // (categoryId, name)
     public event Action<int, int?>? ChannelCategoryChanged;   // (channelId, categoryId?)
+    public event Action<int, string>? MemberRoleChanged;  // (userId, roleName e.g. "Admin")
     public event Action<Exception?>? Reconnecting;
     public event Action<string?>?    Reconnected;
     public event Action<Exception?>? Disconnected;
@@ -106,6 +107,8 @@ public class ChatHubService
         _connection.On<int>("CategoryDeleted", id => CategoryDeleted?.Invoke(id));
         _connection.On<int, string>("CategoryRenamed", (id, name) => CategoryRenamed?.Invoke(id, name));
         _connection.On<int, int?>("ChannelCategoryChanged", (cid, catId) => ChannelCategoryChanged?.Invoke(cid, catId));
+        _connection.On<int, string>("MemberRoleChanged",
+            (uid, role) => MemberRoleChanged?.Invoke(uid, role));
 
         _connection.Reconnecting  += ex  => { Reconnecting?.Invoke(ex);  return Task.CompletedTask; };
         _connection.Reconnected   += cid => { Reconnected?.Invoke(cid);  return Task.CompletedTask; };
