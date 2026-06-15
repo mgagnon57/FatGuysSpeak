@@ -1918,14 +1918,17 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private void OnMemberRoleChanged(int userId, string roleName)
     {
         if (!Enum.TryParse<ServerRole>(roleName, out var role)) return;
-        _memberRoles[userId] = role;
-        if (userId == api.CurrentUserId && SelectedServer is not null)
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            SelectedServer = SelectedServer with { MyRole = role };
-            OnPropertyChanged(nameof(CurrentServerRole));
-            OnPropertyChanged(nameof(IsServerAdmin));
-            OnPropertyChanged(nameof(IsAdminOrModerator));
-        }
+            _memberRoles[userId] = role;
+            if (userId == api.CurrentUserId && SelectedServer is not null)
+            {
+                SelectedServer = SelectedServer with { MyRole = role };
+                OnPropertyChanged(nameof(CurrentServerRole));
+                OnPropertyChanged(nameof(IsServerAdmin));
+                OnPropertyChanged(nameof(IsAdminOrModerator));
+            }
+        });
     }
 
     [RelayCommand]
