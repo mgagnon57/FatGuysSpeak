@@ -110,6 +110,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private CancellationTokenSource? _typingCts;
     private readonly Dictionary<int, string> _typingUsersInChannel = new(); // userId -> username
     private readonly HashSet<int> _blockedUserIds = [];
+    private readonly Dictionary<int, ServerRole> _memberRoles = new();
 
     [ObservableProperty] private int _streamLatencyMs;
     [ObservableProperty] private string _streamQualityLabel = "1080p 20fps";
@@ -489,6 +490,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.CategoryDeleted         += OnCategoryDeleted;
         hub.CategoryRenamed         += OnCategoryRenamed;
         hub.ChannelCategoryChanged  += OnChannelCategoryChanged;
+        hub.MemberRoleChanged += OnMemberRoleChanged;
         hub.Reconnecting += _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Reconnecting");
         hub.Reconnected  += _ => MainThread.BeginInvokeOnMainThread(async () =>
         {
@@ -536,6 +538,16 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         RebuildCategorizedChannels();
         var onlineList = hub.IsConnected ? await hub.GetOnlineUsersAsync(item.Server.Id) : [];
         Members = new ObservableCollection<UserDto>(onlineList);
+        // Load role map for admin elevation UI; failure is non-fatal
+        _memberRoles.Clear();
+        try
+        {
+            var roleList = await api.GetMemberRolesAsync(item.Server.Id);
+            if (roleList is not null)
+                foreach (var m in roleList)
+                    _memberRoles[m.UserId] = m.Role;
+        }
+        catch { /* role map unavailable; Make Admin will not appear */ }
         SelectedChannel = null;
         Messages.Clear();
     }
@@ -1901,6 +1913,43 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             item.CategoryId = categoryId;
             RebuildCategorizedChannels();
         });
+    }
+
+    private void OnMemberRoleChanged(int userId, string roleName)
+    {
+        if (!Enum.TryParse<ServerRole>(roleName, out var role)) return;
+        _memberRoles[userId] = role;
+        if (userId == api.CurrentUserId && SelectedServer is not null)
+        {
+            SelectedServer = SelectedServer with { MyRole = role };
+            OnPropertyChanged(nameof(CurrentServerRole));
+            OnPropertyChanged(nameof(IsServerAdmin));
+            OnPropertyChanged(nameof(IsAdminOrModerator));
+        }
+    }
+
+    [RelayCommand]
+    public async Task ElevateToAdminAsync(int userId)
+    {
+        if (!IsServerAdmin || SelectedServer is null) return;
+        if (_memberRoles.GetValueOrDefault(userId) == ServerRole.Admin) return;
+        var ok = await api.SetMemberRoleAsync(SelectedServer.Id, userId, ServerRole.Admin);
+        if (!ok)
+            toast.Show("FatGuysSpeak", "Failed to update role.");
+    }
+
+    [RelayCommand]
+    public async Task CreateChannelAsync()
+    {
+        if (!IsServerAdmin || SelectedServer is null) return;
+        var name = await Shell.Current.DisplayPromptAsync(
+            "New Channel", "Enter channel name:", "Create", "Cancel");
+        if (string.IsNullOrWhiteSpace(name)) return;
+        var result = await api.CreateChannelAsync(
+            SelectedServer.Id, new CreateChannelRequest(name.Trim(), ChannelType.Text));
+        if (result is null)
+            toast.Show("FatGuysSpeak", "Failed to create channel.");
+        // ChannelCreated SignalR event already appends the channel to the list for all clients
     }
 
     [RelayCommand]
