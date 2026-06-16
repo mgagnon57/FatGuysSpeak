@@ -21,6 +21,8 @@ public static class LoopbackRedirectParser
             }
         }
 
+        // Report an error Google returned regardless of state (the flow fails either way and
+        // never exchanges a code). For the success path, state must match before we trust a code.
         if (error is not null) return new LoopbackResult(false, null, error);
         if (state != expectedState) return new LoopbackResult(false, null, "state_mismatch");
         if (string.IsNullOrEmpty(code)) return new LoopbackResult(false, null, "missing_code");

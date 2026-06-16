@@ -20,12 +20,8 @@ public class GoogleAuthService
         var challenge = PkceHelper.Challenge(verifier);
         var state = PkceHelper.GenerateState();
 
-        var port = GetFreeLoopbackPort();
-        var redirectUri = $"http://127.0.0.1:{port}/";
-
-        using var listener = new HttpListener();
-        listener.Prefixes.Add(redirectUri);
-        listener.Start();
+        var (listener, redirectUri) = StartLoopbackListener();
+        using (listener)
         try
         {
             var url = GoogleAuthUrlBuilder.Build(clientId, redirectUri, challenge, state);
@@ -37,7 +33,12 @@ public class GoogleAuthService
             var contextTask = listener.GetContextAsync();
             var finished = await Task.WhenAny(contextTask, Task.Delay(Timeout.Infinite, timeoutCts.Token));
             if (finished != contextTask)
+            {
+                // Timed out / cancelled: stopping the listener will fault the in-flight
+                // GetContextAsync — observe it so it isn't an unobserved task exception.
+                _ = contextTask.ContinueWith(static t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
                 return new GoogleCodeResult(false, null, null, null, "Google sign-in was cancelled.");
+            }
 
             var context = await contextTask;
             var rawQuery = context.Request.Url?.Query ?? "";
@@ -64,6 +65,29 @@ public class GoogleAuthService
         {
             listener.Stop();
         }
+    }
+
+    // Bind a one-shot loopback listener, retrying on the (rare) race where another local
+    // process grabs the probed port between probe.Stop() and listener.Start().
+    private static (HttpListener listener, string redirectUri) StartLoopbackListener()
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var port = GetFreeLoopbackPort();
+            var redirectUri = $"http://127.0.0.1:{port}/";
+            var listener = new HttpListener();
+            listener.Prefixes.Add(redirectUri);
+            try
+            {
+                listener.Start();
+                return (listener, redirectUri);
+            }
+            catch (HttpListenerException)
+            {
+                listener.Close();
+            }
+        }
+        throw new InvalidOperationException("Could not bind a loopback port for Google sign-in.");
     }
 
     private static int GetFreeLoopbackPort()

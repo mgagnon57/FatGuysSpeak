@@ -108,6 +108,8 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
         finally { IsLoading = false; }
     }
 
+    private string? _googleClientId;
+
     public async Task CheckGoogleAvailabilityAsync()
     {
         if (!OperatingSystem.IsWindows()) { IsGoogleAvailable = false; return; }
@@ -115,7 +117,8 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
         {
             api.SetServerUrl(ServerUrl);
             var cfg = await api.GetGoogleConfigAsync();
-            IsGoogleAvailable = cfg is not null && !string.IsNullOrWhiteSpace(cfg.ClientId);
+            _googleClientId = cfg?.ClientId;
+            IsGoogleAvailable = !string.IsNullOrWhiteSpace(_googleClientId);
         }
         catch { IsGoogleAvailable = false; }
     }
@@ -128,14 +131,18 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
         try
         {
             api.SetServerUrl(ServerUrl);
-            var cfg = await api.GetGoogleConfigAsync();
-            if (cfg is null || string.IsNullOrWhiteSpace(cfg.ClientId))
+            // Use the client id fetched during the availability check; fall back to a fresh
+            // fetch if the page didn't run it (e.g. server changed since load).
+            var clientId = _googleClientId;
+            if (string.IsNullOrWhiteSpace(clientId))
+                clientId = (await api.GetGoogleConfigAsync())?.ClientId;
+            if (string.IsNullOrWhiteSpace(clientId))
             {
                 ErrorMessage = "Google sign-in is not available on this server.";
                 return;
             }
 
-            var result = await google.SignInAsync(cfg.ClientId);
+            var result = await google.SignInAsync(clientId);
             if (!result.Success)
             {
                 ErrorMessage = result.Error ?? "Google sign-in failed.";
