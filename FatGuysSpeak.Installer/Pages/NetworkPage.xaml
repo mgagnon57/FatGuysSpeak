@@ -2,17 +2,17 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#0d0d0d">
-    <StackPanel Margin="40,32,40,24">
+    <StackPanel Margin="28,20,28,16">
 
         <TextBlock Text="Network Configuration" FontSize="22" FontWeight="SemiBold" Foreground="#e8e8e8"/>
         <TextBlock Text="Choose the port the server listens on"
                    FontSize="12" Foreground="#666666" Margin="0,6,0,0"/>
 
-        <Rectangle Fill="#1e1e1e" Height="1" Margin="0,16,0,20"/>
+        <Rectangle Fill="#1e1e1e" Height="1" Margin="0,12,0,14"/>
 
         <!-- Port row -->
         <TextBlock Text="PORT" Style="{StaticResource FieldLabel}"/>
-        <Grid Margin="0,0,0,6">
+        <Grid Margin="0,0,0,4">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="100"/>
                 <ColumnDefinition Width="10"/>
@@ -30,7 +30,7 @@
 
         <!-- Detected IPs -->
         <Border Background="#111111" BorderBrush="#1e1e1e" BorderThickness="1"
-                CornerRadius="3" Padding="14,12" Margin="0,14,0,0">
+                CornerRadius="3" Padding="14,10" Margin="0,10,0,0">
             <StackPanel>
                 <Grid Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
@@ -54,7 +54,7 @@
         </Border>
 
         <!-- Firewall checkbox -->
-        <CheckBox x:Name="ChkFirewall" IsChecked="True" Margin="0,18,0,0"
+        <CheckBox x:Name="ChkFirewall" IsChecked="True" Margin="0,14,0,0"
                   Foreground="#cccccc" FontSize="13" Checked="Chk_Changed" Unchecked="Chk_Changed">
             <TextBlock TextWrapping="Wrap">
                 <Run Text="Add Windows Firewall inbound rule for port "/>
@@ -64,7 +64,7 @@
 
         <!-- Router note -->
         <Border Background="#0f0f0a" BorderBrush="#2a2a10" BorderThickness="1"
-                CornerRadius="3" Padding="12,10" Margin="0,16,0,0">
+                CornerRadius="3" Padding="12,9" Margin="0,12,0,0">
             <TextBlock Foreground="#888855" FontSize="11" TextWrapping="Wrap"
                        Text="For clients outside your local network, you will also need to forward this port on your router to your LAN IP. Check your router's manual for port forwarding instructions."/>
         </Border>
