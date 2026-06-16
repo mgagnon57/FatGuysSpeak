@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -74,11 +76,30 @@ public partial class InstallPage : UserControl, IWizardPage
 
     private void CopyServerFiles()
     {
+        var asm = Assembly.GetExecutingAssembly();
+        var resourceName = asm.GetManifestResourceNames()
+            .FirstOrDefault(n => n.EndsWith("server-bundle.zip"));
+
+        if (resourceName != null)
+        {
+            using var stream = asm.GetManifestResourceStream(resourceName)!;
+            using var zip = new ZipArchive(stream, ZipArchiveMode.Read);
+            foreach (var entry in zip.Entries)
+            {
+                if (string.IsNullOrEmpty(entry.Name)) continue;
+                var dest = Path.Combine(_config.InstallPath, entry.FullName);
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                entry.ExtractToFile(dest, overwrite: true);
+            }
+            return;
+        }
+
+        // Fallback: read from server/ folder beside the exe (dev/demo builds)
         var sourceDir = Path.Combine(AppContext.BaseDirectory, "server");
         if (!Directory.Exists(sourceDir))
-            throw new DirectoryNotFoundException(
-                $"Server files not found at: {sourceDir}\n\n" +
-                "Make sure the 'server' folder is in the same directory as this installer.");
+            throw new InvalidOperationException(
+                "This is a demo build — server files are not bundled.\n\n" +
+                "Download the full installer from github.com/mgagnon57/FatGuysSpeak/releases");
 
         foreach (var srcFile in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories))
         {
