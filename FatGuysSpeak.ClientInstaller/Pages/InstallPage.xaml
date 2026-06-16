@@ -1,0 +1,134 @@
+<UserControl x:Class="FatGuysSpeak.ClientInstaller.Pages.InstallPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0d0d0d">
+    <Grid Margin="28,20,28,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   x:Name="HeadingText"
+                   Text="Installing"
+                   FontFamily="Segoe UI"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="#e8e8e8"/>
+
+        <Rectangle Grid.Row="1" Height="1" Fill="#252525" Margin="0,12,0,14"/>
+
+        <StackPanel Grid.Row="2" VerticalAlignment="Center">
+
+            <!-- Progress area (visible during install) -->
+            <StackPanel x:Name="ProgressPanel">
+                <TextBlock x:Name="StatusText"
+                           Text="Preparing..."
+                           FontFamily="Segoe UI"
+                           FontSize="13"
+                           Foreground="#888888"
+                           Margin="0,0,0,10"/>
+
+                <ProgressBar x:Name="InstallProgress"
+                             Height="4"
+                             Minimum="0" Maximum="100"
+                             BorderThickness="0"
+                             Background="#1a1a1a"
+                             Foreground="#f04010"
+                             Margin="0,0,0,4"/>
+
+                <TextBlock x:Name="PercentText"
+                           Text=""
+                           FontFamily="Segoe UI"
+                           FontSize="11"
+                           Foreground="#444444"/>
+            </StackPanel>
+
+            <!-- Success panel (visible after install) -->
+            <StackPanel x:Name="SuccessPanel" Visibility="Collapsed">
+                <TextBlock Text="✓"
+                           FontFamily="Segoe UI"
+                           FontSize="48"
+                           Foreground="#36b864"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,16"/>
+
+                <TextBlock Text="Installation complete!"
+                           FontFamily="Segoe UI"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="#e8e8e8"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,8"/>
+
+                <TextBlock Text="FatGuysSpeak Client has been installed. Launch the app and sign in with your server address."
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           FontFamily="Segoe UI"
+                           FontSize="13"
+                           Foreground="#888888"
+                           HorizontalAlignment="Center"/>
+
+                <CheckBox x:Name="LaunchCheck"
+                          IsChecked="True"
+                          HorizontalAlignment="Center"
+                          Margin="0,20,0,0">
+                    <CheckBox.Template>
+                        <ControlTemplate TargetType="CheckBox">
+                            <StackPanel Orientation="Horizontal" Cursor="Hand">
+                                <Border Width="16" Height="16"
+                                        Background="#1a1a1a"
+                                        BorderBrush="#333333"
+                                        BorderThickness="1"
+                                        CornerRadius="2"
+                                        VerticalAlignment="Center">
+                                    <TextBlock x:Name="Check"
+                                               Text="✓"
+                                               FontSize="11"
+                                               Foreground="#f04010"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Visibility="Collapsed"/>
+                                </Border>
+                                <TextBlock Text="Launch FatGuysSpeak now"
+                                           FontFamily="Segoe UI"
+                                           FontSize="13"
+                                           Foreground="#e8e8e8"
+                                           Margin="8,0,0,0"/>
+                            </StackPanel>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </CheckBox.Template>
+                </CheckBox>
+            </StackPanel>
+
+            <!-- Error panel -->
+            <Border x:Name="ErrorPanel"
+                    Visibility="Collapsed"
+                    Background="#1a0a0a"
+                    BorderBrush="#5a1a1a"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="14,12">
+                <StackPanel>
+                    <TextBlock Text="Installation failed"
+                               FontFamily="Segoe UI"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Foreground="#e05555"
+                               Margin="0,0,0,6"/>
+                    <TextBlock x:Name="ErrorText"
+                               TextWrapping="Wrap"
+                               FontFamily="Segoe UI"
+                               FontSize="12"
+                               Foreground="#aa6666"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

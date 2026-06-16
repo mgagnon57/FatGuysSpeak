@@ -1,0 +1,152 @@
+<UserControl x:Class="FatGuysSpeak.ClientInstaller.Pages.OptionsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0d0d0d">
+    <Grid Margin="28,20,28,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="Install Options"
+                   FontFamily="Segoe UI"
+                   FontSize="20"
+                   FontWeight="SemiBold"
+                   Foreground="#e8e8e8"/>
+
+        <Rectangle Grid.Row="1" Height="1" Fill="#252525" Margin="0,12,0,14"/>
+
+        <StackPanel Grid.Row="2" VerticalAlignment="Top">
+
+            <!-- Install path -->
+            <TextBlock Text="INSTALL LOCATION"
+                       FontFamily="Segoe UI"
+                       FontSize="10"
+                       FontWeight="SemiBold"
+                       Foreground="#555555"
+                       Margin="0,0,0,6"/>
+
+            <Grid Margin="0,0,0,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="InstallPathBox"
+                         Grid.Column="0"
+                         TextChanged="InstallPathBox_TextChanged"/>
+                <Button Grid.Column="2"
+                        Content="Browse"
+                        Style="{StaticResource NavButton}"
+                        Padding="14,7"
+                        Click="Browse_Click"/>
+            </Grid>
+
+            <TextBlock x:Name="PathNote"
+                       FontFamily="Segoe UI"
+                       FontSize="11"
+                       Foreground="#555555"
+                       Margin="0,4,0,0"/>
+
+            <!-- Divider -->
+            <Rectangle Height="1" Fill="#1a1a1a" Margin="0,18,0,16"/>
+
+            <!-- Shortcuts -->
+            <TextBlock Text="SHORTCUTS"
+                       FontFamily="Segoe UI"
+                       FontSize="10"
+                       FontWeight="SemiBold"
+                       Foreground="#555555"
+                       Margin="0,0,0,10"/>
+
+            <CheckBox x:Name="DesktopShortcutCheck"
+                      IsChecked="True"
+                      Checked="Shortcut_Changed"
+                      Unchecked="Shortcut_Changed">
+                <CheckBox.Template>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal" Cursor="Hand">
+                            <Border Width="16" Height="16"
+                                    Background="#1a1a1a"
+                                    BorderBrush="#333333"
+                                    BorderThickness="1"
+                                    CornerRadius="2"
+                                    VerticalAlignment="Center">
+                                <TextBlock x:Name="Check"
+                                           Text="✓"
+                                           FontSize="11"
+                                           Foreground="#f04010"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </CheckBox.Template>
+                <StackPanel>
+                    <TextBlock Text="Create desktop shortcut"
+                               FontFamily="Segoe UI"
+                               FontSize="13"
+                               Foreground="#e8e8e8"/>
+                    <TextBlock Text="Add FatGuysSpeak to your desktop for quick access"
+                               FontFamily="Segoe UI"
+                               FontSize="11"
+                               Foreground="#555555"
+                               Margin="0,2,0,0"/>
+                </StackPanel>
+            </CheckBox>
+
+            <CheckBox x:Name="StartMenuCheck"
+                      IsChecked="True"
+                      Margin="0,10,0,0"
+                      Checked="Shortcut_Changed"
+                      Unchecked="Shortcut_Changed">
+                <CheckBox.Template>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal" Cursor="Hand">
+                            <Border Width="16" Height="16"
+                                    Background="#1a1a1a"
+                                    BorderBrush="#333333"
+                                    BorderThickness="1"
+                                    CornerRadius="2"
+                                    VerticalAlignment="Center">
+                                <TextBlock x:Name="Check"
+                                           Text="✓"
+                                           FontSize="11"
+                                           Foreground="#f04010"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </CheckBox.Template>
+                <StackPanel>
+                    <TextBlock Text="Add to Start Menu"
+                               FontFamily="Segoe UI"
+                               FontSize="13"
+                               Foreground="#e8e8e8"/>
+                    <TextBlock Text="Create a Start Menu entry under FatGuysSpeak"
+                               FontFamily="Segoe UI"
+                               FontSize="11"
+                               Foreground="#555555"
+                               Margin="0,2,0,0"/>
+                </StackPanel>
+            </CheckBox>
+        </StackPanel>
+    </Grid>
+</UserControl>

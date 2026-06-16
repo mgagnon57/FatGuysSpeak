@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FatGuysSpeak.Tests", "FatGu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FatGuysSpeak.Installer", "FatGuysSpeak.Installer\FatGuysSpeak.Installer.csproj", "{A45098D7-F235-4A76-AA03-9A07A1509C31}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FatGuysSpeak.ClientInstaller", "FatGuysSpeak.ClientInstaller\FatGuysSpeak.ClientInstaller.csproj", "{274F4FC3-7206-4862-94F4-5D8955CA6A3D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,18 @@ Global
 		{A45098D7-F235-4A76-AA03-9A07A1509C31}.Release|x64.Build.0 = Release|Any CPU
 		{A45098D7-F235-4A76-AA03-9A07A1509C31}.Release|x86.ActiveCfg = Release|Any CPU
 		{A45098D7-F235-4A76-AA03-9A07A1509C31}.Release|x86.Build.0 = Release|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Debug|x64.Build.0 = Debug|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Debug|x86.Build.0 = Debug|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Release|x64.ActiveCfg = Release|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Release|x64.Build.0 = Release|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Release|x86.ActiveCfg = Release|Any CPU
+		{274F4FC3-7206-4862-94F4-5D8955CA6A3D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

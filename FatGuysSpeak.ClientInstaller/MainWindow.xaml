@@ -1,0 +1,78 @@
+<Window x:Class="FatGuysSpeak.ClientInstaller.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FatGuysSpeak Client Setup"
+        Width="560" Height="530"
+        WindowStyle="SingleBorderWindow"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        Background="#0d0d0d">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="70"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="55"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#0d0d0d" BorderBrush="#1e1e1e" BorderThickness="0,0,0,1">
+            <Grid Margin="28,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="FATGUYS SPEAK"
+                               FontFamily="Segoe UI Black"
+                               FontSize="18"
+                               FontWeight="Black"
+                               Foreground="#f04010"/>
+                    <TextBlock x:Name="PageTitle"
+                               Text="Client Setup"
+                               FontFamily="Segoe UI"
+                               FontSize="11"
+                               Foreground="#555555"
+                               Margin="2,2,0,0"/>
+                </StackPanel>
+
+                <!-- Step dots (3 steps) -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                            VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <Ellipse x:Name="Dot0" Width="8" Height="8" Fill="#f04010" Margin="4,0"/>
+                    <Ellipse x:Name="Dot1" Width="8" Height="8" Fill="#333333" Margin="4,0"/>
+                    <Ellipse x:Name="Dot2" Width="8" Height="8" Fill="#333333" Margin="4,0"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Page content -->
+        <ContentControl x:Name="ContentHost" Grid.Row="1"/>
+
+        <!-- Button bar -->
+        <Border Grid.Row="2" Background="#0d0d0d" BorderBrush="#1e1e1e" BorderThickness="0,1,0,0">
+            <Grid Margin="28,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="8"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="BackButton"
+                        Grid.Column="1"
+                        Content="Back"
+                        Style="{StaticResource NavButton}"
+                        Click="BackButton_Click"
+                        IsEnabled="False"/>
+
+                <Button x:Name="NextButton"
+                        Grid.Column="3"
+                        Content="Next"
+                        Style="{StaticResource PrimaryButton}"
+                        Click="NextButton_Click"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
