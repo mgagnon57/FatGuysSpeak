@@ -14,7 +14,7 @@ public class AuthControllerTests : IDisposable
     public AuthControllerTests()
     {
         _testDb = new TestDb();
-        _controller = new AuthController(_testDb.Db, TestHelpers.CreateTokenService());
+        _controller = new AuthController(_testDb.Db, TestHelpers.CreateTokenService(), new FatGuysSpeak.Server.Services.SessionBlacklistService());
     }
 
     public void Dispose() => _testDb.Dispose();

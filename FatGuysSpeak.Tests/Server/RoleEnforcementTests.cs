@@ -21,7 +21,7 @@ public class RoleEnforcementTests : IDisposable
     public RoleEnforcementTests()
     {
         _db = new TestDb();
-        _ctrl = new ServersController(_db.Db, TestHelpers.MockHub());
+        _ctrl = new ServersController(_db.Db, TestHelpers.MockHub(), TestHelpers.NullWebhooks());
     }
 
     public void Dispose() => _db.Dispose();

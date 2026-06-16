@@ -14,6 +14,55 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private string _serverUrl = Preferences.Get("server_url", ApiService.DefaultServerUrl);
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSavedServers))]
+    [NotifyPropertyChangedFor(nameof(ServerPickerItems))]
+    [NotifyPropertyChangedFor(nameof(IsEnteringNewServer))]
+    private List<string> _savedServers = LoadSavedServers();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEnteringNewServer))]
+    private string? _selectedServerOption = GetInitialServerOption();
+
+    private const string AddNewOption = "+ Add new server...";
+
+    public bool HasSavedServers => SavedServers.Count > 0;
+    public bool IsEnteringNewServer => !HasSavedServers || SelectedServerOption == AddNewOption;
+    public List<string> ServerPickerItems => [.. SavedServers, AddNewOption];
+
+    partial void OnServerUrlChanged(string value) =>
+        Preferences.Set("server_url", value.TrimEnd('/'));
+
+    partial void OnSelectedServerOptionChanged(string? value)
+    {
+        if (value is not null && value != AddNewOption)
+            ServerUrl = value;
+    }
+
+    private static List<string> LoadSavedServers()
+    {
+        var raw = Preferences.Get("saved_servers", "");
+        return string.IsNullOrEmpty(raw) ? [] : [.. raw.Split('|').Where(s => !string.IsNullOrEmpty(s))];
+    }
+
+    private static string? GetInitialServerOption()
+    {
+        var servers = LoadSavedServers();
+        if (servers.Count == 0) return null;
+        var current = Preferences.Get("server_url", ApiService.DefaultServerUrl);
+        return servers.Contains(current) ? current : servers[0];
+    }
+
+    private void PersistServer(string url)
+    {
+        if (!SavedServers.Contains(url))
+        {
+            SavedServers = [url, .. SavedServers];
+            Preferences.Set("saved_servers", string.Join("|", SavedServers));
+        }
+        SelectedServerOption = url;
+    }
+
     [RelayCommand]
     private async Task LoginAsync()
     {
@@ -27,6 +76,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
 
             api.SetToken(result.Token);
             api.SetCurrentUser(result.UserId, result.Username, result.AvatarUrl);
+            PersistServer(ServerUrl);
             ptt.LoadForUser(result.UserId);
             await hub.ConnectAsync(result.Token, api.ServerUrl);
             await Shell.Current.GoToAsync("//main");
@@ -48,6 +98,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
 
             api.SetToken(result.Token);
             api.SetCurrentUser(result.UserId, result.Username, result.AvatarUrl);
+            PersistServer(ServerUrl);
             ptt.LoadForUser(result.UserId);
             await hub.ConnectAsync(result.Token, api.ServerUrl);
             await Shell.Current.GoToAsync("//main");

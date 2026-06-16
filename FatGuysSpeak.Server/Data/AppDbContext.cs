@@ -20,6 +20,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PinnedMessage> PinnedMessages => Set<PinnedMessage>();
     public DbSet<PinnedDirectMessage> PinnedDirectMessages => Set<PinnedDirectMessage>();
     public DbSet<UserBlock> UserBlocks => Set<UserBlock>();
+    public DbSet<TempBan> TempBans => Set<TempBan>();
+    public DbSet<WordFilter> WordFilters => Set<WordFilter>();
+    public DbSet<UserChannelNotif> UserChannelNotifs => Set<UserChannelNotif>();
+    public DbSet<UserServerNotif> UserServerNotifs => Set<UserServerNotif>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<UserWarning> UserWarnings => Set<UserWarning>();
+    public DbSet<Webhook> Webhooks => Set<Webhook>();
+    public DbSet<GroupConversation> GroupConversations => Set<GroupConversation>();
+    public DbSet<GroupConversationMember> GroupConversationMembers => Set<GroupConversationMember>();
+    public DbSet<GroupMessage> GroupMessages => Set<GroupMessage>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -63,5 +74,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<UserBlock>()
             .HasKey(ub => new { ub.BlockerId, ub.BlockedId });
+
+        b.Entity<UserChannelNotif>()
+            .HasKey(n => new { n.UserId, n.ChannelId });
+
+        b.Entity<UserServerNotif>()
+            .HasKey(n => new { n.UserId, n.ServerId });
+
+        b.Entity<GroupConversationMember>()
+            .HasKey(m => new { m.GroupConversationId, m.UserId });
+
+        b.Entity<GroupMessage>()
+            .HasOne(gm => gm.GroupConversation)
+            .WithMany(gc => gc.Messages)
+            .HasForeignKey(gm => gm.GroupConversationId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<GuildServer>()
+            .HasIndex(s => s.VanityCode).IsUnique();
     }
 }

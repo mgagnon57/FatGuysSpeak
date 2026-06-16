@@ -11,14 +11,46 @@ public partial class ChannelViewItem(ChannelDto channel) : ObservableObject
 
     [ObservableProperty] private bool _isSelected;
     [ObservableProperty] private int _unreadCount;
+    [ObservableProperty] private int _mentionCount;
+    [ObservableProperty] private int _slowmodeSeconds = channel.SlowmodeSeconds;
     [ObservableProperty] private int? _categoryId = channel.CategoryId;
+    [ObservableProperty] private NotifLevel? _notifLevelOverride = channel.UserNotifLevel;
+
+    public string SlowmodeLabel => SlowmodeSeconds switch
+    {
+        0 => "",
+        < 60 => $"⏱ {SlowmodeSeconds}s slowmode",
+        < 3600 => $"⏱ {SlowmodeSeconds / 60}m slowmode",
+        _ => $"⏱ {SlowmodeSeconds / 3600}h slowmode"
+    };
+
+    partial void OnSlowmodeSecondsChanged(int value) => OnPropertyChanged(nameof(SlowmodeLabel));
+
+    public string NotifIcon => NotifLevelOverride switch
+    {
+        NotifLevel.Muted => "🚫",
+        NotifLevel.OnlyMentions => "🔕",
+        _ => ""
+    };
 
     public bool HasUnread => UnreadCount > 0;
     public string UnreadBadge => UnreadCount > 99 ? "99+" : UnreadCount.ToString();
+
+    public bool HasMention => MentionCount > 0;
+    public string MentionBadge => MentionCount > 9 ? "9+" : $"@{MentionCount}";
 
     partial void OnUnreadCountChanged(int value)
     {
         OnPropertyChanged(nameof(HasUnread));
         OnPropertyChanged(nameof(UnreadBadge));
     }
+
+    partial void OnMentionCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasMention));
+        OnPropertyChanged(nameof(MentionBadge));
+    }
+
+    partial void OnNotifLevelOverrideChanged(NotifLevel? value) =>
+        OnPropertyChanged(nameof(NotifIcon));
 }

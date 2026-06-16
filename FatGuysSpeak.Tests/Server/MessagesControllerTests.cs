@@ -30,7 +30,7 @@ public class MessagesControllerTests : IDisposable
         _hubMock = new Mock<IHubContext<ChatHub>>();
         _hubMock.Setup(h => h.Clients).Returns(clients.Object);
 
-        _controller = new MessagesController(_testDb.Db, _hubMock.Object, new FatGuysSpeak.Server.Services.ServerMetricsService(), TestHelpers.NullBot());
+        _controller = new MessagesController(_testDb.Db, _hubMock.Object, new FatGuysSpeak.Server.Services.ServerMetricsService(), TestHelpers.NullBot(), TestHelpers.NullAutomod(), TestHelpers.NullWebhooks());
     }
 
     public void Dispose() => _testDb.Dispose();
@@ -121,5 +121,44 @@ public class MessagesControllerTests : IDisposable
         var result = await _controller.SendMessage(999, new SendMessageRequest("msg"));
 
         Assert.IsType<NotFoundResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task SendMessage_BroadcastsNewMessageNotificationToServerGroup()
+    {
+        // Server sends NewMessageNotification to server-{id} group so all members
+        // (not just those in the channel) can update unread badges.
+        await SeedAsync();
+
+        await _controller.SendMessage(_textChannel.Id, new SendMessageRequest("notify me"));
+
+        _hubMock.Verify(h => h.Clients.Group($"server-{_server.Id}"), Times.Once);
+    }
+
+    [Fact]
+    public async Task SendMessage_EachSendAssignsDistinctId()
+    {
+        // Each message gets a unique server-assigned ID. Client-side dedup relies on
+        // comparing these IDs to decide whether AddToStore should skip the SignalR echo.
+        await SeedAsync();
+
+        var r1 = await _controller.SendMessage(_textChannel.Id, new SendMessageRequest("first"));
+        var r2 = await _controller.SendMessage(_textChannel.Id, new SendMessageRequest("second"));
+
+        var dto1 = Assert.IsType<MessageDto>(Assert.IsType<OkObjectResult>(r1.Result).Value);
+        var dto2 = Assert.IsType<MessageDto>(Assert.IsType<OkObjectResult>(r2.Result).Value);
+        Assert.NotEqual(dto1.Id, dto2.Id);
+    }
+
+    [Fact]
+    public async Task SendMessage_BroadcastsToChannelGroupExactlyOnce()
+    {
+        // Server must broadcast ReceiveMessage exactly once per send; client-side dedup
+        // uses the returned ID to recognize and skip the echo from SignalR.
+        await SeedAsync();
+
+        await _controller.SendMessage(_textChannel.Id, new SendMessageRequest("once"));
+
+        _hubMock.Verify(h => h.Clients.Group($"channel-{_textChannel.Id}"), Times.Once);
     }
 }

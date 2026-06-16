@@ -10,6 +10,19 @@
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- Theme colors — updated at runtime by ThemeService via DynamicResource -->
+            <Color x:Key="ThemeBgPrimary">#1a1a1a</Color>
+            <Color x:Key="ThemeBgPanel">#2a2a2a</Color>
+            <Color x:Key="ThemeBgHeader">#252525</Color>
+            <Color x:Key="ThemeBgElevated">#3a3a3a</Color>
+            <Color x:Key="ThemeBgInput">#141414</Color>
+            <Color x:Key="ThemeDivider">#333333</Color>
+            <Color x:Key="ThemeAccent">#2d5f9e</Color>
+            <Color x:Key="ThemeAccentLight">#8ab4d4</Color>
+            <Color x:Key="ThemeTextPrimary">#d0d0d0</Color>
+            <Color x:Key="ThemeTextSecondary">#888888</Color>
+            <Color x:Key="ThemeTextMuted">#666666</Color>
+
             <local:StringToBoolConverter x:Key="StringToBoolConverter" />
             <local:InvertBoolConverter x:Key="InvertBoolConverter" />
             <local:InitialsConverter x:Key="InitialsConverter" />

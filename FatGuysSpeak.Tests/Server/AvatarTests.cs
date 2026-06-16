@@ -121,7 +121,7 @@ public class AvatarTests : IDisposable
         _db.Db.Messages.Add(new Message { Content = "hello", AuthorId = _user.Id, ChannelId = channel.Id });
         await _db.Db.SaveChangesAsync();
 
-        var msgsCtrl = new MessagesController(_db.Db, TestHelpers.MockHub(), new FatGuysSpeak.Server.Services.ServerMetricsService(), TestHelpers.NullBot());
+        var msgsCtrl = new MessagesController(_db.Db, TestHelpers.MockHub(), new FatGuysSpeak.Server.Services.ServerMetricsService(), TestHelpers.NullBot(), TestHelpers.NullAutomod(), TestHelpers.NullWebhooks());
         TestHelpers.SetUser(msgsCtrl, _user.Id, _user.Username);
 
         var result = await msgsCtrl.GetMessages(channel.Id);

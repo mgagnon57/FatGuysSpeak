@@ -4,10 +4,11 @@
              xmlns:shared="clr-namespace:FatGuysSpeak.Shared;assembly=FatGuysSpeak.Shared"
              xmlns:vm="clr-namespace:FatGuysSpeak.Client.ViewModels"
              xmlns:svc="clr-namespace:FatGuysSpeak.Client.Services"
+             xmlns:controls="clr-namespace:FatGuysSpeak.Client.Controls"
              x:Class="FatGuysSpeak.Client.Pages.MainPage"
              x:Name="RootPage"
              Title="FatGuysSpeak"
-             BackgroundColor="#1a1a1a">
+             BackgroundColor="{DynamicResource ThemeBgPrimary}">
 
     <ContentPage.Resources>
         <ResourceDictionary>
@@ -37,15 +38,15 @@
     <Grid RowDefinitions="Auto,Auto,*,Auto">
 
         <!-- ═══ TOP BAR ═══ -->
-        <Grid Grid.Row="0" BackgroundColor="#2a2a2a" Padding="10,6"
+        <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgPanel}" Padding="10,6"
               ColumnDefinitions="Auto,*,Auto">
             <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
                 <Button Text="☰"
                         Command="{Binding ToggleSidebarCommand}"
-                        BackgroundColor="Transparent" TextColor="#8ab4d4"
+                        BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
                         FontSize="16" WidthRequest="32" HeightRequest="30" Padding="0"
                         ToolTipProperties.Text="Toggle sidebar" />
-                <Label Text="🖥" FontSize="14" TextColor="#8ab4d4" VerticalOptions="Center" />
+                <Label Text="🖥" FontSize="14" TextColor="{DynamicResource ThemeAccentLight}" VerticalOptions="Center" />
                 <Label Text="FatGuysSpeak" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13" VerticalOptions="Center" />
                 <BoxView WidthRequest="1" HeightRequest="14" BackgroundColor="#444444" VerticalOptions="Center" Margin="4,0" />
                 <Ellipse WidthRequest="8" HeightRequest="8"
@@ -71,7 +72,7 @@
         </Grid>
 
         <!-- ═══ MAIN CONTENT ═══ -->
-        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*">
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto">
 
             <!-- SERVER SIDEBAR -->
             <Grid Grid.Column="0" BackgroundColor="#111111" RowDefinitions="*,Auto"
@@ -92,11 +93,16 @@
                                                  VerticalOptions="Center" HorizontalOptions="Start"
                                                  IsVisible="{Binding IsSelected}" />
                                         <Frame CornerRadius="16" WidthRequest="40" HeightRequest="40"
-                                               BackgroundColor="#2d5f9e" Padding="0"
+                                               BackgroundColor="{DynamicResource ThemeAccent}" Padding="0"
                                                HorizontalOptions="Center" VerticalOptions="Center">
-                                            <Label Text="{Binding Initials}" TextColor="White"
-                                                   FontSize="14" FontAttributes="Bold"
-                                                   HorizontalOptions="Center" VerticalOptions="Center" />
+                                            <Grid>
+                                                <Label Text="{Binding Initials}" TextColor="White"
+                                                       FontSize="14" FontAttributes="Bold"
+                                                       HorizontalOptions="Center" VerticalOptions="Center"
+                                                       IsVisible="{Binding HasIcon, Converter={StaticResource InvertBoolConverter}}" />
+                                                <Image Source="{Binding IconUrl}" Aspect="AspectFill"
+                                                       IsVisible="{Binding HasIcon}" />
+                                            </Grid>
                                         </Frame>
                                     </Grid>
                                 </DataTemplate>
@@ -104,24 +110,17 @@
                         </StackLayout>
                     </VerticalStackLayout>
                 </ScrollView>
-                <Button Grid.Row="1" Text="+"
-                        Command="{Binding CreateServerPromptCommand}"
-                        BackgroundColor="#23a55a" TextColor="White"
-                        FontSize="18" FontAttributes="Bold"
-                        WidthRequest="40" HeightRequest="40" CornerRadius="20"
-                        HorizontalOptions="Center" Margin="0,4,0,12" Padding="0"
-                        ToolTipProperties.Text="Create a new server" />
             </Grid>
 
             <!-- LEFT: Server tree -->
             <Grid Grid.Column="1" BackgroundColor="#1e1e1e" RowDefinitions="Auto,*,Auto"
                   WidthRequest="216" IsVisible="{Binding IsSidebarOpen}">
 
-                <Grid Grid.Row="0" BackgroundColor="#252525" Padding="8,7"
+                <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,7"
                       ColumnDefinitions="Auto,*,Auto,Auto,Auto">
-                    <Label Grid.Column="0" Text="▼" TextColor="#8ab4d4" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0"
+                    <Label Grid.Column="0" Text="▼" TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0"
                            IsVisible="{Binding IsNotDmMode}" />
-                    <Label Grid.Column="0" Text="💬" TextColor="#8ab4d4" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0"
+                    <Label Grid.Column="0" Text="💬" TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0"
                            IsVisible="{Binding IsDmMode}" />
                     <Label Grid.Column="1" Text="{Binding SelectedServer.Name, FallbackValue='FatGuysSpeak'}" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="12" VerticalOptions="Center"
                            IsVisible="{Binding IsNotDmMode}" />
@@ -133,12 +132,12 @@
                     <Button Grid.Column="3" Text="🔗"
                             Command="{Binding CopyInviteLinkCommand}"
                             IsVisible="{Binding IsServerAdmin}"
-                            BackgroundColor="Transparent" TextColor="#8ab4d4"
+                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
                             FontSize="13" HeightRequest="26" WidthRequest="30" Padding="0"
                             ToolTipProperties.Text="Copy invite link" />
                     <Button Grid.Column="4" Text="💬"
                             Command="{Binding ToggleDmModeCommand}"
-                            BackgroundColor="Transparent" TextColor="#8ab4d4"
+                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
                             FontSize="13" HeightRequest="26" WidthRequest="30" Padding="0"
                             ToolTipProperties.Text="Direct Messages" />
                 </Grid>
@@ -214,7 +213,7 @@
                                IsVisible="{Binding Members.Count, Converter={StaticResource NullToBoolConverter}}" />
                         <StackLayout BindableLayout.ItemsSource="{Binding Members}" Spacing="0">
                             <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="shared:UserDto">
+                                <DataTemplate x:DataType="vm:MemberViewItem">
                                     <Grid Padding="16,3,8,3" BackgroundColor="Transparent">
                                         <FlyoutBase.ContextFlyout>
                                             <MenuFlyout>
@@ -223,15 +222,32 @@
                                                     CommandParameter="{Binding Id}" />
                                                 <MenuFlyoutItem Text="🎤 Test My Mic (Loopback)"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ToggleMicLoopbackCommand}" />
+                                                <MenuFlyoutItem Text="🛡 Make Moderator"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.PromoteToModeratorCommand}"
+                                                    CommandParameter="{Binding Id}"
+                                                    IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}" />
                                                 <MenuFlyoutItem Text="👑 Make Admin"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ElevateToAdminCommand}"
                                                     CommandParameter="{Binding Id}"
                                                     IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}" />
+                                                <MenuFlyoutItem Text="🔇 Mute"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.MuteUserByIdCommand}"
+                                                    CommandParameter="{Binding Id}"
+                                                    IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}" />
+                                                <MenuFlyoutItem Text="⛔ Temp Ban"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.TempBanUserByIdCommand}"
+                                                    CommandParameter="{Binding Id}"
+                                                    IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}" />
+                                                <MenuFlyoutItem Text="🚫 Block / Unblock"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.BlockUserByIdCommand}"
+                                                    CommandParameter="{Binding Id}" />
                                             </MenuFlyout>
                                         </FlyoutBase.ContextFlyout>
                                         <HorizontalStackLayout Spacing="7">
                                             <BoxView WidthRequest="8" HeightRequest="8" CornerRadius="4" VerticalOptions="Center"
                                                      BackgroundColor="{Binding Status, Converter={StaticResource StatusDotColorConverter}}" />
+                                            <Label Text="{Binding RoleIcon}" FontSize="11" VerticalOptions="Center"
+                                                   IsVisible="{Binding HasRoleIcon}" />
                                             <Label Text="{Binding Username}" TextColor="#c0c0c0" FontSize="12" VerticalOptions="Center">
                                                 <Label.GestureRecognizers>
                                                     <TapGestureRecognizer
@@ -245,7 +261,7 @@
                             </BindableLayout.ItemTemplate>
                         </StackLayout>
 
-                        <BoxView HeightRequest="1" BackgroundColor="#333333" Margin="0,4" />
+                        <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" Margin="0,4" />
 
                         <!-- Channels grouped by category -->
                         <StackLayout BindableLayout.ItemsSource="{Binding CategorizedChannels}" Spacing="0">
@@ -254,6 +270,25 @@
                                     <MenuFlyoutItem Text="+ Create Channel"
                                         Command="{Binding CreateChannelCommand}"
                                         IsEnabled="{Binding IsServerAdmin}" />
+                                    <MenuFlyoutItem Text="🔤 Word Filter"
+                                        Command="{Binding ManageWordFilterCommand}"
+                                        IsEnabled="{Binding IsServerAdmin}" />
+                                    <MenuFlyoutItem Text="📷 Change Icon"
+                                        Command="{Binding ChangeServerIconCommand}"
+                                        IsEnabled="{Binding IsServerAdmin}" />
+                                    <MenuFlyoutItem Text="🗑 Remove Icon"
+                                        Command="{Binding RemoveServerIconCommand}"
+                                        IsEnabled="{Binding IsServerAdmin}" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="🔔 All Notifications"
+                                        Command="{Binding SetServerNotifLevelCommand}"
+                                        CommandParameter="All" />
+                                    <MenuFlyoutItem Text="🔕 Mentions Only"
+                                        Command="{Binding SetServerNotifLevelCommand}"
+                                        CommandParameter="OnlyMentions" />
+                                    <MenuFlyoutItem Text="🚫 Mute Server"
+                                        Command="{Binding SetServerNotifLevelCommand}"
+                                        CommandParameter="Muted" />
                                 </MenuFlyout>
                             </FlyoutBase.ContextFlyout>
                             <BindableLayout.ItemTemplate>
@@ -297,6 +332,19 @@
                                                                     <MenuFlyoutItem Text="📁 Move to Category"
                                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SetChannelCategoryCommand}"
                                                                         CommandParameter="{Binding .}" />
+                                                                    <MenuFlyoutItem Text="⏱ Set Slowmode"
+                                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SetSlowmodeCommand}"
+                                                                        CommandParameter="{Binding .}" />
+                                                                    <MenuFlyoutSeparator />
+                                                                    <MenuFlyoutItem Text="🔔 All Notifications"
+                                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SetChannelNotifLevelCommand}"
+                                                                        CommandParameter="All" />
+                                                                    <MenuFlyoutItem Text="🔕 Mentions Only"
+                                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SetChannelNotifLevelCommand}"
+                                                                        CommandParameter="OnlyMentions" />
+                                                                    <MenuFlyoutItem Text="🚫 Mute Channel"
+                                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SetChannelNotifLevelCommand}"
+                                                                        CommandParameter="Muted" />
                                                                 </MenuFlyout>
                                                             </FlyoutBase.ContextFlyout>
                                                             <Grid.GestureRecognizers>
@@ -310,15 +358,26 @@
                                                                        TextColor="{Binding IsSelected, Converter={StaticResource ChannelTextConverter}}"
                                                                        FontAttributes="{Binding IsSelected, Converter={StaticResource SelectedFontConverter}}"
                                                                        Margin="7,0,0,0" />
-                                                                <Border Grid.Column="2"
-                                                                        BackgroundColor="{Binding HasUnread, Converter={StaticResource UnreadBadgeBgConverter}}"
-                                                                        StrokeThickness="0" StrokeShape="RoundRectangle 8"
-                                                                        Padding="5,1" MinimumWidthRequest="18"
-                                                                        IsVisible="{Binding HasUnread}">
-                                                                    <Label Text="{Binding UnreadBadge}"
-                                                                           TextColor="White" FontSize="10" FontAttributes="Bold"
-                                                                           HorizontalOptions="Center" VerticalOptions="Center" />
-                                                                </Border>
+                                                                <HorizontalStackLayout Grid.Column="2" Spacing="3" VerticalOptions="Center">
+                                                                    <Label Text="{Binding NotifIcon}" FontSize="9" VerticalOptions="Center"
+                                                                           IsVisible="{Binding NotifLevelOverride, Converter={StaticResource NullToBoolConverter}}" />
+                                                                    <Border BackgroundColor="#d4860f"
+                                                                            StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                                                                            Padding="5,1" MinimumWidthRequest="18"
+                                                                            IsVisible="{Binding HasMention}">
+                                                                        <Label Text="{Binding MentionBadge}"
+                                                                               TextColor="White" FontSize="10" FontAttributes="Bold"
+                                                                               HorizontalOptions="Center" VerticalOptions="Center" />
+                                                                    </Border>
+                                                                    <Border BackgroundColor="{Binding HasUnread, Converter={StaticResource UnreadBadgeBgConverter}}"
+                                                                            StrokeThickness="0" StrokeShape="RoundRectangle 8"
+                                                                            Padding="5,1" MinimumWidthRequest="18"
+                                                                            IsVisible="{Binding HasUnread}">
+                                                                        <Label Text="{Binding UnreadBadge}"
+                                                                               TextColor="White" FontSize="10" FontAttributes="Bold"
+                                                                               HorizontalOptions="Center" VerticalOptions="Center" />
+                                                                    </Border>
+                                                                </HorizontalStackLayout>
                                                             </Grid>
                                                         </Grid>
                                                         <!-- Users in this channel -->
@@ -333,7 +392,7 @@
                                                                             </MenuFlyout>
                                                                         </FlyoutBase.ContextFlyout>
                                                                         <HorizontalStackLayout Spacing="6">
-                                                                            <Label Text="🎧" FontSize="10" TextColor="#8ab4d4" VerticalOptions="Center" />
+                                                                            <Label Text="🎧" FontSize="10" TextColor="{DynamicResource ThemeAccentLight}" VerticalOptions="Center" />
                                                                             <Label Text="{Binding Username}" TextColor="#aaaaaa" FontSize="11" VerticalOptions="Center" />
                                                                         </HorizontalStackLayout>
                                                                     </Grid>
@@ -364,7 +423,7 @@
                                 ToolTipProperties.Text="Create a new channel category" />
 
                         <!-- Invite actions -->
-                        <BoxView HeightRequest="1" BackgroundColor="#333333" Margin="0,6,0,2" />
+                        <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" Margin="0,6,0,2" />
                         <Button Text="+ Join with Invite Code"
                                 Command="{Binding JoinByInviteCommand}"
                                 BackgroundColor="Transparent" TextColor="#666666"
@@ -384,10 +443,10 @@
                 </ScrollView>
 
                 <!-- Profile bar -->
-                <Grid Grid.Row="2" BackgroundColor="#252525" Padding="8,7"
+                <Grid Grid.Row="2" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,7"
                       ColumnDefinitions="Auto,*,Auto">
                     <Frame Grid.Column="0" CornerRadius="14" WidthRequest="28" HeightRequest="28"
-                           BackgroundColor="#2d5f9e" Padding="0" Margin="0,0,8,0">
+                           BackgroundColor="{DynamicResource ThemeAccent}" Padding="0" Margin="0,0,8,0">
                         <Grid>
                             <Label Text="{Binding CurrentUsername, Converter={StaticResource InitialsConverter}}"
                                    TextColor="White" FontSize="9" FontAttributes="Bold"
@@ -410,17 +469,23 @@
             </Grid>
 
             <!-- RIGHT: Chat panel -->
-            <Grid Grid.Column="2" BackgroundColor="#1a1a1a" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto">
+            <Grid Grid.Column="2" BackgroundColor="{DynamicResource ThemeBgPrimary}" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto">
 
                 <!-- Channel header / DM header -->
-                <Grid Grid.Row="0" BackgroundColor="#252525" RowDefinitions="Auto,Auto">
+                <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgHeader}" RowDefinitions="Auto,Auto">
                     <!-- Channel header (hidden in DM mode) -->
                     <Grid Grid.Row="0" Padding="14,8" ColumnDefinitions="Auto,*,Auto,Auto"
                           IsVisible="{Binding IsNotDmMode}">
                         <Label Grid.Column="0" Text="#" TextColor="#555555" FontSize="16" VerticalOptions="Center" />
-                        <Label Grid.Column="1" Text="{Binding SelectedChannel.Name, FallbackValue='Select a channel'}"
-                               TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13"
-                               VerticalOptions="Center" Margin="6,0,0,0" />
+                        <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center" Margin="6,0,0,0">
+                            <Label Text="{Binding SelectedChannel.Name, FallbackValue='Select a channel'}"
+                                   TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13"
+                                   VerticalOptions="Center" />
+                            <Label Text="{Binding CurrentChannelSlowmodeLabel}"
+                                   TextColor="#e09030" FontSize="10"
+                                   VerticalOptions="Center"
+                                   IsVisible="{Binding CurrentChannelHasSlowmode}" />
+                        </HorizontalStackLayout>
                         <Button Grid.Column="2" Text="📌"
                                 Command="{Binding TogglePinsCommand}"
                                 BackgroundColor="{Binding IsPinsOpen, Converter={StaticResource TabBgConverter}}"
@@ -438,7 +503,7 @@
                           IsVisible="{Binding IsDmMode}">
                         <Button Grid.Column="0" Text="←"
                                 Command="{Binding ToggleDmModeCommand}"
-                                BackgroundColor="Transparent" TextColor="#8ab4d4"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
                                 FontSize="14" HeightRequest="30" WidthRequest="34" Padding="0" />
                         <Label Grid.Column="1" Text="{Binding DmHeaderTitle, StringFormat='💬  {0}'}"
                                TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13"
@@ -456,11 +521,11 @@
                                Text="{Binding SearchQuery}"
                                Placeholder="Search in channel…"
                                PlaceholderColor="#555555" TextColor="#d0d0d0"
-                               BackgroundColor="#2a2a2a" FontSize="12"
+                               BackgroundColor="{DynamicResource ThemeBgPanel}" FontSize="12"
                                ReturnCommand="{Binding SearchCommand}" />
                         <Button Grid.Column="1" Text="Search"
                                 Command="{Binding SearchCommand}"
-                                BackgroundColor="#2d5f9e" TextColor="White"
+                                BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
                                 FontSize="11" CornerRadius="3" Padding="10,0"
                                 HeightRequest="32" Margin="6,0,0,0" />
                         <Button Grid.Column="2" Text="✕"
@@ -513,6 +578,17 @@
                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ElevateToAdminCommand}"
                                                         CommandParameter="{Binding UserId}"
                                                         IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}" />
+                                                    <MenuFlyoutItem Text="🔇 Mute"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.MuteUserByIdCommand}"
+                                                        CommandParameter="{Binding UserId}"
+                                                        IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}" />
+                                                    <MenuFlyoutItem Text="⛔ Temp Ban"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.TempBanUserByIdCommand}"
+                                                        CommandParameter="{Binding UserId}"
+                                                        IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}" />
+                                                    <MenuFlyoutItem Text="🚫 Block / Unblock"
+                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.BlockUserByIdCommand}"
+                                                        CommandParameter="{Binding UserId}" />
                                                 </MenuFlyout>
                                             </FlyoutBase.ContextFlyout>
                                             <Ellipse WidthRequest="7" HeightRequest="7"
@@ -538,7 +614,7 @@
                         </CollectionView.ItemsLayout>
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="vm:VideoTileViewModel">
-                                <Grid WidthRequest="200" HeightRequest="150" BackgroundColor="#1a1a1a">
+                                <Grid WidthRequest="200" HeightRequest="150" BackgroundColor="{DynamicResource ThemeBgPrimary}">
                                     <Image Source="{Binding Frame}" Aspect="AspectFill" />
                                     <Border VerticalOptions="End" HorizontalOptions="Fill"
                                             BackgroundColor="#99000000" StrokeThickness="0" Padding="6,3">
@@ -558,7 +634,7 @@
                       RowDefinitions="Auto,480">
                     <Grid Grid.Row="0" BackgroundColor="#141420" ColumnDefinitions="*,Auto,Auto,Auto">
                         <Label Grid.Column="0" Text="{Binding StreamHeaderText}"
-                               TextColor="#8ab4d4" FontSize="11" FontAttributes="Bold"
+                               TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" FontAttributes="Bold"
                                VerticalOptions="Center" Padding="8,5" />
                         <HorizontalStackLayout Grid.Column="1" Spacing="5" VerticalOptions="Center" Margin="0,0,8,0">
                             <Ellipse WidthRequest="8" HeightRequest="8"
@@ -570,12 +646,12 @@
                         <Button Grid.Column="2" Text="💬"
                                 Command="{Binding ToggleStreamChatOverlayCommand}"
                                 BackgroundColor="{Binding IsStreamChatOverlayVisible, Converter={StaticResource ChannelSelectionConverter}}"
-                                TextColor="#8ab4d4" FontSize="13"
+                                TextColor="{DynamicResource ThemeAccentLight}" FontSize="13"
                                 HeightRequest="30" WidthRequest="36" Padding="0" Margin="0,0,2,0"
                                 ToolTipProperties.Text="Toggle chat overlay" />
                         <Button Grid.Column="3" Text="⛶"
                                 Command="{Binding ToggleFullScreenCommand}"
-                                BackgroundColor="Transparent" TextColor="#8ab4d4" FontSize="15"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}" FontSize="15"
                                 HeightRequest="30" WidthRequest="36" Padding="0" Margin="0,0,4,0"
                                 ToolTipProperties.Text="Pop out to separate window" />
                     </Grid>
@@ -616,7 +692,7 @@
                                     <DataTemplate x:DataType="vm:MessageViewItem">
                                         <VerticalStackLayout Padding="8,4" Spacing="1">
                                             <Label Text="{Binding Message.AuthorUsername}"
-                                                   TextColor="#8ab4d4" FontSize="11" FontAttributes="Bold" />
+                                                   TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" FontAttributes="Bold" />
                                             <Label Text="{Binding Message.Content}"
                                                    TextColor="#e0e0e0" FontSize="11"
                                                    LineBreakMode="TailTruncation" MaxLines="2" />
@@ -632,10 +708,10 @@
                 <Grid Grid.Row="3" BackgroundColor="#141420" Padding="12,6" IsVisible="{Binding IsFullScreen}">
                     <HorizontalStackLayout Spacing="12" HorizontalOptions="Center">
                         <Label Text="{Binding ActiveStreamerName, StringFormat='📺  {0} — stream in separate window'}"
-                               TextColor="#8ab4d4" FontSize="11" VerticalOptions="Center" />
+                               TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" VerticalOptions="Center" />
                         <Button Text="↩ Return to In-App"
                                 Command="{Binding ToggleFullScreenCommand}"
-                                BackgroundColor="#2d5f9e" TextColor="White" FontSize="10"
+                                BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White" FontSize="10"
                                 HeightRequest="26" CornerRadius="3" Padding="10,0" />
                     </HorizontalStackLayout>
                 </Grid>
@@ -643,7 +719,7 @@
                 <!-- Messages + new-message pill overlay -->
                 <Grid Grid.Row="4" IsVisible="{Binding ShowMessages}">
                 <CollectionView x:Name="MessagesView" ItemsSource="{Binding Messages}"
-                                BackgroundColor="#1a1a1a"
+                                BackgroundColor="{DynamicResource ThemeBgPrimary}"
                                 Scrolled="OnMessagesScrolled">
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="vm:MessageViewItem">
@@ -674,6 +750,9 @@
                                         <MenuFlyout>
                                             <MenuFlyoutItem Text="↩ Reply"
                                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ReplyCommand}"
+                                                CommandParameter="{Binding .}" />
+                                            <MenuFlyoutItem Text="🧵 Open Thread"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.OpenThreadCommand}"
                                                 CommandParameter="{Binding .}" />
                                             <MenuFlyoutItem Text="✏ Edit Message"
                                                 Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.EditMessageCommand}"
@@ -708,11 +787,11 @@
                                             StrokeShape="RoundRectangle 3"
                                             Margin="0,2,0,4" Padding="8,4">
                                         <HorizontalStackLayout Spacing="8">
-                                            <BoxView WidthRequest="3" BackgroundColor="#2d5f9e"
+                                            <BoxView WidthRequest="3" BackgroundColor="{DynamicResource ThemeAccent}"
                                                      CornerRadius="1" VerticalOptions="Fill" />
                                             <VerticalStackLayout Spacing="0">
                                                 <Label Text="{Binding ReplyAuthor}"
-                                                       TextColor="#8ab4d4" FontSize="10" FontAttributes="Bold" />
+                                                       TextColor="{DynamicResource ThemeAccentLight}" FontSize="10" FontAttributes="Bold" />
                                                 <Label Text="{Binding ReplyBodyPreview}"
                                                        TextColor="#888888" FontSize="10"
                                                        LineBreakMode="TailTruncation" MaxLines="1" />
@@ -722,7 +801,7 @@
                                     <!-- Avatar -->
                                     <Frame Grid.Row="0" Grid.RowSpan="6" Grid.Column="0"
                                            CornerRadius="18" WidthRequest="36" HeightRequest="36"
-                                           BackgroundColor="#2d5f9e" Padding="0" Margin="0,0,10,0"
+                                           BackgroundColor="{DynamicResource ThemeAccent}" Padding="0" Margin="0,0,10,0"
                                            VerticalOptions="Start">
                                         <Grid>
                                             <Label Text="{Binding Message.AuthorUsername, Converter={StaticResource InitialsConverter}}"
@@ -736,7 +815,7 @@
                                     </Frame>
                                     <!-- Author + time + edited badge -->
                                     <HorizontalStackLayout Grid.Row="1" Grid.Column="1" Spacing="8">
-                                        <Label Text="{Binding Message.AuthorUsername}" TextColor="#8ab4d4"
+                                        <Label Text="{Binding Message.AuthorUsername}" TextColor="{DynamicResource ThemeAccentLight}"
                                                FontAttributes="Bold" FontSize="13">
                                             <Label.GestureRecognizers>
                                                 <TapGestureRecognizer
@@ -744,6 +823,8 @@
                                                     CommandParameter="{Binding Message.AuthorId}" />
                                             </Label.GestureRecognizers>
                                         </Label>
+                                        <Label Text="{Binding AuthorRoleIcon}" FontSize="11" VerticalOptions="Center"
+                                               IsVisible="{Binding HasAuthorRoleIcon}" />
                                         <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
                                                TextColor="#555555" FontSize="10" VerticalOptions="End" Margin="0,0,0,1" />
                                         <Label Text="(edited)" TextColor="#555555" FontSize="10"
@@ -763,11 +844,11 @@
                                     <Label Grid.Row="2" Grid.Column="1"
                                            Text="✗  This message was deleted."
                                            TextColor="#555555" FontSize="12" FontAttributes="Italic"
-                                           IsVisible="{Binding Message.IsDeleted}" />
+                                           IsVisible="{Binding IsDeleted}" />
                                     <!-- Normal content (hidden when deleted) -->
-                                    <Label Grid.Row="2" Grid.Column="1" Text="{Binding Message.Content}"
-                                           TextColor="#c8c8c8" FontSize="13"
-                                           IsVisible="{Binding Message.IsDeleted, Converter={StaticResource InvertBoolConverter}}" />
+                                    <controls:MarkdownView Grid.Row="2" Grid.Column="1"
+                                           Text="{Binding Message.Content}"
+                                           IsVisible="{Binding IsDeleted, Converter={StaticResource InvertBoolConverter}}" />
                                     <!-- Static attachment (non-GIF) -->
                                     <Image Grid.Row="3" Grid.Column="1"
                                            Source="{Binding Message.AttachmentUrl}"
@@ -798,7 +879,7 @@
                                         <Button Text="▶ Replay GIF"
                                                 Command="{Binding ReplayGifCommand}"
                                                 BackgroundColor="Transparent"
-                                                TextColor="#8ab4d4" FontSize="11"
+                                                TextColor="{DynamicResource ThemeAccentLight}" FontSize="11"
                                                 Padding="0" HeightRequest="38" />
                                     </Border>
                                     <!-- File attachment card (non-image files) -->
@@ -820,7 +901,7 @@
                                                        LineBreakMode="TailTruncation" />
                                                 <Button Text="Open File"
                                                         Command="{Binding OpenFileCommand}"
-                                                        BackgroundColor="#2d5f9e" TextColor="White"
+                                                        BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
                                                         FontSize="10" CornerRadius="3"
                                                         Padding="8,2" HeightRequest="24" />
                                             </VerticalStackLayout>
@@ -856,12 +937,12 @@
                                         <Grid.GestureRecognizers>
                                             <TapGestureRecognizer Command="{Binding OpenLinkCommand}" />
                                         </Grid.GestureRecognizers>
-                                        <BoxView Grid.Column="0" BackgroundColor="#2d5f9e"
+                                        <BoxView Grid.Column="0" BackgroundColor="{DynamicResource ThemeAccent}"
                                                  WidthRequest="4" CornerRadius="2" VerticalOptions="Fill" />
                                         <VerticalStackLayout Grid.Column="1" Padding="10,8" Spacing="3"
                                                              BackgroundColor="#1e1e2e">
                                             <Label Text="{Binding Preview.SiteName}"
-                                                   TextColor="#8ab4d4" FontSize="10" FontAttributes="Bold"
+                                                   TextColor="{DynamicResource ThemeAccentLight}" FontSize="10" FontAttributes="Bold"
                                                    IsVisible="{Binding Preview.SiteName, Converter={StaticResource StringToBoolConverter}}" />
                                             <Label Text="{Binding Preview.Title}"
                                                    TextColor="#d0d0d0" FontSize="13" FontAttributes="Bold"
@@ -879,7 +960,7 @@
                                             <HorizontalStackLayout Spacing="8" Margin="0,6,0,2">
                                                 <Button Text="🔗 Open in Browser"
                                                         Command="{Binding OpenLinkCommand}"
-                                                        BackgroundColor="#2d5f9e" TextColor="#d0d0d0"
+                                                        BackgroundColor="{DynamicResource ThemeAccent}" TextColor="#d0d0d0"
                                                         FontSize="11" CornerRadius="4"
                                                         Padding="10,4" HeightRequest="28" />
                                                 <Button Text="▶ Watch in App"
@@ -891,6 +972,19 @@
                                             </HorizontalStackLayout>
                                         </VerticalStackLayout>
                                     </Grid>
+                                    <!-- Thread reply count -->
+                                    <Label Grid.Row="6" Grid.Column="1"
+                                           Text="{Binding ThreadLabel}"
+                                           IsVisible="{Binding HasThread}"
+                                           TextColor="{DynamicResource ThemeAccentLight}" FontSize="10"
+                                           HorizontalOptions="Start"
+                                           Margin="0,2,0,0">
+                                        <Label.GestureRecognizers>
+                                            <TapGestureRecognizer
+                                                Command="{Binding BindingContext.OpenThreadCommand, Source={x:Reference RootPage}}"
+                                                CommandParameter="{Binding .}" />
+                                        </Label.GestureRecognizers>
+                                    </Label>
                                     <!-- Read receipt -->
                                     <Label Grid.Row="6" Grid.Column="1"
                                            Text="Seen"
@@ -922,20 +1016,22 @@
                 <!-- Search results -->
                 <CollectionView Grid.Row="4" ItemsSource="{Binding SearchResults}"
                                 IsVisible="{Binding IsSearchOpen}"
-                                BackgroundColor="#1a1a1a">
+                                BackgroundColor="{DynamicResource ThemeBgPrimary}">
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="vm:MessageViewItem">
                             <VerticalStackLayout Padding="14,6" Spacing="2">
                                 <HorizontalStackLayout Spacing="8">
                                     <Label Text="{Binding Message.AuthorUsername}"
-                                           TextColor="#8ab4d4" FontSize="12" FontAttributes="Bold"
+                                           TextColor="{DynamicResource ThemeAccentLight}" FontSize="12" FontAttributes="Bold"
                                            VerticalOptions="Center" />
+                                    <Label Text="{Binding AuthorRoleIcon}" FontSize="10" VerticalOptions="Center"
+                                           IsVisible="{Binding HasAuthorRoleIcon}" />
                                     <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
                                            TextColor="#555555" FontSize="10" VerticalOptions="Center" />
                                 </HorizontalStackLayout>
                                 <Label Text="{Binding Message.Content}" TextColor="#c8c8c8"
                                        FontSize="13" LineBreakMode="WordWrap" />
-                                <BoxView HeightRequest="1" BackgroundColor="#2a2a2a" Margin="0,4,0,0" />
+                                <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeBgPanel}" Margin="0,4,0,0" />
                             </VerticalStackLayout>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
@@ -950,21 +1046,21 @@
                 <!-- Search loading spinner -->
                 <ActivityIndicator Grid.Row="4" IsRunning="{Binding IsSearching}"
                                    IsVisible="{Binding IsSearching}"
-                                   Color="#2d5f9e"
+                                   Color="{DynamicResource ThemeAccent}"
                                    VerticalOptions="Center" HorizontalOptions="Center" />
 
                 <!-- Pinned messages panel -->
-                <Grid Grid.Row="4" IsVisible="{Binding IsPinsOpen}" BackgroundColor="#1a1a1a"
+                <Grid Grid.Row="4" IsVisible="{Binding IsPinsOpen}" BackgroundColor="{DynamicResource ThemeBgPrimary}"
                       RowDefinitions="Auto,*">
                     <Label Grid.Row="0" Text="📌  Pinned Messages"
                            TextColor="#f0a030" FontSize="13" FontAttributes="Bold"
                            Padding="14,10,14,6" BackgroundColor="#202030" />
                     <CollectionView Grid.Row="1" ItemsSource="{Binding PinnedMessages}"
-                                    BackgroundColor="#1a1a1a">
+                                    BackgroundColor="{DynamicResource ThemeBgPrimary}">
                         <CollectionView.ItemTemplate>
                             <DataTemplate x:DataType="vm:MessageViewItem">
                                 <Grid Padding="14,8" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto"
-                                      BackgroundColor="#1a1a1a">
+                                      BackgroundColor="{DynamicResource ThemeBgPrimary}">
                                     <FlyoutBase.ContextFlyout>
                                         <MenuFlyout>
                                             <MenuFlyoutItem Text="📌 Unpin"
@@ -974,7 +1070,9 @@
                                     </FlyoutBase.ContextFlyout>
                                     <HorizontalStackLayout Grid.Row="0" Grid.Column="1" Spacing="8">
                                         <Label Text="{Binding Message.AuthorUsername}"
-                                               TextColor="#8ab4d4" FontAttributes="Bold" FontSize="12" />
+                                               TextColor="{DynamicResource ThemeAccentLight}" FontAttributes="Bold" FontSize="12" />
+                                        <Label Text="{Binding AuthorRoleIcon}" FontSize="10" VerticalOptions="Center"
+                                               IsVisible="{Binding HasAuthorRoleIcon}" />
                                         <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
                                                TextColor="#555555" FontSize="10" VerticalOptions="End" />
                                     </HorizontalStackLayout>
@@ -983,7 +1081,7 @@
                                            TextColor="#c8c8c8" FontSize="12"
                                            LineBreakMode="WordWrap" MaxLines="4" />
                                     <BoxView Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
-                                             HeightRequest="1" BackgroundColor="#2a2a2a"
+                                             HeightRequest="1" BackgroundColor="{DynamicResource ThemeBgPanel}"
                                              VerticalOptions="End" Margin="0,8,0,0" />
                                 </Grid>
                             </DataTemplate>
@@ -1007,17 +1105,17 @@
                        VerticalOptions="Center" />
 
                 <!-- Message input area (Text, Stream, and DM) -->
-                <Grid Grid.Row="5" BackgroundColor="#252525" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Padding="12,4,12,8"
+                <Grid Grid.Row="5" BackgroundColor="{DynamicResource ThemeBgHeader}" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" Padding="12,4,12,8"
                       IsVisible="{Binding ShowMessageInput}">
                     <!-- Reply bar -->
                     <Grid Grid.Row="0" IsVisible="{Binding IsReplying}"
                           BackgroundColor="#1e1e2e" Margin="-12,0,-12,4" Padding="12,5"
                           ColumnDefinitions="Auto,*,Auto">
-                        <Label Grid.Column="0" Text="↩" TextColor="#8ab4d4"
+                        <Label Grid.Column="0" Text="↩" TextColor="{DynamicResource ThemeAccentLight}"
                                FontSize="12" VerticalOptions="Center" Margin="0,0,8,0" />
                         <VerticalStackLayout Grid.Column="1" Spacing="0" VerticalOptions="Center">
                             <Label Text="{Binding ReplyingToUsername, StringFormat='Replying to {0}'}"
-                                   TextColor="#8ab4d4" FontSize="10" FontAttributes="Bold" />
+                                   TextColor="{DynamicResource ThemeAccentLight}" FontSize="10" FontAttributes="Bold" />
                             <Label Text="{Binding ReplyingToPreview}"
                                    TextColor="#888888" FontSize="10"
                                    LineBreakMode="TailTruncation" MaxLines="1" />
@@ -1039,6 +1137,12 @@
                            TextColor="#888888" FontSize="10" FontAttributes="Italic"
                            Margin="0,0,0,2"
                            IsVisible="{Binding TypingText, Converter={StaticResource StringToBoolConverter}}" />
+                    <!-- Slowmode cooldown indicator -->
+                    <Label Grid.Row="2"
+                           Text="{Binding SlowmodeCooldownLabel}"
+                           TextColor="#e09030" FontSize="10" FontAttributes="Bold"
+                           HorizontalOptions="End" Margin="0,0,0,2"
+                           IsVisible="{Binding IsCooldownActive}" />
                     <!-- Pending attachment preview -->
                     <Grid Grid.Row="3" IsVisible="{Binding HasPendingAttachment}" Padding="0,4,0,4">
                         <HorizontalStackLayout Spacing="8">
@@ -1060,10 +1164,10 @@
                                            LineBreakMode="TailTruncation" />
                                 </HorizontalStackLayout>
                             </Border>
-                            <Label Text="📎 Image attached" TextColor="#8ab4d4" FontSize="11"
+                            <Label Text="📎 Image attached" TextColor="{DynamicResource ThemeAccentLight}" FontSize="11"
                                    VerticalOptions="Center"
                                    IsVisible="{Binding PendingIsImage}" />
-                            <Label Text="📎 File attached" TextColor="#8ab4d4" FontSize="11"
+                            <Label Text="📎 File attached" TextColor="{DynamicResource ThemeAccentLight}" FontSize="11"
                                    VerticalOptions="Center"
                                    IsVisible="{Binding PendingIsImage, Converter={StaticResource InvertBoolConverter}}" />
                             <Button Text="✕" Command="{Binding ClearAttachmentCommand}"
@@ -1104,16 +1208,16 @@
                                        Placeholder="Search GIFs…"
                                        Text="{Binding GifSearchQuery}"
                                        ReturnCommand="{Binding SearchGifsCommand}"
-                                       BackgroundColor="#2a2a2a" TextColor="#d0d0d0" PlaceholderColor="#555555" />
+                                       BackgroundColor="{DynamicResource ThemeBgPanel}" TextColor="#d0d0d0" PlaceholderColor="#555555" />
                                 <Button Grid.Column="1" Text="Search"
                                         Command="{Binding SearchGifsCommand}"
-                                        BackgroundColor="#2d5f9e" TextColor="White" FontSize="12"
+                                        BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White" FontSize="12"
                                         HeightRequest="36" Padding="10,0" Margin="4,0,0,0" CornerRadius="3" />
                             </Grid>
                             <!-- Loading indicator -->
                             <ActivityIndicator Grid.Row="1" IsRunning="{Binding IsSearchingGifs}"
                                                IsVisible="{Binding IsSearchingGifs}"
-                                               Color="#2d5f9e" HeightRequest="120" />
+                                               Color="{DynamicResource ThemeAccent}" HeightRequest="120" />
                             <!-- Error / empty state -->
                             <Label Grid.Row="1"
                                    Text="{Binding GifErrorText}"
@@ -1133,7 +1237,7 @@
                                         <Image Source="{Binding PreviewUrl}"
                                                Aspect="AspectFill"
                                                HeightRequest="72"
-                                               BackgroundColor="#2a2a2a">
+                                               BackgroundColor="{DynamicResource ThemeBgPanel}">
                                             <Image.GestureRecognizers>
                                                 <TapGestureRecognizer
                                                     Command="{Binding BindingContext.SendGifCommand, Source={x:Reference RootPage}}"
@@ -1166,28 +1270,87 @@
                                 ToolTipProperties.Text="GIF picker" />
                         <Entry Grid.Column="3"
                                Placeholder="{Binding MessagePlaceholderText}"
-                               BackgroundColor="#1a1a1a" PlaceholderColor="#555555" TextColor="#d0d0d0"
+                               BackgroundColor="{DynamicResource ThemeBgPrimary}" PlaceholderColor="#555555" TextColor="#d0d0d0"
                                Text="{Binding MessageInput}" ReturnCommand="{Binding SendMessageCommand}" />
                         <Button Grid.Column="4" Text="Send" Command="{Binding SendMessageCommand}"
-                                BackgroundColor="#2d5f9e" TextColor="White" CornerRadius="3"
-                                FontSize="12" Margin="8,0,0,0" HeightRequest="36" Padding="14,0" />
+                                BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White" CornerRadius="3"
+                                FontSize="12" Margin="8,0,0,0" HeightRequest="36" Padding="14,0"
+                                IsEnabled="{Binding IsCooldownActive, Converter={StaticResource InvertBoolConverter}}" />
                     </Grid>
                 </Grid>
 
                 <!-- Typing row shown on Stream tab too (always visible below messages) -->
                 <Label Grid.Row="6"
                        Text="{Binding TypingText}"
-                       BackgroundColor="#252525"
+                       BackgroundColor="{DynamicResource ThemeBgHeader}"
                        TextColor="#888888" FontSize="10" FontAttributes="Italic"
                        Padding="14,4"
                        IsVisible="{Binding IsStreamTab, Converter={StaticResource InvertBoolConverter}}" />
 
             </Grid>
 
+            <!-- ═══ THREAD PANEL ═══ -->
+            <Grid Grid.Column="3" BackgroundColor="#1a1a2e" WidthRequest="320"
+                  IsVisible="{Binding IsThreadOpen}"
+                  RowDefinitions="Auto,*,Auto">
+                <!-- Thread header -->
+                <Grid Grid.Row="0" BackgroundColor="#252535" Padding="12,8" ColumnDefinitions="*,Auto">
+                    <Label Grid.Column="0" Text="🧵 Thread" TextColor="#d0d0d0"
+                           FontAttributes="Bold" FontSize="13" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="✕" Command="{Binding CloseThreadCommand}"
+                            BackgroundColor="Transparent" TextColor="#888888"
+                            FontSize="13" WidthRequest="28" HeightRequest="28" Padding="0" />
+                </Grid>
+                <!-- Thread messages -->
+                <CollectionView Grid.Row="1" ItemsSource="{Binding ThreadMessages}"
+                                BackgroundColor="Transparent">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MessageViewItem">
+                            <Grid Padding="12,6" ColumnDefinitions="Auto,*"
+                                  IsVisible="{Binding IsRegularMessage}">
+                                <Frame Grid.Column="0" CornerRadius="14" WidthRequest="28" HeightRequest="28"
+                                       BackgroundColor="{DynamicResource ThemeAccent}" Padding="0" Margin="0,0,8,0"
+                                       VerticalOptions="Start">
+                                    <Label Text="{Binding Message.AuthorUsername, Converter={StaticResource InitialsConverter}}"
+                                           TextColor="White" FontSize="10" FontAttributes="Bold"
+                                           HorizontalOptions="Center" VerticalOptions="Center" />
+                                </Frame>
+                                <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                    <HorizontalStackLayout Spacing="6">
+                                        <Label Text="{Binding Message.AuthorUsername}"
+                                               TextColor="{DynamicResource ThemeAccentLight}" FontAttributes="Bold" FontSize="12" />
+                                        <Label Text="{Binding AuthorRoleIcon}" FontSize="10" VerticalOptions="Center"
+                                               IsVisible="{Binding HasAuthorRoleIcon}" />
+                                        <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
+                                               TextColor="#555555" FontSize="10" VerticalOptions="End" Margin="0,0,0,1" />
+                                    </HorizontalStackLayout>
+                                    <Label Text="{Binding Message.Content}" TextColor="#d0d0d0" FontSize="12"
+                                           LineBreakMode="WordWrap"
+                                           IsVisible="{Binding IsDeleted, Converter={StaticResource InvertBoolConverter}}" />
+                                    <Label Text="✗  This message was deleted." TextColor="#555555"
+                                           FontSize="11" FontAttributes="Italic"
+                                           IsVisible="{Binding IsDeleted}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+                <!-- Thread reply input -->
+                <Grid Grid.Row="2" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,6" ColumnDefinitions="*,Auto">
+                    <Entry Grid.Column="0" Placeholder="Reply in thread…"
+                           BackgroundColor="{DynamicResource ThemeBgPrimary}" PlaceholderColor="#555555" TextColor="#d0d0d0"
+                           Text="{Binding ThreadInput}"
+                           ReturnCommand="{Binding SendThreadMessageCommand}" />
+                    <Button Grid.Column="1" Text="Send" Command="{Binding SendThreadMessageCommand}"
+                            BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White" CornerRadius="3"
+                            FontSize="12" Margin="6,0,0,0" HeightRequest="36" Padding="12,0" />
+                </Grid>
+            </Grid>
+
         </Grid>
 
         <!-- ═══ BOTTOM CONTROLS BAR ═══ -->
-        <Grid Grid.Row="3" BackgroundColor="#252525" Padding="10,6"
+        <Grid Grid.Row="3" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="10,6"
               ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
 
             <Button Grid.Column="0"
@@ -1201,7 +1364,7 @@
             <Button Grid.Column="1"
                     Text="{Binding IsDeafened, Converter={StaticResource DeafenButtonConverter}}"
                     Command="{Binding ToggleDeafenCommand}"
-                    BackgroundColor="#3a3a3a" TextColor="White" FontSize="13"
+                    BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="White" FontSize="13"
                     WidthRequest="40" HeightRequest="32" CornerRadius="3" Margin="0,0,4,0"
                     ToolTipProperties.Text="Deafen / Undeafen" />
 
@@ -1217,7 +1380,7 @@
                 <Label Text="MIC" TextColor="#666666" FontSize="8" HorizontalOptions="Center" />
                 <ProgressBar Progress="{Binding MicLevel}"
                              ProgressColor="{Binding MicLevel, Converter={StaticResource MicLevelColorConverter}}"
-                             WidthRequest="80" HeightRequest="10" BackgroundColor="#1a1a1a" />
+                             WidthRequest="80" HeightRequest="10" BackgroundColor="{DynamicResource ThemeBgPrimary}" />
             </VerticalStackLayout>
 
             <Button Grid.Column="4"
@@ -1254,18 +1417,18 @@
                        VerticalOptions="Center" IsVisible="{Binding IsLoopbackActive}" />
             </HorizontalStackLayout>
 
-            <Label Grid.Column="8" Text="localhost:5238" TextColor="#555555"
+            <Label Grid.Column="8" Text="{Binding CurrentServerUrl}" TextColor="#555555"
                    FontSize="10" VerticalOptions="Center" Margin="0,0,12,0" />
 
             <Button Grid.Column="9" Text="⚙"
                     Command="{Binding OpenSettingsCommand}"
-                    BackgroundColor="#3a3a3a" TextColor="#aaaaaa" FontSize="14"
+                    BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#aaaaaa" FontSize="14"
                     WidthRequest="36" HeightRequest="32" CornerRadius="3" Margin="0,0,4,0"
                     ToolTipProperties.Text="Settings" />
 
             <Button Grid.Column="10" Text="Sign Out"
                     Command="{Binding LogoutCommand}"
-                    BackgroundColor="#3a3a3a" TextColor="#cc4444"
+                    BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#cc4444"
                     FontSize="11" FontAttributes="Bold"
                     HeightRequest="32" CornerRadius="3" Padding="10,0" />
         </Grid>

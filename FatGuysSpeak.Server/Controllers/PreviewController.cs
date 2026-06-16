@@ -50,6 +50,7 @@ public partial class PreviewController(IHttpClientFactory httpClientFactory) : C
 
     private static bool IsPrivateOrLoopback(IPAddress ip)
     {
+        if (ip.IsIPv4MappedToIPv6) ip = ip.MapToIPv4();
         if (IPAddress.IsLoopback(ip)) return true;
         if (ip.AddressFamily == AddressFamily.InterNetworkV6)
             return ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal || ip.Equals(IPAddress.IPv6Loopback);
@@ -58,6 +59,7 @@ public partial class PreviewController(IHttpClientFactory httpClientFactory) : C
             || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
             || (b[0] == 192 && b[1] == 168)
             || (b[0] == 169 && b[1] == 254)
+            || (b[0] == 100 && b[1] >= 64 && b[1] <= 127) // CGNAT
             || b[0] == 127;
     }
 

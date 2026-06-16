@@ -12,6 +12,7 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }
+    public DateTime? LastSeenAt { get; set; }
 
     public List<ServerMember> ServerMemberships { get; set; } = [];
     public List<Message> Messages { get; set; } = [];
@@ -25,6 +26,10 @@ public class GuildServer
     public int OwnerId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? InviteCode { get; set; }
+    public string? VanityCode { get; set; }
+    public byte[]? IconData { get; set; }
+    public string? IconMimeType { get; set; }
+    public ServerRole MinRoleToMentionEveryone { get; set; } = ServerRole.Admin;
 
     public List<Channel> Channels { get; set; } = [];
     public List<ServerMember> Members { get; set; } = [];
@@ -38,6 +43,27 @@ public class ServerMember
     public User User { get; set; } = null!;
     public ServerRole Role { get; set; } = ServerRole.Member;
     public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? MutedUntil { get; set; }
+}
+
+public class TempBan
+{
+    public int Id { get; set; }
+    public int ServerId { get; set; }
+    public int UserId { get; set; }
+    public int ActorId { get; set; }
+    public DateTime ExpiresAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class WordFilter
+{
+    public int Id { get; set; }
+    public int ServerId { get; set; }
+    public string Pattern { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public WordFilterSeverity Severity { get; set; } = WordFilterSeverity.Delete;
+    public bool CaseSensitive { get; set; } = false;
 }
 
 public class Category
@@ -59,6 +85,9 @@ public class Channel
     public int Position { get; set; }
     public int? CategoryId { get; set; }
     public Category? Category { get; set; }
+    public int SlowmodeSeconds { get; set; }
+    public string? Topic { get; set; }
+    public bool IsNsfw { get; set; }
 
     public List<Message> Messages { get; set; } = [];
 }
@@ -79,6 +108,8 @@ public class Message
     public int? ReplyToId { get; set; }
     public Message? ReplyTo { get; set; }
     public string? AttachmentFileName { get; set; }
+    public int? ThreadId { get; set; }
+    public Message? Thread { get; set; }
 }
 
 public class DirectConversation
@@ -174,5 +205,96 @@ public class MessageReaction
     public int UserId { get; set; }
     public string Username { get; set; } = "";
     public string Emoji { get; set; } = "";
+}
+
+public class UserChannelNotif
+{
+    public int UserId { get; set; }
+    public int ChannelId { get; set; }
+    public NotifLevel Level { get; set; }
+}
+
+public class UserServerNotif
+{
+    public int UserId { get; set; }
+    public int ServerId { get; set; }
+    public NotifLevel Level { get; set; }
+}
+
+public class PasswordResetToken
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User User { get; set; } = null!;
+    public string Token { get; set; } = "";
+    public DateTime ExpiresAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool IsUsed { get; set; }
+}
+
+public class UserSession
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public User User { get; set; } = null!;
+    public string TokenHash { get; set; } = "";
+    public string? IpAddress { get; set; }
+    public string? UserAgent { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
+    public DateTime? RevokedAt { get; set; }
+}
+
+public class UserWarning
+{
+    public int Id { get; set; }
+    public int ServerId { get; set; }
+    public int UserId { get; set; }
+    public int ActorId { get; set; }
+    public string ActorUsername { get; set; } = "";
+    public string Reason { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class Webhook
+{
+    public int Id { get; set; }
+    public int ServerId { get; set; }
+    public string Name { get; set; } = "";
+    public string Url { get; set; } = "";
+    public string Events { get; set; } = "message,member_join,member_leave";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public int CreatedById { get; set; }
+}
+
+public class GroupConversation
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public int CreatedById { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public List<GroupConversationMember> Members { get; set; } = [];
+    public List<GroupMessage> Messages { get; set; } = [];
+}
+
+public class GroupConversationMember
+{
+    public int GroupConversationId { get; set; }
+    public GroupConversation GroupConversation { get; set; } = null!;
+    public int UserId { get; set; }
+    public User User { get; set; } = null!;
+    public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class GroupMessage
+{
+    public int Id { get; set; }
+    public int GroupConversationId { get; set; }
+    public GroupConversation GroupConversation { get; set; } = null!;
+    public int AuthorId { get; set; }
+    public User Author { get; set; } = null!;
+    public string Content { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public bool IsDeleted { get; set; }
 }
 

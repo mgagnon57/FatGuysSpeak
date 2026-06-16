@@ -83,9 +83,6 @@ public class ApiService
     public Task<List<ServerDto>?> GetServersAsync() =>
         _http.GetFromJsonAsync<List<ServerDto>>("api/servers");
 
-    public Task<ServerDto?> CreateServerAsync(CreateServerRequest req) =>
-        _http.PostAsJsonAsync("api/servers", req).ContinueWith(t => t.Result.Content.ReadFromJsonAsync<ServerDto>().Result);
-
     public Task<List<ChannelDto>?> GetChannelsAsync(int serverId) =>
         _http.GetFromJsonAsync<List<ChannelDto>>($"api/servers/{serverId}/channels");
 
@@ -115,9 +112,46 @@ public class ApiService
         _http.GetFromJsonAsync<List<MessageDto>>(
             $"api/channels/{channelId}/messages/search?q={Uri.EscapeDataString(query)}");
 
-    public Task<MessageDto?> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text, string? attachmentUrl = null, int? replyToId = null, string? attachmentFileName = null) =>
-        _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source, attachmentUrl, replyToId, attachmentFileName))
-             .ContinueWith(t => t.Result.Content.ReadFromJsonAsync<MessageDto>().Result);
+    public async Task<(MessageDto? Dto, string? Error)> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text, string? attachmentUrl = null, int? replyToId = null, string? attachmentFileName = null, int? threadId = null)
+    {
+        var resp = await _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source, attachmentUrl, replyToId, attachmentFileName, threadId));
+        if (resp.IsSuccessStatusCode)
+            return (await resp.Content.ReadFromJsonAsync<MessageDto>(), null);
+        return (null, await resp.Content.ReadAsStringAsync());
+    }
+
+    public async Task<bool> MuteUserAsync(int serverId, int userId, int seconds)
+    {
+        var r = await _http.PutAsJsonAsync($"api/servers/{serverId}/members/{userId}/mute", new MuteUserRequest(seconds));
+        return r.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> TempBanUserAsync(int serverId, int userId, int seconds)
+    {
+        var r = await _http.PutAsJsonAsync($"api/servers/{serverId}/members/{userId}/tempban", new TempBanRequest(seconds));
+        return r.IsSuccessStatusCode;
+    }
+
+    public Task<List<MessageDto>?> GetThreadMessagesAsync(int channelId, int messageId) =>
+        _http.GetFromJsonAsync<List<MessageDto>>($"api/channels/{channelId}/messages/{messageId}/thread");
+
+    public string GetServerIconUrl(int serverId) => $"{ServerUrl}/api/servers/{serverId}/icon";
+
+    public async Task<bool> UploadServerIconAsync(int serverId, Stream stream, string fileName, string contentType)
+    {
+        using var content = new MultipartFormDataContent();
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        content.Add(fileContent, "file", fileName);
+        var resp = await _http.PutAsync($"api/servers/{serverId}/icon", content);
+        return resp.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> DeleteServerIconAsync(int serverId)
+    {
+        var resp = await _http.DeleteAsync($"api/servers/{serverId}/icon");
+        return resp.IsSuccessStatusCode;
+    }
 
     public async Task<string?> UploadAvatarAsync(Stream stream, string fileName, string contentType)
     {
@@ -311,6 +345,39 @@ public class ApiService
     public Task SetChannelCategoryAsync(int serverId, int channelId, SetChannelCategoryRequest req) =>
         _http.PutAsJsonAsync($"api/servers/{serverId}/channels/{channelId}/category", req);
 
+    public async Task<bool> SetSlowmodeAsync(int serverId, int channelId, int seconds)
+    {
+        var r = await _http.PutAsJsonAsync($"api/servers/{serverId}/channels/{channelId}/slowmode", new SetSlowmodeRequest(seconds));
+        return r.IsSuccessStatusCode;
+    }
+
+    public Task<List<WordFilterDto>?> GetWordFiltersAsync(int serverId) =>
+        _http.GetFromJsonAsync<List<WordFilterDto>>($"api/servers/{serverId}/wordfilter");
+
+    public async Task<WordFilterDto?> AddWordFilterAsync(int serverId, string pattern)
+    {
+        var r = await _http.PostAsJsonAsync($"api/servers/{serverId}/wordfilter", new AddWordFilterRequest(pattern));
+        return r.IsSuccessStatusCode ? await r.Content.ReadFromJsonAsync<WordFilterDto>() : null;
+    }
+
+    public async Task<bool> RemoveWordFilterAsync(int serverId, int filterId)
+    {
+        var r = await _http.DeleteAsync($"api/servers/{serverId}/wordfilter/{filterId}");
+        return r.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> SetServerNotifLevelAsync(int serverId, NotifLevel level)
+    {
+        var resp = await _http.PutAsJsonAsync($"api/servers/{serverId}/notif", new SetNotifLevelRequest(level));
+        return resp.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> SetChannelNotifLevelAsync(int channelId, NotifLevel level)
+    {
+        var resp = await _http.PutAsJsonAsync($"api/channels/{channelId}/notif", new SetNotifLevelRequest(level));
+        return resp.IsSuccessStatusCode;
+    }
+
     public async Task<LinkPreviewDto?> GetLinkPreviewAsync(string url)
     {
         try
@@ -327,4 +394,12 @@ public class ApiService
             return null;
         }
     }
+
+    public Task<List<GifResult>?> GetTrendingGifsAsync(int limit = 24) =>
+        _http.GetFromJsonAsync<List<GifResult>>($"api/gifs/trending?limit={limit}");
+
+    public Task<List<GifResult>?> SearchGifsAsync(string query, int limit = 24) =>
+        _http.GetFromJsonAsync<List<GifResult>>($"api/gifs/search?q={Uri.EscapeDataString(query)}&limit={limit}");
 }
+
+public record GifResult(string PreviewUrl, string Url);

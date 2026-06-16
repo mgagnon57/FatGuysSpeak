@@ -117,4 +117,29 @@ public class UsersControllerTests : IDisposable
             Assert.Equal(status, user!.Status);
         }
     }
+
+    [Fact]
+    public async Task GetProfile_WhenLastSeenSet_ReturnsLastSeenAt()
+    {
+        await SeedAsync();
+        var expectedTime = new DateTime(2025, 6, 1, 12, 0, 0, DateTimeKind.Utc);
+        _other.LastSeenAt = expectedTime;
+        await _testDb.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_controller, _owner.Id, _owner.Username);
+
+        var result = await _controller.GetProfile(_other.Id, _server.Id);
+
+        Assert.Equal(expectedTime, result.Value!.LastSeenAt);
+    }
+
+    [Fact]
+    public async Task GetProfile_WhenLastSeenNotSet_ReturnsNullLastSeenAt()
+    {
+        await SeedAsync();
+        TestHelpers.SetUser(_controller, _owner.Id, _owner.Username);
+
+        var result = await _controller.GetProfile(_other.Id, _server.Id);
+
+        Assert.Null(result.Value!.LastSeenAt);
+    }
 }

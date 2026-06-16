@@ -61,6 +61,23 @@ public partial class UserProfileViewModel : ObservableObject
             ? $"Account created {c:MMMM yyyy}"
             : "";
 
+    public string LastSeenText
+    {
+        get
+        {
+            if (Profile?.LastSeenAt is not DateTime dt || Profile.Status != UserStatus.Offline)
+                return "";
+            var ago = DateTime.UtcNow - dt;
+            if (ago.TotalSeconds < 60) return "Last seen just now";
+            if (ago.TotalMinutes < 60) return $"Last seen {(int)ago.TotalMinutes}m ago";
+            if (ago.TotalHours < 24) return $"Last seen {(int)ago.TotalHours}h ago";
+            if (ago.TotalDays < 7) return $"Last seen {(int)ago.TotalDays}d ago";
+            return $"Last seen {dt.ToLocalTime():MMM d}";
+        }
+    }
+
+    public bool HasLastSeen => !string.IsNullOrEmpty(LastSeenText);
+
     public bool IsOwnProfile => Profile?.IsCurrentUser ?? false;
     public bool HasBio => !string.IsNullOrWhiteSpace(Profile?.Bio);
     public string BlockButtonText => IsBlocked ? "🔓 Unblock User" : "🚫 Block User";
@@ -156,6 +173,8 @@ public partial class UserProfileViewModel : ObservableObject
         OnPropertyChanged(nameof(RoleText));
         OnPropertyChanged(nameof(HasRole));
         OnPropertyChanged(nameof(JoinedText));
+        OnPropertyChanged(nameof(LastSeenText));
+        OnPropertyChanged(nameof(HasLastSeen));
         OnPropertyChanged(nameof(IsOwnProfile));
         OnPropertyChanged(nameof(HasBio));
         OnPropertyChanged(nameof(BlockButtonText));

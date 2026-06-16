@@ -12,10 +12,21 @@ public partial class MessageViewItem : ObservableObject
     private static int _systemIdCounter = -1;
 
     [ObservableProperty] private MessageDto _message;
+    [ObservableProperty] private bool _isDeleted;
     [ObservableProperty] private bool _isEdited;
     [ObservableProperty] private LinkPreviewDto? _preview;
     [ObservableProperty] private bool _showSeenReceipt;
     [ObservableProperty] private bool _isPinned;
+    [ObservableProperty] private int _replyCount;
+
+    public bool HasThread => ReplyCount > 0;
+    public string ThreadLabel => ReplyCount == 1 ? "1 reply" : $"{ReplyCount} replies";
+
+    partial void OnReplyCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(HasThread));
+        OnPropertyChanged(nameof(ThreadLabel));
+    }
 
     // GIF playback control
     private string? _attachmentDisplayUrl;
@@ -40,8 +51,19 @@ public partial class MessageViewItem : ObservableObject
     public bool IsMention { get; private init; }
     public bool IsOwnMessage { get; private init; }
     public bool IsBot => Message.Source == MessageSource.AI;
-    public bool CanModerate { get; set; }
+    [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanDelete))] private bool _canModerate;
     public bool CanDelete => IsOwnMessage || CanModerate;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AuthorRoleIcon), nameof(HasAuthorRoleIcon))]
+    private ServerRole _authorRole;
+    public string AuthorRoleIcon => AuthorRole switch
+    {
+        ServerRole.Admin => "👑",
+        ServerRole.Moderator => "🛡",
+        _ => ""
+    };
+    public bool HasAuthorRoleIcon => AuthorRole >= ServerRole.Moderator;
 
     public bool HasAttachment => Message.AttachmentUrl is not null;
     public bool HasGifAttachment => IsGifUrl(Message.AttachmentUrl);
@@ -97,14 +119,14 @@ public partial class MessageViewItem : ObservableObject
     public MessageViewItem(MessageDto message, string currentUsername = "", int currentUserId = 0)
     {
         _message = message;
+        _isDeleted = message.IsDeleted;
         _isEdited = message.EditedAt.HasValue;
         _isPinned = message.IsPinned;
         IsSystemMessage = false;
         IsOwnMessage = message.AuthorId != 0 && message.AuthorId == currentUserId;
-        IsMention = !string.IsNullOrEmpty(currentUsername)
-            && message.AuthorId != 0
+        IsMention = message.AuthorId != 0
             && message.AuthorUsername != currentUsername
-            && message.Content.Contains($"@{currentUsername}", StringComparison.OrdinalIgnoreCase);
+            && NotificationRules.IsMentionOf(message.Content, currentUsername);
 
         ToggleReactionCommand = new RelayCommand<string>(emoji =>
             ReactionRequested?.Invoke(this, emoji ?? ""));
@@ -210,6 +232,7 @@ public partial class MessageViewItem : ObservableObject
     public void ApplyDelete()
     {
         Message = Message with { IsDeleted = true };
+        IsDeleted = true;
     }
 
     public void ApplyReactions(List<ReactionDto> reactions)

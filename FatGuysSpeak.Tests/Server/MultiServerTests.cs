@@ -39,7 +39,7 @@ public class MultiServerTests : IDisposable
 
     private ServersController MakeController(int userId, string username)
     {
-        var ctrl = new ServersController(_testDb.Db, _hub);
+        var ctrl = new ServersController(_testDb.Db, _hub, TestHelpers.NullWebhooks());
         TestHelpers.SetUser(ctrl, userId, username);
         return ctrl;
     }

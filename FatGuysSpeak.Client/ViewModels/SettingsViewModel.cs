@@ -19,7 +19,7 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
     [ObservableProperty] private bool _isNoiseSuppressionEnabled;
     [ObservableProperty] private double _noiseGateThreshold = 0.05;
     [ObservableProperty] private bool _isAdaptiveThresholdEnabled;
-    [ObservableProperty] private string _giphyApiKey = "";
+    [ObservableProperty] private string _selectedTheme = ThemeService.Dark;
 
     public string Username => api.CurrentUsername;
     public string InputGainPercent => $"{(int)(InputGain * 100)}%";
@@ -45,7 +45,7 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
         IsNoiseSuppressionEnabled = audio.NoiseGateEnabled;
         NoiseGateThreshold = audio.NoiseGateThreshold;
         IsAdaptiveThresholdEnabled = audio.AdaptiveThresholdEnabled;
-        GiphyApiKey = Preferences.Get("giphy_api_key", "");
+        SelectedTheme = ThemeService.CurrentTheme;
         audio.ThresholdChanged += OnThresholdChanged;
         ptt.KeyLearned += OnKeyLearned;
     }
@@ -100,9 +100,6 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
     partial void OnAdaptiveStreamQualityChanged(bool value) =>
         Preferences.Set("adaptive_quality", value);
 
-    partial void OnGiphyApiKeyChanged(string value) =>
-        Preferences.Set("giphy_api_key", value);
-
     partial void OnServerUrlChanged(string value) =>
         Preferences.Set("server_url", value.TrimEnd('/'));
 
@@ -140,5 +137,12 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
         if (!ptt.IsHookInstalled || IsSettingPttKey) return;
         IsSettingPttKey = true;
         ptt.BeginLearning();
+    }
+
+    [RelayCommand]
+    public void SetTheme(string themeName)
+    {
+        ThemeService.Apply(themeName);
+        SelectedTheme = themeName;
     }
 }

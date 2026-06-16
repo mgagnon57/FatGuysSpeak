@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using FatGuysSpeak.Server.Data;
 using FatGuysSpeak.Server.Hubs;
 using FatGuysSpeak.Server.Models;
+using FatGuysSpeak.Server.Services;
 using FatGuysSpeak.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +15,7 @@ namespace FatGuysSpeak.Server.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : ControllerBase
+public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, WebhookDeliveryService webhooks) : ControllerBase
 {
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string Username => User.FindFirstValue(ClaimTypes.Name)!;
@@ -22,17 +23,69 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
     [HttpGet]
     public async Task<List<ServerDto>> GetMyServers()
     {
-        return await db.ServerMembers
+        var memberships = await db.ServerMembers
             .Where(sm => sm.UserId == UserId)
             .Include(sm => sm.Server).ThenInclude(s => s.Members)
-            .Select(sm => new ServerDto(
-                sm.Server.Id,
-                sm.Server.Name,
-                sm.Server.Description,
-                sm.Server.OwnerId.ToString(),
-                sm.Server.Members.Count,
-                sm.Role))
             .ToListAsync();
+
+        var serverIds = memberships.ConvertAll(sm => sm.ServerId);
+        var notifMap = await db.UserServerNotifs
+            .Where(n => n.UserId == UserId && serverIds.Contains(n.ServerId))
+            .ToDictionaryAsync(n => n.ServerId, n => n.Level);
+
+        return memberships.Select(sm => new ServerDto(
+            sm.Server.Id,
+            sm.Server.Name,
+            sm.Server.Description,
+            sm.Server.OwnerId.ToString(),
+            sm.Server.Members.Count,
+            sm.Role,
+            sm.Server.IconData != null,
+            notifMap.TryGetValue(sm.ServerId, out var lvl) ? lvl : (NotifLevel?)null))
+            .ToList();
+    }
+
+    [HttpGet("{serverId}/icon")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetIcon(int serverId)
+    {
+        var server = await db.Servers.FindAsync(serverId);
+        if (server?.IconData is null) return NotFound();
+        return File(server.IconData, server.IconMimeType ?? "image/png");
+    }
+
+    [HttpPut("{serverId}/icon")]
+    public async Task<IActionResult> UploadIcon(int serverId, IFormFile file)
+    {
+        var member = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (member is null || member.Role < ServerRole.Admin) return Forbid();
+        if (file.Length > 1024 * 1024) return BadRequest("Icon must be under 1 MB.");
+        if (!file.ContentType.StartsWith("image/")) return BadRequest("File must be an image.");
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
+
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        server.IconData = ms.ToArray();
+        server.IconMimeType = file.ContentType;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpDelete("{serverId}/icon")]
+    public async Task<IActionResult> DeleteIcon(int serverId)
+    {
+        var member = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (member is null || member.Role < ServerRole.Admin) return Forbid();
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
+
+        server.IconData = null;
+        server.IconMimeType = null;
+        await db.SaveChangesAsync();
+        return NoContent();
     }
 
     [HttpPost]
@@ -87,11 +140,20 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
         if (!await db.ServerMembers.AnyAsync(sm => sm.ServerId == serverId && sm.UserId == UserId))
             return Forbid();
 
-        return await db.Channels
+        var channels = await db.Channels
             .Where(c => c.ServerId == serverId)
             .OrderBy(c => c.Position)
-            .Select(c => new ChannelDto(c.Id, c.Name, c.Type, c.ServerId, c.Position, c.CategoryId))
             .ToListAsync();
+
+        var channelIds = channels.ConvertAll(c => c.Id);
+        var notifMap = await db.UserChannelNotifs
+            .Where(n => n.UserId == UserId && channelIds.Contains(n.ChannelId))
+            .ToDictionaryAsync(n => n.ChannelId, n => n.Level);
+
+        return channels.Select(c => new ChannelDto(
+            c.Id, c.Name, c.Type, c.ServerId, c.Position, c.CategoryId, c.SlowmodeSeconds,
+            notifMap.TryGetValue(c.Id, out var lvl) ? lvl : (NotifLevel?)null, c.Topic, c.IsNsfw))
+            .ToList();
     }
 
     [HttpPost("{serverId}/channels")]
@@ -134,6 +196,30 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelDeleted", channelId);
+        return NoContent();
+    }
+
+    [HttpPut("{serverId}/channels/{channelId}/slowmode")]
+    public async Task<IActionResult> SetSlowmode(int serverId, int channelId, SetSlowmodeRequest req)
+    {
+        var actor = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (actor is null || actor.Role < ServerRole.Admin) return Forbid();
+
+        var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
+        if (channel is null) return NotFound();
+
+        if (req.Seconds < 0 || req.Seconds > 21600) return BadRequest("Slowmode must be 0–21600 seconds.");
+
+        channel.SlowmodeSeconds = req.Seconds;
+        db.AuditLogs.Add(new AuditLog
+        {
+            ServerId = serverId, ActorId = UserId, ActorUsername = Username,
+            Action = "SlowmodeSet", TargetId = channelId,
+            Detail = $"#{channel.Name}: {req.Seconds}s"
+        });
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelSlowmodeUpdated", channelId, req.Seconds);
         return NoContent();
     }
 
@@ -199,6 +285,63 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
         return NoContent();
     }
 
+    // ── Mute / Temp-ban ───────────────────────────────────────────────────────
+
+    [HttpPut("{serverId}/members/{targetUserId}/mute")]
+    public async Task<IActionResult> MuteUser(int serverId, int targetUserId, MuteUserRequest req)
+    {
+        if (req.Seconds < 0 || req.Seconds > 86400) return BadRequest("Mute duration must be 0–86400 seconds.");
+        var actor = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (actor is null || actor.Role < ServerRole.Moderator) return Forbid();
+
+        var target = await db.ServerMembers.Include(m => m.User)
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
+        if (target is null) return NotFound();
+        if (target.Role >= actor.Role) return Forbid();
+
+        target.MutedUntil = req.Seconds == 0 ? null : DateTime.UtcNow.AddSeconds(req.Seconds);
+        db.AuditLogs.Add(new AuditLog
+        {
+            ServerId = serverId, ActorId = UserId, ActorUsername = Username,
+            Action = req.Seconds == 0 ? "UserUnmuted" : "UserMuted",
+            TargetId = targetUserId, TargetUsername = target.User.Username,
+            Detail = req.Seconds == 0 ? null : $"{req.Seconds}s"
+        });
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("UserMuted", targetUserId, target.MutedUntil);
+        return NoContent();
+    }
+
+    [HttpPut("{serverId}/members/{targetUserId}/tempban")]
+    public async Task<IActionResult> TempBanUser(int serverId, int targetUserId, TempBanRequest req)
+    {
+        if (req.Seconds <= 0 || req.Seconds > 2592000) return BadRequest("Ban duration must be 1–2592000 seconds.");
+        var actor = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (actor is null || actor.Role < ServerRole.Admin) return Forbid();
+
+        var target = await db.ServerMembers.Include(m => m.User)
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);
+        if (target is null) return NotFound();
+        if (targetUserId == UserId) return BadRequest("Cannot ban yourself.");
+        if (target.Role >= actor.Role) return Forbid();
+
+        var expiresAt = DateTime.UtcNow.AddSeconds(req.Seconds);
+        db.TempBans.Add(new TempBan { ServerId = serverId, UserId = targetUserId, ActorId = UserId, ExpiresAt = expiresAt });
+        db.ServerMembers.Remove(target);
+        db.AuditLogs.Add(new AuditLog
+        {
+            ServerId = serverId, ActorId = UserId, ActorUsername = Username,
+            Action = "UserTempBanned", TargetId = targetUserId, TargetUsername = target.User.Username,
+            Detail = $"{req.Seconds}s"
+        });
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"user-{targetUserId}").SendAsync("KickedFromServer", serverId);
+        await hub.Clients.Group($"server-{serverId}").SendAsync("UserTempBanned", targetUserId, expiresAt);
+        return NoContent();
+    }
+
     // ── Invite links ──────────────────────────────────────────────────────────
 
     private static string GenerateCode() =>
@@ -239,22 +382,24 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
         return Ok(new ServerInviteDto(server.InviteCode, server.Id, server.Name, memberCount));
     }
 
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
     [HttpGet("by-invite/{code}")]
     public async Task<ActionResult<ServerInviteDto>> PreviewInvite(string code)
     {
         var server = await db.Servers
             .Include(s => s.Members)
-            .FirstOrDefaultAsync(s => s.InviteCode == code);
+            .FirstOrDefaultAsync(s => s.InviteCode == code || s.VanityCode == code);
         if (server is null) return NotFound("Invalid or expired invite code.");
         return Ok(new ServerInviteDto(code, server.Id, server.Name, server.Members.Count));
     }
 
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
     [HttpPost("by-invite/{code}/join")]
     public async Task<ActionResult<ServerDto>> JoinByInvite(string code)
     {
         var server = await db.Servers
             .Include(s => s.Members)
-            .FirstOrDefaultAsync(s => s.InviteCode == code);
+            .FirstOrDefaultAsync(s => s.InviteCode == code || s.VanityCode == code);
         if (server is null) return NotFound("Invalid or expired invite code.");
 
         if (server.Members.Any(m => m.UserId == UserId))
@@ -267,6 +412,8 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
         if (user is not null)
             await hub.Clients.Group($"server-{server.Id}")
                 .SendAsync("UserJoinedServer", new UserDto(UserId, user.Username, UserStatus.Online));
+
+        _ = DeliverMemberWebhooksAsync(server.Id, "member.joined", UserId, user?.Username ?? "");
 
         var memberCount = await db.ServerMembers.CountAsync(sm => sm.ServerId == server.Id);
         return Ok(new ServerDto(server.Id, server.Name, server.Description, server.OwnerId.ToString(), memberCount, ServerRole.Member));
@@ -296,6 +443,71 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub) : Cont
 
         await hub.Clients.User(targetUserId.ToString()).SendAsync("KickedFromServer", serverId);
         await hub.Clients.Group($"server-{serverId}").SendAsync("UserDisconnected", new UserDto(targetUserId, target.User.Username, UserStatus.Offline));
+        return NoContent();
+    }
+
+    // Channel topic / NSFW
+    [HttpPut("{serverId}/channels/{channelId}/topic")]
+    public async Task<IActionResult> SetChannelTopic(int serverId, int channelId, SetChannelTopicRequest req)
+    {
+        var member = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (member is null || member.Role < ServerRole.Admin) return Forbid();
+
+        var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
+        if (channel is null) return NotFound();
+
+        channel.Topic = req.Topic?.Trim().Length > 0 ? req.Topic.Trim() : null;
+        if (req.IsNsfw.HasValue) channel.IsNsfw = req.IsNsfw.Value;
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelUpdated",
+            new ChannelDto(channel.Id, channel.Name, channel.Type, channel.ServerId, channel.Position, channel.CategoryId, channel.SlowmodeSeconds, null, channel.Topic, channel.IsNsfw));
+        return NoContent();
+    }
+
+    // Vanity invite code
+    [HttpPut("{serverId}/invite/vanity")]
+    public async Task<IActionResult> SetVanityCode(int serverId, SetVanityCodeRequest req)
+    {
+        var member = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (member is null || member.Role < ServerRole.Admin) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(req.Code) || req.Code.Length < 3 || req.Code.Length > 32)
+            return BadRequest("Vanity code must be 3–32 characters.");
+        if (!System.Text.RegularExpressions.Regex.IsMatch(req.Code, @"^[a-zA-Z0-9_-]+$"))
+            return BadRequest("Vanity code may only contain letters, numbers, hyphens, and underscores.");
+
+        var taken = await db.Servers.AnyAsync(s => s.VanityCode == req.Code && s.Id != serverId);
+        if (taken) return Conflict("That vanity code is already in use.");
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
+        server.VanityCode = req.Code;
+        await db.SaveChangesAsync();
+        return Ok(new { vanityCode = req.Code });
+    }
+
+    private async Task DeliverMemberWebhooksAsync(int serverId, string eventName, int userId, string username)
+    {
+        var serverWebhooks = await db.Webhooks.Where(w => w.ServerId == serverId).ToListAsync();
+        foreach (var wh in serverWebhooks)
+        {
+            if (!wh.Events.Contains(eventName)) continue;
+            _ = webhooks.DeliverAsync(wh.Url, eventName, new { userId, username, serverId });
+        }
+    }
+
+    // @everyone mention gating
+    [HttpPut("{serverId}/mention-role")]
+    public async Task<IActionResult> SetMentionRole(int serverId, SetMentionRoleRequest req)
+    {
+        var member = await db.ServerMembers.FindAsync(serverId, UserId);
+        if (member is null || member.Role < ServerRole.Admin) return Forbid();
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound();
+        server.MinRoleToMentionEveryone = req.MinRole;
+        await db.SaveChangesAsync();
         return NoContent();
     }
 }

@@ -14,6 +14,9 @@ public class ChatHubService
     public event Action<UserDto>? UserDisconnected;
     public event Action<UserDto>? UserJoinedServer;
     public event Action<ChannelDto>? ChannelCreated;
+    public event Action<ChannelDto>? ChannelUpdated;
+    public event Action<int>? ChannelDeleted;
+    public event Action<int>? ForceJoinChannel;
     public event Action<int, UserDto>? UserJoinedChannel;
     public event Action<int, UserDto>? UserLeftChannel;
     public event Action<byte[]>? VoiceDataReceived;
@@ -23,6 +26,7 @@ public class ChatHubService
     public event Action<int, string, int>? StreamStarted;   // (streamerId, streamerName, channelId)
     public event Action<int, int>? StreamStopped;            // (streamerId, channelId)
     public event Action<byte[]>? StreamFrameReceived;
+    public event Action<int, byte[]>? StreamAudioReceived;   // (streamerId, opusData)
     public event Action<int, string>? StreamNotification;   // (channelId, text)
     public event Action<int, string, int>? UserTyping;       // (userId, username, channelId)
     public event Action<int, int>? UserStoppedTyping;        // (userId, channelId)
@@ -51,6 +55,10 @@ public class ChatHubService
     public event Action<int, string>? CategoryRenamed;         // (categoryId, name)
     public event Action<int, int?>? ChannelCategoryChanged;   // (channelId, categoryId?)
     public event Action<int, string>? MemberRoleChanged;  // (userId, roleName e.g. "Admin")
+    public event Action<int, int>? ChannelSlowmodeUpdated; // (channelId, slowmodeSeconds)
+    public event Action<MessageDto, int, int>? ThreadReplyReceived; // (reply, rootMessageId, newReplyCount)
+    public event Action<int, DateTime?>? UserMuted;   // (userId, mutedUntil — null means unmuted)
+    public event Action<int, DateTime>? UserTempBanned; // (userId, expiresAt)
     public event Action<Exception?>? Reconnecting;
     public event Action<string?>?    Reconnected;
     public event Action<Exception?>? Disconnected;
@@ -71,6 +79,9 @@ public class ChatHubService
         _connection.On<UserDto>("UserDisconnected", dto => UserDisconnected?.Invoke(dto));
         _connection.On<UserDto>("UserJoinedServer", dto => UserJoinedServer?.Invoke(dto));
         _connection.On<ChannelDto>("ChannelCreated", dto => ChannelCreated?.Invoke(dto));
+        _connection.On<ChannelDto>("ChannelUpdated", dto => ChannelUpdated?.Invoke(dto));
+        _connection.On<int>("ChannelDeleted", id => ChannelDeleted?.Invoke(id));
+        _connection.On<int>("ForceJoinChannel", id => ForceJoinChannel?.Invoke(id));
         _connection.On<int, UserDto>("UserJoinedChannel", (cid, dto) => UserJoinedChannel?.Invoke(cid, dto));
         _connection.On<int, UserDto>("UserLeftChannel", (cid, dto) => UserLeftChannel?.Invoke(cid, dto));
         _connection.On<byte[]>("ReceiveVoiceData", data => VoiceDataReceived?.Invoke(data));
@@ -80,6 +91,7 @@ public class ChatHubService
         _connection.On<int, string, int>("StreamStarted", (uid, name, cid) => StreamStarted?.Invoke(uid, name, cid));
         _connection.On<int, int>("StreamStopped", (uid, cid) => StreamStopped?.Invoke(uid, cid));
         _connection.On<byte[]>("ReceiveStreamFrame", data => StreamFrameReceived?.Invoke(data));
+        _connection.On<int, byte[]>("ReceiveStreamAudio", (uid, data) => StreamAudioReceived?.Invoke(uid, data));
         _connection.On<int, string>("StreamNotification", (cid, text) => StreamNotification?.Invoke(cid, text));
         _connection.On<int, string, int>("UserTyping", (uid, name, cid) => UserTyping?.Invoke(uid, name, cid));
         _connection.On<int, int>("UserStoppedTyping", (uid, cid) => UserStoppedTyping?.Invoke(uid, cid));
@@ -109,6 +121,12 @@ public class ChatHubService
         _connection.On<int, int?>("ChannelCategoryChanged", (cid, catId) => ChannelCategoryChanged?.Invoke(cid, catId));
         _connection.On<int, string>("MemberRoleChanged",
             (uid, role) => MemberRoleChanged?.Invoke(uid, role));
+        _connection.On<int, int>("ChannelSlowmodeUpdated",
+            (cid, secs) => ChannelSlowmodeUpdated?.Invoke(cid, secs));
+        _connection.On<MessageDto, int, int>("ThreadReplyReceived",
+            (dto, rootId, count) => ThreadReplyReceived?.Invoke(dto, rootId, count));
+        _connection.On<int, DateTime?>("UserMuted", (uid, until) => UserMuted?.Invoke(uid, until));
+        _connection.On<int, DateTime>("UserTempBanned", (uid, exp) => UserTempBanned?.Invoke(uid, exp));
 
         _connection.Reconnecting  += ex  => { Reconnecting?.Invoke(ex);  return Task.CompletedTask; };
         _connection.Reconnected   += cid => { Reconnected?.Invoke(cid);  return Task.CompletedTask; };
@@ -150,6 +168,7 @@ public class ChatHubService
     public Task StartStreamAsync(int channelId) => _connection!.InvokeAsync("StartStream", channelId);
     public Task StopStreamAsync() => _connection!.InvokeAsync("StopStream");
     public Task SendStreamFrameAsync(byte[] data) => _connection?.SendAsync("SendStreamFrame", data) ?? Task.CompletedTask;
+    public Task SendStreamAudioAsync(byte[] data) => _connection?.SendAsync("SendStreamAudio", data) ?? Task.CompletedTask;
     public Task WatchStreamAsync(int channelId) => _connection!.InvokeAsync("WatchStream", channelId);
     public Task StopWatchingAsync(int channelId) => _connection!.InvokeAsync("StopWatching", channelId);
 

@@ -10,7 +10,7 @@ namespace FatGuysSpeak.Server.Controllers;
 
 [ApiController]
 [Route("api/admin")]
-[AllowAnonymous]
+[Authorize(Policy = "DashboardAdmin")]
 public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMetricsService metrics) : ControllerBase
 {
     // Restrict to localhost only — dashboard is the only consumer
@@ -158,11 +158,74 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         var members = await db.ServerMembers
             .Where(sm => sm.ServerId == serverId)
             .Include(sm => sm.User)
-            .Select(sm => new FatGuysSpeak.Shared.ServerMemberDto(
-                sm.User.Id, sm.User.Username, sm.User.Status, sm.Role, sm.JoinedAt))
+            .Select(sm => new
+            {
+                UserId     = sm.User.Id,
+                Username   = sm.User.Username,
+                Status     = sm.User.Status,
+                Role       = sm.Role,
+                JoinedAt   = sm.JoinedAt,
+                MutedUntil = sm.MutedUntil,
+            })
             .ToListAsync();
 
         return Ok(members);
+    }
+
+    [HttpPut("servers/{serverId}/members/{userId}/mute")]
+    public async Task<IActionResult> MuteUser(int serverId, int userId, [FromBody] FatGuysSpeak.Shared.MuteUserRequest req)
+    {
+        if (!IsLocal) return Forbid();
+        if (req.Seconds < 0 || req.Seconds > 86400) return BadRequest("Mute duration must be 0–86400 seconds.");
+
+        var target = await db.ServerMembers.Include(m => m.User)
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+        if (target is null) return NotFound();
+
+        target.MutedUntil = req.Seconds == 0 ? null : DateTime.UtcNow.AddSeconds(req.Seconds);
+        db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
+        {
+            ServerId = serverId, ActorId = 0, ActorUsername = "dashboard",
+            Action = req.Seconds == 0 ? "UserUnmuted" : "UserMuted",
+            TargetId = userId, TargetUsername = target.User.Username,
+            Detail = req.Seconds == 0 ? null : $"{req.Seconds}s"
+        });
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("UserMuted", userId, target.MutedUntil);
+        return NoContent();
+    }
+
+    [HttpPut("servers/{serverId}/members/{userId}/tempban")]
+    public async Task<IActionResult> TempBanUser(int serverId, int userId, [FromBody] FatGuysSpeak.Shared.TempBanRequest req)
+    {
+        if (!IsLocal) return Forbid();
+        if (req.Seconds <= 0 || req.Seconds > 2592000) return BadRequest("Ban duration must be 1–2592000 seconds.");
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server?.OwnerId == userId) return BadRequest("Cannot ban the server owner.");
+
+        var target = await db.ServerMembers.Include(m => m.User)
+            .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+        if (target is null) return NotFound();
+
+        var expiresAt = DateTime.UtcNow.AddSeconds(req.Seconds);
+        db.TempBans.Add(new FatGuysSpeak.Server.Models.TempBan
+        {
+            ServerId = serverId, UserId = userId, ActorId = 0, ExpiresAt = expiresAt
+        });
+        db.ServerMembers.Remove(target);
+        db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
+        {
+            ServerId = serverId, ActorId = 0, ActorUsername = "dashboard",
+            Action = "UserTempBanned", TargetId = userId, TargetUsername = target.User.Username,
+            Detail = $"{req.Seconds}s"
+        });
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"user-{userId}").SendAsync("KickedFromServer", serverId);
+        await hub.Clients.Group($"server-{serverId}").SendAsync("UserTempBanned", userId, expiresAt);
+        return NoContent();
     }
 
     [HttpPut("servers/{serverId}/members/{userId}/role")]
@@ -251,6 +314,143 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         await db.SaveChangesAsync();
         return NoContent();
     }
+
+    [HttpGet("servers/{serverId}/wordfilter")]
+    public async Task<IActionResult> GetWordFilters(int serverId)
+    {
+        if (!IsLocal) return Forbid();
+        var filters = await db.WordFilters
+            .Where(f => f.ServerId == serverId)
+            .OrderBy(f => f.Pattern)
+            .Select(f => new FatGuysSpeak.Shared.WordFilterDto(f.Id, f.Pattern, f.CreatedAt, f.Severity, f.CaseSensitive))
+            .ToListAsync();
+        return Ok(filters);
+    }
+
+    [HttpPost("servers/{serverId}/wordfilter")]
+    public async Task<IActionResult> AddWordFilter(int serverId, [FromBody] FatGuysSpeak.Shared.AddWordFilterRequest req)
+    {
+        if (!IsLocal) return Forbid();
+        var pattern = req.Pattern.Trim();
+        if (string.IsNullOrEmpty(pattern) || pattern.Length > 100)
+            return BadRequest("Pattern must be 1–100 characters.");
+        var count = await db.WordFilters.CountAsync(f => f.ServerId == serverId);
+        if (count >= 200) return BadRequest("Maximum 200 patterns.");
+        if (await db.WordFilters.AnyAsync(f => f.ServerId == serverId && f.Pattern.ToLower() == pattern.ToLower()))
+            return Conflict("Pattern already exists.");
+        var filter = new FatGuysSpeak.Server.Models.WordFilter { ServerId = serverId, Pattern = pattern };
+        db.WordFilters.Add(filter);
+        await db.SaveChangesAsync();
+        return Ok(new FatGuysSpeak.Shared.WordFilterDto(filter.Id, filter.Pattern, filter.CreatedAt));
+    }
+
+    [HttpDelete("servers/{serverId}/wordfilter/{filterId}")]
+    public async Task<IActionResult> RemoveWordFilter(int serverId, int filterId)
+    {
+        if (!IsLocal) return Forbid();
+        var filter = await db.WordFilters.FindAsync(filterId);
+        if (filter is null || filter.ServerId != serverId) return NotFound();
+        db.WordFilters.Remove(filter);
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpPatch("servers/{serverId}/channels/{channelId}/name")]
+    public async Task<IActionResult> RenameChannel(int serverId, int channelId, [FromBody] AdminRenameChannelRequest req)
+    {
+        if (!IsLocal) return Forbid();
+
+        var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
+        if (channel is null) return NotFound();
+
+        var name = req.Name.Trim().ToLower().Replace(' ', '-');
+        if (string.IsNullOrEmpty(name) || name.Length > 64)
+            return BadRequest("Channel name must be 1–64 characters.");
+
+        var oldName = channel.Name;
+        channel.Name = name;
+        db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
+        {
+            ServerId = serverId, ActorId = 0, ActorUsername = "dashboard",
+            Action = "ChannelRenamed", Detail = $"#{oldName} → #{name}"
+        });
+        await db.SaveChangesAsync();
+
+        var dto = new FatGuysSpeak.Shared.ChannelDto(channel.Id, channel.Name, channel.Type, channel.ServerId, channel.Position, channel.CategoryId, channel.SlowmodeSeconds, null, channel.Topic, channel.IsNsfw);
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelUpdated", dto);
+        return NoContent();
+    }
+
+    public record AdminRenameChannelRequest(string Name);
+
+    [HttpDelete("servers/{serverId}/channels/{channelId}")]
+    public async Task<IActionResult> DeleteChannel(int serverId, int channelId)
+    {
+        if (!IsLocal) return Forbid();
+
+        var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
+        if (channel is null) return NotFound();
+
+        var lobby = await db.Channels
+            .Where(c => c.ServerId == serverId && c.Id != channelId)
+            .OrderBy(c => c.Position)
+            .FirstOrDefaultAsync();
+
+        db.Channels.Remove(channel);
+        db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
+        {
+            ServerId = serverId, ActorId = 0, ActorUsername = "dashboard",
+            Action = "ChannelDeleted", Detail = $"#{channel.Name}"
+        });
+        await db.SaveChangesAsync();
+
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelDeleted", channelId);
+
+        if (lobby is not null)
+        {
+            var textUsers  = FatGuysSpeak.Server.Hubs.ChatHub.TextChannelSnapshot
+                .Where(kv => kv.Value == channelId).Select(kv => kv.Key);
+            var voiceUsers = FatGuysSpeak.Server.Hubs.ChatHub.VoiceChannelSnapshot
+                .Where(kv => kv.Value == channelId).Select(kv => kv.Key);
+            var affected   = textUsers.Union(voiceUsers).Distinct();
+            foreach (var uid in affected)
+                await hub.Clients.User(uid.ToString()).SendAsync("ForceJoinChannel", lobby.Id);
+        }
+
+        return NoContent();
+    }
+
+    [HttpPost("servers/{serverId}/channels")]
+    public async Task<IActionResult> CreateChannel(int serverId, [FromBody] AdminCreateChannelRequest req)
+    {
+        if (!IsLocal) return Forbid();
+
+        var server = await db.Servers.FindAsync(serverId);
+        if (server is null) return NotFound("Server not found.");
+
+        var name = req.Name.Trim().ToLower().Replace(' ', '-');
+        if (string.IsNullOrEmpty(name) || name.Length > 64)
+            return BadRequest("Channel name must be 1–64 characters.");
+
+        var pos = await db.Channels.Where(c => c.ServerId == serverId).CountAsync();
+        var channel = new FatGuysSpeak.Server.Models.Channel
+        {
+            Name = name, Type = FatGuysSpeak.Shared.ChannelType.Text, ServerId = serverId, Position = pos
+        };
+        db.Channels.Add(channel);
+        db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
+        {
+            ServerId = serverId, ActorId = 0, ActorUsername = "dashboard",
+            Action = "ChannelCreated", Detail = $"#{name}"
+        });
+        await db.SaveChangesAsync();
+
+        var dto = new FatGuysSpeak.Shared.ChannelDto(channel.Id, channel.Name, channel.Type, channel.ServerId, channel.Position);
+        await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelCreated", dto);
+        return Ok(dto);
+    }
+
+    public record AdminCreateChannelRequest(string Name);
 
     [HttpGet("servers")]
     public async Task<IActionResult> GetServers()

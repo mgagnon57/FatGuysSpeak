@@ -25,6 +25,19 @@
                    TextColor="White" BackgroundColor="#1e1f22"
                    IsPassword="True" Text="{Binding Password}" />
 
+            <Label Text="SERVER" FontSize="10" TextColor="#4e5058"
+                   FontAttributes="Bold" Margin="0,8,0,0" />
+            <Picker ItemsSource="{Binding ServerPickerItems}"
+                    SelectedItem="{Binding SelectedServerOption, Mode=TwoWay}"
+                    IsVisible="{Binding HasSavedServers}"
+                    Title="Select or add a server..." TitleColor="#3f4248"
+                    TextColor="#72767d" BackgroundColor="#1e1f22" />
+            <Entry Placeholder="http://localhost:5238"
+                   Text="{Binding ServerUrl}"
+                   IsVisible="{Binding IsEnteringNewServer}"
+                   TextColor="#72767d" BackgroundColor="#1e1f22"
+                   PlaceholderColor="#3f4248" FontSize="12" />
+
             <Label Text="{Binding ErrorMessage}" TextColor="#ed4245"
                    IsVisible="{Binding ErrorMessage, Converter={StaticResource StringToBoolConverter}}" />
 

@@ -19,7 +19,7 @@ public class ReplyTests : IDisposable
     public ReplyTests()
     {
         _db = new TestDb();
-        _ctrl = new MessagesController(_db.Db, TestHelpers.MockHub(), new ServerMetricsService(), TestHelpers.NullBot());
+        _ctrl = new MessagesController(_db.Db, TestHelpers.MockHub(), new ServerMetricsService(), TestHelpers.NullBot(), TestHelpers.NullAutomod(), TestHelpers.NullWebhooks());
     }
 
     public void Dispose() => _db.Dispose();

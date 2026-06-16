@@ -39,6 +39,8 @@ public class DirectMessagesController(AppDbContext db, IHubContext<ChatHub> hub)
         if (otherUserId == UserId) return BadRequest("Cannot DM yourself.");
         var other = await db.Users.FindAsync(otherUserId);
         if (other is null) return NotFound("User not found.");
+        if (await db.UserBlocks.AnyAsync(b => (b.BlockerId == UserId && b.BlockedId == otherUserId) || (b.BlockerId == otherUserId && b.BlockedId == UserId)))
+            return BadRequest("Cannot open a conversation with a blocked user.");
 
         int u1 = Math.Min(UserId, otherUserId);
         int u2 = Math.Max(UserId, otherUserId);
@@ -92,6 +94,10 @@ public class DirectMessagesController(AppDbContext db, IHubContext<ChatHub> hub)
         var convo = await db.DirectConversations.FindAsync(conversationId);
         if (convo is null) return NotFound();
         if (convo.User1Id != UserId && convo.User2Id != UserId) return Forbid();
+
+        int recipientUserId = convo.User1Id == UserId ? convo.User2Id : convo.User1Id;
+        if (await db.UserBlocks.AnyAsync(b => (b.BlockerId == UserId && b.BlockedId == recipientUserId) || (b.BlockerId == recipientUserId && b.BlockedId == UserId)))
+            return BadRequest("Cannot send messages to a blocked user.");
 
         var user = await db.Users.FindAsync(UserId);
         var msg = new DirectMessage

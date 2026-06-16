@@ -41,6 +41,9 @@ public class ChannelPermissionsController(AppDbContext db) : ControllerBase
         var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
         if (channel is null) return NotFound();
 
+        if (req.MinRoleToWrite < req.MinRoleToRead)
+            return BadRequest("MinRoleToWrite must be greater than or equal to MinRoleToRead.");
+
         var perm = await db.ChannelPermissions.FindAsync(channelId);
         if (perm is null)
         {

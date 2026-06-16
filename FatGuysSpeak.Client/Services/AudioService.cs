@@ -16,6 +16,11 @@ public class AudioService : IDisposable
     private BufferedWaveProvider? _playbackBuffer;
     private IOpusEncoder? _encoder;
     private IOpusDecoder? _decoder;
+
+    // Stream audio playback (separate from voice so they don't interfere)
+    private WaveOutEvent? _streamWaveOut;
+    private BufferedWaveProvider? _streamPlaybackBuffer;
+    private IOpusDecoder? _streamDecoder;
     private System.Threading.Timer? _testMicTimer;
     private double _testMicPhase;
     private bool _loopbackOwnedPlayback;
@@ -167,6 +172,38 @@ public class AudioService : IDisposable
         _playbackBuffer.AddSamples(bytes, 0, bytes.Length);
     }
 
+    public void StartStreamPlayback()
+    {
+        if (_streamWaveOut is not null) return;
+        _streamDecoder = OpusCodecFactory.CreateDecoder(SampleRate, Channels);
+        _streamPlaybackBuffer = new BufferedWaveProvider(new WaveFormat(SampleRate, 16, Channels)) { DiscardOnBufferOverflow = true };
+        int deviceIndex = Math.Clamp(OutputDeviceIndex, 0, Math.Max(0, WaveOut.DeviceCount - 1));
+        _streamWaveOut = new WaveOutEvent { DeviceNumber = deviceIndex };
+        _streamWaveOut.Init(_streamPlaybackBuffer);
+        _streamWaveOut.Volume = Math.Clamp(_outputVolume, 0f, 1f);
+        _streamWaveOut.Play();
+    }
+
+    public void StopStreamPlayback()
+    {
+        _streamWaveOut?.Stop();
+        _streamWaveOut?.Dispose();
+        _streamWaveOut = null;
+        _streamPlaybackBuffer = null;
+        _streamDecoder = null;
+    }
+
+    public void PlayStreamAudio(byte[] opusData)
+    {
+        if (IsDeafened || _streamDecoder is null || _streamPlaybackBuffer is null) return;
+
+        var pcm = new short[FrameSamples * Channels];
+        int decoded = _streamDecoder.Decode(opusData, pcm, FrameSamples, false);
+        var bytes = new byte[decoded * 2 * Channels];
+        Buffer.BlockCopy(pcm, 0, bytes, 0, bytes.Length);
+        _streamPlaybackBuffer.AddSamples(bytes, 0, bytes.Length);
+    }
+
     public void SetMuted(bool muted) => IsMuted = muted;
     public void SetDeafened(bool deafened) => IsDeafened = deafened;
 
@@ -283,5 +320,6 @@ public class AudioService : IDisposable
     {
         StopCapture();
         StopPlayback();
+        StopStreamPlayback();
     }
 }

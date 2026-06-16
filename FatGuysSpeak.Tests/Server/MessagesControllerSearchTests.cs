@@ -21,7 +21,7 @@ public class MessagesControllerSearchTests : IDisposable
             _testDb.Db,
             TestHelpers.MockHub(),
             new FatGuysSpeak.Server.Services.ServerMetricsService(),
-            TestHelpers.NullBot());
+            TestHelpers.NullBot(), TestHelpers.NullAutomod(), TestHelpers.NullWebhooks());
     }
 
     public void Dispose() => _testDb.Dispose();

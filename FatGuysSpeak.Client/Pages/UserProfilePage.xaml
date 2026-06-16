@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:FatGuysSpeak.Client.ViewModels"
              x:Class="FatGuysSpeak.Client.Pages.UserProfilePage"
-             BackgroundColor="#1e1e1e">
+             BackgroundColor="{DynamicResource ThemeBgPrimary}">
 
     <ContentPage.Resources>
         <local:InvertBoolConverter x:Key="InvertBool" xmlns:local="clr-namespace:FatGuysSpeak.Client" />
@@ -15,14 +15,14 @@
 
         <!-- Loading indicator -->
         <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}"
-                           Color="#2d5f9e" HorizontalOptions="Center" Margin="0,40" />
+                           Color="{DynamicResource ThemeAccent}" HorizontalOptions="Center" Margin="0,40" />
 
         <!-- Profile content -->
         <VerticalStackLayout IsVisible="{Binding IsLoading, Converter={StaticResource InvertBool}}" Spacing="0">
 
             <!-- Avatar + username -->
             <Frame CornerRadius="40" WidthRequest="80" HeightRequest="80"
-                   BackgroundColor="#2d5f9e" Padding="0" HorizontalOptions="Center"
+                   BackgroundColor="{DynamicResource ThemeAccent}" Padding="0" HorizontalOptions="Center"
                    BorderColor="Transparent" Margin="0,0,0,14">
                 <Grid>
                     <Label Text="{Binding AvatarText}"
@@ -46,8 +46,12 @@
                 <Label Text="{Binding StatusText}" TextColor="#a0a0a0" FontSize="13" VerticalOptions="Center" />
             </HorizontalStackLayout>
 
+            <!-- Last seen -->
+            <Label Text="{Binding LastSeenText}" TextColor="#555555" FontSize="11"
+                   HorizontalOptions="Center" IsVisible="{Binding HasLastSeen}" Margin="0,0,0,4" />
+
             <!-- Role -->
-            <Label Text="{Binding RoleText}" TextColor="#8ab4d4" FontSize="12"
+            <Label Text="{Binding RoleText}" TextColor="{DynamicResource ThemeAccentLight}" FontSize="12"
                    HorizontalOptions="Center" IsVisible="{Binding HasRole}" Margin="0,0,0,4" />
 
             <!-- Joined date -->
@@ -63,7 +67,7 @@
                     HorizontalOptions="Center" Padding="16,0" Margin="0,10,0,0" />
 
             <!-- Bio section -->
-            <BoxView HeightRequest="1" BackgroundColor="#333333" Margin="0,14,0,14" />
+            <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" Margin="0,14,0,14" />
 
             <!-- Bio display (not editing) -->
             <VerticalStackLayout IsVisible="{Binding IsEditingBio, Converter={StaticResource InvertBool}}" Spacing="6">
@@ -78,7 +82,7 @@
                 <Button Text="✏ Edit Bio"
                         Command="{Binding StartEditBioCommand}"
                         IsVisible="{Binding IsOwnProfile}"
-                        BackgroundColor="#2a2a3a" TextColor="#8ab4d4"
+                        BackgroundColor="#2a2a3a" TextColor="{DynamicResource ThemeAccentLight}"
                         FontSize="12" CornerRadius="4" HeightRequest="32"
                         HorizontalOptions="Start" Padding="14,0" Margin="0,8,0,0" />
             </VerticalStackLayout>
@@ -89,7 +93,7 @@
                        HorizontalOptions="Start" />
                 <Editor Text="{Binding BioInput}"
                         HeightRequest="90"
-                        BackgroundColor="#141414" TextColor="#d0d0d0"
+                        BackgroundColor="{DynamicResource ThemeBgInput}" TextColor="#d0d0d0"
                         PlaceholderColor="#555555"
                         Placeholder="Write something about yourself…"
                         FontSize="13" />
@@ -99,17 +103,17 @@
                 <HorizontalStackLayout Spacing="8">
                     <Button Text="Save"
                             Command="{Binding SaveBioCommand}"
-                            BackgroundColor="#2d5f9e" TextColor="White"
+                            BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
                             FontSize="12" CornerRadius="4" HeightRequest="32" Padding="16,0" />
                     <Button Text="Cancel"
                             Command="{Binding CancelEditBioCommand}"
-                            BackgroundColor="#3a3a3a" TextColor="#c0c0c0"
+                            BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#c0c0c0"
                             FontSize="12" CornerRadius="4" HeightRequest="32" Padding="14,0" />
                 </HorizontalStackLayout>
             </VerticalStackLayout>
 
             <!-- Divider before status picker -->
-            <BoxView HeightRequest="1" BackgroundColor="#333333" Margin="0,20,0,20"
+            <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" Margin="0,20,0,20"
                      IsVisible="{Binding IsOwnProfile}" />
 
             <!-- Status picker (own profile only) -->

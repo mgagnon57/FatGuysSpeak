@@ -21,7 +21,7 @@ public class ModDeleteTests : IDisposable
     public ModDeleteTests()
     {
         _db = new TestDb();
-        _ctrl = new MessagesController(_db.Db, TestHelpers.MockHub(), new ServerMetricsService(), TestHelpers.NullBot());
+        _ctrl = new MessagesController(_db.Db, TestHelpers.MockHub(), new ServerMetricsService(), TestHelpers.NullBot(), TestHelpers.NullAutomod(), TestHelpers.NullWebhooks());
     }
 
     public void Dispose() => _db.Dispose();
@@ -52,7 +52,7 @@ public class ModDeleteTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteMessage_Moderator_CanDeleteOthersMessage()
+    public async Task DeleteMessage_Moderator_CannotDeleteOthersMessage()
     {
         await SeedAsync();
         var msg = await AddMessageAsync(_member.Id, "bad message");
@@ -60,8 +60,8 @@ public class ModDeleteTests : IDisposable
 
         var result = await _ctrl.DeleteMessage(_channel.Id, msg.Id);
 
-        Assert.IsType<NoContentResult>(result);
-        Assert.True(_db.Db.Messages.Find(msg.Id)!.IsDeleted);
+        Assert.IsType<ForbidResult>(result);
+        Assert.False(_db.Db.Messages.Find(msg.Id)!.IsDeleted);
     }
 
     [Fact]
@@ -103,18 +103,18 @@ public class ModDeleteTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteMessage_ModeratorDelete_WritesAuditLog()
+    public async Task DeleteMessage_AdminDelete_WritesAuditLog()
     {
         await SeedAsync();
         var msg = await AddMessageAsync(_member.Id, "flagged content here");
-        TestHelpers.SetUser(_ctrl, _moderator.Id, _moderator.Username);
+        TestHelpers.SetUser(_ctrl, _owner.Id, _owner.Username);
 
         await _ctrl.DeleteMessage(_channel.Id, msg.Id);
 
         var log = _db.Db.AuditLogs.FirstOrDefault(a => a.Action == "MessageDeleted");
         Assert.NotNull(log);
         Assert.Equal(_server.Id, log.ServerId);
-        Assert.Equal(_moderator.Id, log.ActorId);
+        Assert.Equal(_owner.Id, log.ActorId);
         Assert.Equal(_member.Id, log.TargetId);
     }
 

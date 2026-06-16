@@ -4,6 +4,7 @@ using FatGuysSpeak.Server.Data;
 using FatGuysSpeak.Server.Hubs;
 using FatGuysSpeak.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
@@ -46,31 +47,70 @@ builder.Services.AddSingleton<FatGuysSpeak.Server.Services.BotService>();
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey))
     throw new InvalidOperationException("JWT key is not configured. Set Jwt:Key in appsettings or the JWT__Key environment variable.");
+if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
+    throw new InvalidOperationException("JWT key is too short. It must be at least 32 bytes (256 bits).");
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(opt =>
+builder.Services.AddAuthentication(opt =>
+{
+    // Routes to JWT or Dashboard cookie depending on which is present
+    opt.DefaultScheme = "SmartBearer";
+    opt.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    opt.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddPolicyScheme("SmartBearer", "JWT or Dashboard Cookie", opt =>
+{
+    opt.ForwardDefaultSelector = ctx =>
+        ctx.Request.Cookies.ContainsKey(".FatGuysSpeak.Dashboard")
+            ? "Dashboard"
+            : JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(opt =>
+{
+    opt.TokenValidationParameters = new TokenValidationParameters
     {
-        opt.TokenValidationParameters = new TokenValidationParameters
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero,
+    };
+    // Allow JWT via query string for SignalR WebSocket handshakes
+    opt.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = ctx =>
         {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero,
-        };
-        // Allow JWT via query string for SignalR WebSocket handshakes
-        opt.Events = new JwtBearerEvents
+            var token = ctx.Request.Query["access_token"];
+            if (!string.IsNullOrEmpty(token) && ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                ctx.Token = token;
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = ctx =>
         {
-            OnMessageReceived = ctx =>
-            {
-                var token = ctx.Request.Query["access_token"];
-                if (!string.IsNullOrEmpty(token) && ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
-                    ctx.Token = token;
-                return Task.CompletedTask;
-            }
-        };
-    });
+            var bl = ctx.HttpContext.RequestServices.GetRequiredService<SessionBlacklistService>();
+            var raw = ctx.HttpContext.Request.Headers.Authorization.FirstOrDefault()?.Replace("Bearer ", "")
+                      ?? ctx.HttpContext.Request.Query["access_token"].FirstOrDefault()
+                      ?? "";
+            if (!string.IsNullOrEmpty(raw) && bl.IsRevoked(SessionBlacklistService.HashToken(raw)))
+                ctx.Fail("Token has been revoked.");
+            return Task.CompletedTask;
+        }
+    };
+})
+.AddCookie("Dashboard", opt =>
+{
+    opt.Cookie.Name = ".FatGuysSpeak.Dashboard";
+    opt.LoginPath = "/dashboard/login";
+    opt.AccessDeniedPath = "/dashboard/login";
+    opt.Cookie.HttpOnly = true;
+    opt.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.Always;
+    opt.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict;
+    opt.ExpireTimeSpan = TimeSpan.FromHours(8);
+    opt.SlidingExpiration = true;
+});
 
 // Rate limiters: auth (per-IP) + messages (per-user)
 builder.Services.AddRateLimiter(opt =>
@@ -98,6 +138,14 @@ builder.Services.AddRateLimiter(opt =>
         });
     });
 
+    opt.AddFixedWindowLimiter("dashboard", limiter =>
+    {
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.PermitLimit = 5;
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 0;
+    });
+
     opt.OnRejected = async (context, token) =>
     {
         var svc = context.HttpContext.RequestServices.GetRequiredService<ServerMetricsService>();
@@ -111,12 +159,42 @@ builder.Services.AddRateLimiter(opt =>
     opt.RejectionStatusCode = 429;
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(opt =>
+{
+    opt.AddPolicy("DashboardAdmin", policy =>
+        policy.AddAuthenticationSchemes("Dashboard")
+              .RequireAuthenticatedUser());
+});
 builder.Services.AddControllers();
 builder.Services.AddHttpClient("preview", c =>
 {
     c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; FatGuysSpeak/1.0)");
     c.Timeout = TimeSpan.FromSeconds(8);
+});
+builder.Services.AddHttpClient("giphy", c =>
+{
+    c.BaseAddress = new Uri("https://api.giphy.com/v1/gifs/");
+    c.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddHostedService<FatGuysSpeak.Server.Services.TempBanCleanupService>();
+builder.Services.AddHostedService<FatGuysSpeak.Server.Services.AuditLogCleanupService>();
+builder.Services.AddSingleton<FatGuysSpeak.Server.Services.SessionBlacklistService>();
+builder.Services.AddSingleton<FatGuysSpeak.Server.Services.WebhookDeliveryService>();
+builder.Services.AddSingleton<FatGuysSpeak.Server.Services.AutomodService>();
+builder.Services.AddHttpClient("webhook", c => c.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new() { Title = "FatGuysSpeak API", Version = "v1" });
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "Authorization", Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer", BearerFormat = "JWT", In = Microsoft.OpenApi.Models.ParameterLocation.Header
+    });
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        [new Microsoft.OpenApi.Models.OpenApiSecurityScheme { Reference = new() { Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme, Id = "Bearer" } }] = []
+    });
 });
 builder.Services.AddSignalR(opt =>
 {
@@ -181,6 +259,46 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='Bio'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"Bio\" TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Channels' AND column_name='SlowmodeSeconds'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Channels\" ADD COLUMN \"SlowmodeSeconds\" INTEGER NOT NULL DEFAULT 0");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='ThreadId'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"ThreadId\" INTEGER REFERENCES \"Messages\"(\"Id\")");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='ServerMembers' AND column_name='MutedUntil'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"ServerMembers\" ADD COLUMN \"MutedUntil\" TIMESTAMPTZ");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""TempBans"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""ServerId"" INTEGER NOT NULL,
+                ""UserId"" INTEGER NOT NULL,
+                ""ActorId"" INTEGER NOT NULL,
+                ""ExpiresAt"" TIMESTAMPTZ NOT NULL,
+                ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""WordFilters"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""ServerId"" INTEGER NOT NULL,
+                ""Pattern"" TEXT NOT NULL,
+                ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Servers' AND column_name='IconData'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Servers\" ADD COLUMN \"IconData\" BYTEA");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Servers' AND column_name='IconMimeType'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Servers\" ADD COLUMN \"IconMimeType\" TEXT");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='LastSeenAt'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"LastSeenAt\" TIMESTAMP");
     }
     else
     {
@@ -224,6 +342,46 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='Bio'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN Bio TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Channels') WHERE name='SlowmodeSeconds'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Channels ADD COLUMN SlowmodeSeconds INTEGER NOT NULL DEFAULT 0");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='ThreadId'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN ThreadId INTEGER");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('ServerMembers') WHERE name='MutedUntil'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE ServerMembers ADD COLUMN MutedUntil TEXT");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS TempBans (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ServerId INTEGER NOT NULL,
+                UserId INTEGER NOT NULL,
+                ActorId INTEGER NOT NULL,
+                ExpiresAt TEXT NOT NULL,
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS WordFilters (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ServerId INTEGER NOT NULL,
+                Pattern TEXT NOT NULL,
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Servers') WHERE name='IconData'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Servers ADD COLUMN IconData BLOB");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Servers') WHERE name='IconMimeType'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Servers ADD COLUMN IconMimeType TEXT");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='LastSeenAt'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN LastSeenAt TEXT");
     }
 
     // MessageReactions table (added for reactions feature)
@@ -418,6 +576,91 @@ using (var scope = app.Services.CreateScope())
             )");
     }
 
+    if (isPostgres)
+    {
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""UserChannelNotifs"" (
+                ""UserId"" INTEGER NOT NULL,
+                ""ChannelId"" INTEGER NOT NULL,
+                ""Level"" INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (""UserId"", ""ChannelId"")
+            )");
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""UserServerNotifs"" (
+                ""UserId"" INTEGER NOT NULL,
+                ""ServerId"" INTEGER NOT NULL,
+                ""Level"" INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (""UserId"", ""ServerId"")
+            )");
+    }
+    else
+    {
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS UserChannelNotifs (
+                UserId INTEGER NOT NULL,
+                ChannelId INTEGER NOT NULL,
+                Level INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (UserId, ChannelId)
+            )");
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS UserServerNotifs (
+                UserId INTEGER NOT NULL,
+                ServerId INTEGER NOT NULL,
+                Level INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (UserId, ServerId)
+            )");
+    }
+
+    // New tables: password reset, sessions, warnings, webhooks, group DMs, column additions
+    if (isPostgres)
+    {
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""PasswordResetTokens"" (""Id"" SERIAL PRIMARY KEY, ""UserId"" INTEGER NOT NULL, ""Token"" TEXT NOT NULL UNIQUE, ""ExpiresAt"" TIMESTAMPTZ NOT NULL, ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW(), ""IsUsed"" BOOLEAN NOT NULL DEFAULT FALSE)");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""UserSessions"" (""Id"" SERIAL PRIMARY KEY, ""UserId"" INTEGER NOT NULL, ""TokenHash"" TEXT NOT NULL UNIQUE, ""IpAddress"" TEXT, ""UserAgent"" TEXT, ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW(), ""LastSeenAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW(), ""RevokedAt"" TIMESTAMPTZ)");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""UserWarnings"" (""Id"" SERIAL PRIMARY KEY, ""ServerId"" INTEGER NOT NULL, ""UserId"" INTEGER NOT NULL, ""ActorId"" INTEGER NOT NULL, ""ActorUsername"" TEXT NOT NULL, ""Reason"" TEXT NOT NULL, ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Webhooks"" (""Id"" SERIAL PRIMARY KEY, ""ServerId"" INTEGER NOT NULL, ""Name"" TEXT NOT NULL, ""Url"" TEXT NOT NULL, ""Events"" TEXT NOT NULL DEFAULT 'message,member_join,member_leave', ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW(), ""CreatedById"" INTEGER NOT NULL)");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""GroupConversations"" (""Id"" SERIAL PRIMARY KEY, ""Name"" TEXT NOT NULL, ""CreatedById"" INTEGER NOT NULL, ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""GroupConversationMembers"" (""GroupConversationId"" INTEGER NOT NULL REFERENCES ""GroupConversations""(""Id"") ON DELETE CASCADE, ""UserId"" INTEGER NOT NULL, ""JoinedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY (""GroupConversationId"", ""UserId""))");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""GroupMessages"" (""Id"" SERIAL PRIMARY KEY, ""GroupConversationId"" INTEGER NOT NULL REFERENCES ""GroupConversations""(""Id"") ON DELETE CASCADE, ""AuthorId"" INTEGER NOT NULL, ""Content"" TEXT NOT NULL DEFAULT '', ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW(), ""IsDeleted"" BOOLEAN NOT NULL DEFAULT FALSE)");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Channels' AND column_name='Topic'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Channels\" ADD COLUMN \"Topic\" TEXT");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Channels' AND column_name='IsNsfw'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Channels\" ADD COLUMN \"IsNsfw\" BOOLEAN NOT NULL DEFAULT FALSE");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Servers' AND column_name='VanityCode'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Servers\" ADD COLUMN \"VanityCode\" TEXT");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Servers' AND column_name='MinRoleToMentionEveryone'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Servers\" ADD COLUMN \"MinRoleToMentionEveryone\" INTEGER NOT NULL DEFAULT 2");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='WordFilters' AND column_name='Severity'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE \"WordFilters\" ADD COLUMN \"Severity\" INTEGER NOT NULL DEFAULT 1");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='WordFilters' AND column_name='CaseSensitive'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE \"WordFilters\" ADD COLUMN \"CaseSensitive\" BOOLEAN NOT NULL DEFAULT FALSE");
+        ctx.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IF NOT EXISTS IX_Servers_VanityCode ON \"Servers\" (\"VanityCode\") WHERE \"VanityCode\" IS NOT NULL");
+    }
+    else
+    {
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS PasswordResetTokens (Id INTEGER PRIMARY KEY AUTOINCREMENT, UserId INTEGER NOT NULL, Token TEXT NOT NULL UNIQUE, ExpiresAt TEXT NOT NULL, CreatedAt TEXT NOT NULL DEFAULT (datetime('now')), IsUsed INTEGER NOT NULL DEFAULT 0)");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS UserSessions (Id INTEGER PRIMARY KEY AUTOINCREMENT, UserId INTEGER NOT NULL, TokenHash TEXT NOT NULL UNIQUE, IpAddress TEXT, UserAgent TEXT, CreatedAt TEXT NOT NULL DEFAULT (datetime('now')), LastSeenAt TEXT NOT NULL DEFAULT (datetime('now')), RevokedAt TEXT)");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS UserWarnings (Id INTEGER PRIMARY KEY AUTOINCREMENT, ServerId INTEGER NOT NULL, UserId INTEGER NOT NULL, ActorId INTEGER NOT NULL, ActorUsername TEXT NOT NULL, Reason TEXT NOT NULL, CreatedAt TEXT NOT NULL DEFAULT (datetime('now')))");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS Webhooks (Id INTEGER PRIMARY KEY AUTOINCREMENT, ServerId INTEGER NOT NULL, Name TEXT NOT NULL, Url TEXT NOT NULL, Events TEXT NOT NULL DEFAULT 'message,member_join,member_leave', CreatedAt TEXT NOT NULL DEFAULT (datetime('now')), CreatedById INTEGER NOT NULL)");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS GroupConversations (Id INTEGER PRIMARY KEY AUTOINCREMENT, Name TEXT NOT NULL, CreatedById INTEGER NOT NULL, CreatedAt TEXT NOT NULL DEFAULT (datetime('now')))");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS GroupConversationMembers (GroupConversationId INTEGER NOT NULL REFERENCES GroupConversations(Id) ON DELETE CASCADE, UserId INTEGER NOT NULL, JoinedAt TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (GroupConversationId, UserId))");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS GroupMessages (Id INTEGER PRIMARY KEY AUTOINCREMENT, GroupConversationId INTEGER NOT NULL REFERENCES GroupConversations(Id) ON DELETE CASCADE, AuthorId INTEGER NOT NULL, Content TEXT NOT NULL DEFAULT '', CreatedAt TEXT NOT NULL DEFAULT (datetime('now')), IsDeleted INTEGER NOT NULL DEFAULT 0)");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Channels') WHERE name='Topic'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE Channels ADD COLUMN Topic TEXT");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Channels') WHERE name='IsNsfw'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE Channels ADD COLUMN IsNsfw INTEGER NOT NULL DEFAULT 0");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Servers') WHERE name='VanityCode'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE Servers ADD COLUMN VanityCode TEXT");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Servers') WHERE name='MinRoleToMentionEveryone'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE Servers ADD COLUMN MinRoleToMentionEveryone INTEGER NOT NULL DEFAULT 2");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('WordFilters') WHERE name='Severity'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE WordFilters ADD COLUMN Severity INTEGER NOT NULL DEFAULT 1");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('WordFilters') WHERE name='CaseSensitive'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE WordFilters ADD COLUMN CaseSensitive INTEGER NOT NULL DEFAULT 0");
+        ctx.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IF NOT EXISTS IX_Servers_VanityCode ON Servers (VanityCode) WHERE VanityCode IS NOT NULL");
+    }
+
     // Seed bot user
     var botUser = ctx.Users.FirstOrDefault(u => u.Username == FatGuysSpeak.Server.Services.BotService.BotUsername);
     if (botUser is null)
@@ -462,8 +705,40 @@ using (var scope = app.Services.CreateScope())
             ctx.SaveChanges();
         }
     }
+
+    var blacklist = scope.ServiceProvider.GetRequiredService<SessionBlacklistService>();
+    await blacklist.RehydrateAsync(ctx);
 }
 
+// Validate dashboard credentials are configured before accepting traffic
+var dashUser = app.Configuration["Dashboard:Username"];
+var dashPass = app.Configuration["Dashboard:Password"];
+if (string.IsNullOrWhiteSpace(dashUser) || string.IsNullOrWhiteSpace(dashPass))
+    throw new InvalidOperationException("Dashboard credentials are not configured. Set Dashboard:Username and Dashboard:Password in appsettings.");
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+// Forward proxy headers from Railway so rate-limiting and auth see the real client IP
+var forwardedOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+};
+forwardedOptions.KnownNetworks.Clear();
+forwardedOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedOptions);
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["X-Frame-Options"] = "DENY";
+    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    ctx.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    if (ctx.Request.IsHttps)
+        ctx.Response.Headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains";
+    await next();
+});
 app.UseCors();
 app.UseRateLimiter();
 
@@ -472,7 +747,12 @@ Directory.CreateDirectory(uploadsPath);
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsPath),
-    RequestPath = "/uploads"
+    RequestPath = "/uploads",
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+        ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+    }
 });
 app.UseAuthentication();
 app.UseAuthorization();

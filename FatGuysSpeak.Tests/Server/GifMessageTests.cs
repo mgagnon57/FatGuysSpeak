@@ -30,7 +30,7 @@ public class GifMessageTests : IDisposable
         var hub = new Mock<IHubContext<ChatHub>>();
         hub.Setup(h => h.Clients).Returns(clients.Object);
 
-        _controller = new MessagesController(_testDb.Db, hub.Object, new ServerMetricsService(), TestHelpers.NullBot());
+        _controller = new MessagesController(_testDb.Db, hub.Object, new ServerMetricsService(), TestHelpers.NullBot(), TestHelpers.NullAutomod(), TestHelpers.NullWebhooks());
     }
 
     public void Dispose() => _testDb.Dispose();

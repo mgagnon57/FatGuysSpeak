@@ -512,4 +512,51 @@ public class ChatHubStreamTests : IDisposable
         Assert.False(_sent.Any(kv => kv.Value.Any(m => m.Method == "ReceiveStreamFrame")),
             "Oversized frames must be dropped to prevent DoS");
     }
+
+    // ── SendStreamAudio ───────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task SendStreamAudio_WhenStreaming_ForwardsToStreamGroupWithStreamerId()
+    {
+        var (server, user) = await TestHelpers.SeedServerAsync(_testDb.Db, "sam");
+        var channel = _testDb.Db.Channels.First(c => c.ServerId == server.Id && c.Name == "general");
+        var hub = CreateHub(user.Id, user.Username, "conn-sam");
+
+        await hub.StartStream(channel.Id);
+        _sent.Clear();
+        var audioData = new byte[100];
+        await hub.SendStreamAudio(audioData);
+
+        Assert.True(WasSentTo($"others:stream-{channel.Id}", "ReceiveStreamAudio"),
+            "Audio must be forwarded to stream group viewers");
+        var (_, args) = _sent[$"others:stream-{channel.Id}"].Last(m => m.Method == "ReceiveStreamAudio");
+        Assert.Equal(user.Id, (int)args[0]);
+        Assert.Equal(audioData, (byte[])args[1]);
+    }
+
+    [Fact]
+    public async Task SendStreamAudio_WhenNotStreaming_DropsSilently()
+    {
+        var (_, user) = await TestHelpers.SeedServerAsync(_testDb.Db, "tess");
+
+        await CreateHub(user.Id, user.Username).SendStreamAudio(new byte[100]);
+
+        Assert.False(_sent.Any(kv => kv.Value.Any(m => m.Method == "ReceiveStreamAudio")),
+            "Audio must be dropped when user is not actively streaming");
+    }
+
+    [Fact]
+    public async Task SendStreamAudio_OversizedPacket_DropsSilently()
+    {
+        var (server, user) = await TestHelpers.SeedServerAsync(_testDb.Db, "uma");
+        var channel = _testDb.Db.Channels.First(c => c.ServerId == server.Id && c.Name == "general");
+        var hub = CreateHub(user.Id, user.Username, "conn-uma");
+
+        await hub.StartStream(channel.Id);
+        _sent.Clear();
+        await hub.SendStreamAudio(new byte[1276]); // 1276 > 1275 max Opus packet
+
+        Assert.False(_sent.Any(kv => kv.Value.Any(m => m.Method == "ReceiveStreamAudio")),
+            "Oversized audio packets must be dropped");
+    }
 }

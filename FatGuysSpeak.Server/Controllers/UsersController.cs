@@ -38,7 +38,7 @@ public class UsersController(AppDbContext db) : ControllerBase
             }
         }
 
-        return new UserProfileDto(user.Id, user.Username, user.Status, user.CreatedAt, role, joinedAt, user.Id == UserId, user.AvatarUrl, user.Bio);
+        return new UserProfileDto(user.Id, user.Username, user.Status, user.CreatedAt, role, joinedAt, user.Id == UserId, user.AvatarUrl, user.Bio, user.LastSeenAt);
     }
 
     [HttpPost("me/avatar")]

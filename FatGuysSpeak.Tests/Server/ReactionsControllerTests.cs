@@ -156,7 +156,7 @@ public class ReactionsControllerTests : IDisposable
         await _controller.Toggle(_channel.Id, _message.Id, "🎉");
 
         var msgsController = new MessagesController(
-            _testDb.Db, TestHelpers.MockHub(), new FatGuysSpeak.Server.Services.ServerMetricsService(), TestHelpers.NullBot());
+            _testDb.Db, TestHelpers.MockHub(), new FatGuysSpeak.Server.Services.ServerMetricsService(), TestHelpers.NullBot(), TestHelpers.NullAutomod(), TestHelpers.NullWebhooks());
         TestHelpers.SetUser(msgsController, _owner.Id, _owner.Username);
 
         var result = await msgsController.GetMessages(_channel.Id);

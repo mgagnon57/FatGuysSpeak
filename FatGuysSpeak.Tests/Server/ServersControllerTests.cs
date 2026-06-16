@@ -16,7 +16,7 @@ public class ServersControllerTests : IDisposable
     public ServersControllerTests()
     {
         _testDb = new TestDb();
-        _controller = new ServersController(_testDb.Db, TestHelpers.MockHub());
+        _controller = new ServersController(_testDb.Db, TestHelpers.MockHub(), TestHelpers.NullWebhooks());
     }
 
     public void Dispose() => _testDb.Dispose();
@@ -192,6 +192,46 @@ public class ServersControllerTests : IDisposable
         Assert.IsType<NoContentResult>(result);
         var updated = await _testDb.Db.ServerMembers.FindAsync(_server.Id, member.Id);
         Assert.Equal(ServerRole.Admin, updated!.Role);
+    }
+
+    [Fact]
+    public async Task SetMemberRole_AdminPromotesMemberToModerator_Succeeds()
+    {
+        await SeedAsync();
+        var member = new User { Username = "member2", Email = "m2@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(member);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.Add(new ServerMember
+            { ServerId = _server.Id, UserId = member.Id, Role = ServerRole.Member });
+        await _testDb.Db.SaveChangesAsync();
+
+        var result = await _controller.SetMemberRole(_server.Id, member.Id,
+            new SetRoleRequest(ServerRole.Moderator));
+
+        Assert.IsType<NoContentResult>(result);
+        var updated = await _testDb.Db.ServerMembers.FindAsync(_server.Id, member.Id);
+        Assert.Equal(ServerRole.Moderator, updated!.Role);
+    }
+
+    [Fact]
+    public async Task SetMemberRole_NonAdminCannotPromoteToModerator_ReturnsForbid()
+    {
+        await SeedAsync();
+        var member = new User { Username = "member2", Email = "m2@test.com", PasswordHash = "*" };
+        var target = new User { Username = "target", Email = "target@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.AddRange(member, target);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.AddRange(
+            new ServerMember { ServerId = _server.Id, UserId = member.Id, Role = ServerRole.Member },
+            new ServerMember { ServerId = _server.Id, UserId = target.Id, Role = ServerRole.Member }
+        );
+        await _testDb.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_controller, member.Id, member.Username);
+
+        var result = await _controller.SetMemberRole(_server.Id, target.Id,
+            new SetRoleRequest(ServerRole.Moderator));
+
+        Assert.IsType<ForbidResult>(result);
     }
 
     [Fact]

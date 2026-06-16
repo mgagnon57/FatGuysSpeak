@@ -30,7 +30,7 @@ public class MessagesControllerEditDeleteTests : IDisposable
         _hubMock = new Mock<IHubContext<ChatHub>>();
         _hubMock.Setup(h => h.Clients).Returns(clients.Object);
 
-        _controller = new MessagesController(_testDb.Db, _hubMock.Object, new FatGuysSpeak.Server.Services.ServerMetricsService(), TestHelpers.NullBot());
+        _controller = new MessagesController(_testDb.Db, _hubMock.Object, new FatGuysSpeak.Server.Services.ServerMetricsService(), TestHelpers.NullBot(), TestHelpers.NullAutomod(), TestHelpers.NullWebhooks());
     }
 
     public void Dispose() => _testDb.Dispose();
@@ -208,7 +208,6 @@ public class MessagesControllerEditDeleteTests : IDisposable
     public async Task DeleteMessage_RegularMember_CannotDeleteOthersMessage()
     {
         await SeedAsync();
-        // Add a second member (Member role) and a message authored by the owner
         var regularMember = new User { Username = "regular2", Email = "regular2@test.com", PasswordHash = "*" };
         _testDb.Db.Users.Add(regularMember);
         await _testDb.Db.SaveChangesAsync();
@@ -225,6 +224,50 @@ public class MessagesControllerEditDeleteTests : IDisposable
         var result = await _controller.DeleteMessage(_textChannel.Id, msg.Id);
 
         Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
+    public async Task DeleteMessage_Moderator_CannotDeleteOthersMessage()
+    {
+        await SeedAsync();
+        var moderator = new User { Username = "mod1", Email = "mod1@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(moderator);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.Add(new FatGuysSpeak.Server.Models.ServerMember
+        {
+            ServerId = _server.Id, UserId = moderator.Id,
+            Role = FatGuysSpeak.Shared.ServerRole.Moderator
+        });
+        await _testDb.Db.SaveChangesAsync();
+
+        var msg = await AddMessageAsync(authorId: _owner.Id, content: "owner message");
+        TestHelpers.SetUser(_controller, moderator.Id, moderator.Username);
+
+        var result = await _controller.DeleteMessage(_textChannel.Id, msg.Id);
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    [Fact]
+    public async Task DeleteMessage_Admin_CanDeleteOthersMessage()
+    {
+        await SeedAsync();
+        var admin = new User { Username = "admin2", Email = "admin2@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(admin);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.Add(new FatGuysSpeak.Server.Models.ServerMember
+        {
+            ServerId = _server.Id, UserId = admin.Id,
+            Role = FatGuysSpeak.Shared.ServerRole.Admin
+        });
+        await _testDb.Db.SaveChangesAsync();
+
+        var msg = await AddMessageAsync(authorId: _owner.Id, content: "owner message");
+        TestHelpers.SetUser(_controller, admin.Id, admin.Username);
+
+        var result = await _controller.DeleteMessage(_textChannel.Id, msg.Id);
+
+        Assert.IsType<NoContentResult>(result);
     }
 
     [Fact]
@@ -263,7 +306,7 @@ public class MessagesControllerEditDeleteTests : IDisposable
     // ── DTO fields ────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task GetMessages_ReturnsIsDeletedAndEditedAtInDto()
+    public async Task GetMessages_ExcludesDeletedMessages()
     {
         await SeedAsync();
         _testDb.Db.Messages.AddRange(
@@ -276,11 +319,9 @@ public class MessagesControllerEditDeleteTests : IDisposable
         var result = await _controller.GetMessages(_textChannel.Id);
 
         var msgs = result.Value!;
-        Assert.Equal(3, msgs.Count);
-        Assert.False(msgs[0].IsDeleted);
-        Assert.Null(msgs[0].EditedAt);
-        Assert.True(msgs[1].IsDeleted);
-        Assert.NotNull(msgs[2].EditedAt);
+        Assert.Equal(2, msgs.Count);
+        Assert.DoesNotContain(msgs, m => m.IsDeleted);
+        Assert.NotNull(msgs[1].EditedAt);
     }
 
     [Fact]

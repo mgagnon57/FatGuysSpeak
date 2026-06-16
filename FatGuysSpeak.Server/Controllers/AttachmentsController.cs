@@ -52,6 +52,10 @@ public class AttachmentsController(IWebHostEnvironment env) : ControllerBase
             await file.CopyToAsync(stream);
 
         var url = $"{Request.Scheme}://{Request.Host}/uploads/{storedName}";
-        return Ok(new AttachmentDto(url, safeName, file.ContentType));
+        // Use server-determined MIME type to prevent client-supplied Content-Type spoofing
+        var mimeType = isImage
+            ? ext switch { ".jpg" or ".jpeg" => "image/jpeg", ".png" => "image/png", ".gif" => "image/gif", ".webp" => "image/webp", _ => "application/octet-stream" }
+            : "application/octet-stream";
+        return Ok(new AttachmentDto(url, safeName, mimeType));
     }
 }

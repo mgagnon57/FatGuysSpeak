@@ -77,6 +77,17 @@ public static class TestHelpers
         return new FatGuysSpeak.Server.Services.BotService(httpFactory, config, scopeFactory, MockHub());
     }
 
+    public static FatGuysSpeak.Server.Services.AutomodService NullAutomod() =>
+        new FatGuysSpeak.Server.Services.AutomodService();
+
+    public static FatGuysSpeak.Server.Services.WebhookDeliveryService NullWebhooks()
+    {
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new System.Net.Http.HttpClient());
+        var logger = new Mock<Microsoft.Extensions.Logging.ILogger<FatGuysSpeak.Server.Services.WebhookDeliveryService>>();
+        return new FatGuysSpeak.Server.Services.WebhookDeliveryService(factory.Object, logger.Object);
+    }
+
     public static IHubContext<ChatHub> MockHub()
     {
         var proxy = new Mock<IClientProxy>();

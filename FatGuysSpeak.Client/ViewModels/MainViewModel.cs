@@ -10,7 +10,7 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, GifService gif) : ObservableObject
+public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, CameraService camera, SettingsViewModel settings, ToastNotificationService toast) : ObservableObject
 {
     private bool _initialized;
     private static readonly ConcurrentDictionary<string, LinkPreviewDto?> PreviewCache = new();
@@ -26,7 +26,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private List<CategoryDto> _serverCategories = [];
     public ObservableCollection<CategoryViewItem> CategorizedChannels { get; } = [];
     [ObservableProperty] private ObservableCollection<MessageViewItem> _messages = [];
-    [ObservableProperty] private ObservableCollection<UserDto> _members = [];
+    [ObservableProperty] private ObservableCollection<MemberViewItem> _members = [];
     [ObservableProperty] private string _selectedTab = "Text";
     [ObservableProperty] private ObservableCollection<VoiceParticipantViewModel> _voiceParticipants = [];
 
@@ -87,6 +87,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     // Current user info (for profile bar)
     [ObservableProperty] private string _currentUsername = api.CurrentUsername;
     [ObservableProperty] private string? _currentUserAvatarUrl = api.CurrentAvatarUrl;
+    [ObservableProperty] private string _currentServerUrl = api.ServerUrl;
     public bool HasCurrentUserAvatar => _currentUserAvatarUrl is not null;
     partial void OnCurrentUserAvatarUrlChanged(string? value) => OnPropertyChanged(nameof(HasCurrentUserAvatar));
 
@@ -143,6 +144,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public Color  CameraButtonColor => IsCameraOn ? Color.FromArgb("#ed4245") : Color.FromArgb("#3a3a3a");
     public bool IsNotDmMode => !IsDmMode;
     public bool ShowChannelUiElements => !IsDmMode && SelectedChannel is not null;
+    public string CurrentChannelSlowmodeLabel =>
+        Channels.FirstOrDefault(c => c.Channel.Id == SelectedChannel?.Id)?.SlowmodeLabel ?? "";
+    public bool CurrentChannelHasSlowmode => !string.IsNullOrEmpty(CurrentChannelSlowmodeLabel);
     public string DmHeaderTitle => SelectedDmConversation?.OtherUsername ?? "Direct Messages";
     public string MessagePlaceholderText => IsDmMode && SelectedDmConversation is not null
         ? $"Message @{SelectedDmConversation.OtherUsername}"
@@ -361,6 +365,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         OnPropertyChanged(nameof(ShowChannelUiElements));
         OnPropertyChanged(nameof(MessagePlaceholderText));
+        OnPropertyChanged(nameof(CurrentChannelSlowmodeLabel));
+        OnPropertyChanged(nameof(CurrentChannelHasSlowmode));
         IsPinsOpen = false;
     }
     partial void OnIsStreamingChanged(bool value)
@@ -457,12 +463,16 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.UserDisconnected  += OnUserDisconnected;
         hub.UserJoinedServer  += OnUserJoinedServer;
         hub.ChannelCreated    += OnChannelCreated;
+        hub.ChannelUpdated    += OnChannelUpdated;
+        hub.ChannelDeleted    += OnChannelDeleted;
+        hub.ForceJoinChannel  += OnForceJoinChannel;
         hub.UserJoinedChannel += OnUserJoinedChannel;
         hub.UserLeftChannel   += OnUserLeftChannel;
         hub.VoiceDataReceived += OnVoiceDataReceived;
         hub.StreamStarted        += OnStreamStarted;
         hub.StreamStopped        += OnStreamStopped;
         hub.StreamFrameReceived  += OnStreamFrameReceived;
+        hub.StreamAudioReceived  += OnStreamAudioReceived;
         hub.StreamNotification   += OnStreamNotification;
         hub.UserTyping              += OnUserTyping;
         hub.UserStoppedTyping       += OnUserStoppedTyping;
@@ -491,6 +501,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.CategoryRenamed         += OnCategoryRenamed;
         hub.ChannelCategoryChanged  += OnChannelCategoryChanged;
         hub.MemberRoleChanged += OnMemberRoleChanged;
+        hub.ChannelSlowmodeUpdated += OnChannelSlowmodeUpdated;
+        hub.ThreadReplyReceived += OnThreadReplyReceived;
+        hub.UserMuted += OnUserMuted;
+        hub.UserTempBanned += OnUserTempBanned;
         hub.Reconnecting += _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Reconnecting");
         hub.Reconnected  += _ => MainThread.BeginInvokeOnMainThread(async () =>
         {
@@ -498,7 +512,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             await OnReconnectedAsync();
         });
         hub.Disconnected += _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Disconnected");
-        screen.FrameCaptured  += OnScreenFrameCaptured;
+        screen.FrameCaptured       += OnScreenFrameCaptured;
+        screen.StreamAudioCaptured += OnStreamAudioCaptured;
         audio.MicLevelChanged += level => MainThread.BeginInvokeOnMainThread(() => MicLevel = level);
         speech.TextRecognized  += OnSpeechRecognized;
         speech.HypothesisChanged += text => MainThread.BeginInvokeOnMainThread(() => HypothesisText = text);
@@ -518,7 +533,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public async Task LoadServersAsync()
     {
         var list = await api.GetServersAsync();
-        Servers = new ObservableCollection<ServerViewItem>((list ?? []).Select(ServerViewItem.FromDto));
+        Servers = new ObservableCollection<ServerViewItem>(
+            (list ?? []).Select(s => ServerViewItem.FromDto(s, s.HasIcon ? api.GetServerIconUrl(s.Id) : null)));
         var blocks = await api.GetBlockedUsersAsync();
         _blockedUserIds.Clear();
         foreach (var b in blocks ?? [])
@@ -537,8 +553,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         Channels = new ObservableCollection<ChannelViewItem>((channelList ?? []).Select(c => new ChannelViewItem(c)));
         RebuildCategorizedChannels();
         var onlineList = hub.IsConnected ? await hub.GetOnlineUsersAsync(item.Server.Id) : [];
-        Members = new ObservableCollection<UserDto>(onlineList);
-        // Load role map for admin elevation UI; failure is non-fatal
+        // Load role map first so MemberViewItems are built with correct roles
         _memberRoles.Clear();
         try
         {
@@ -547,7 +562,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                 foreach (var m in roleList)
                     _memberRoles[m.UserId] = m.Role;
         }
-        catch { /* role map unavailable; Make Admin will not appear */ }
+        catch { /* role map unavailable; icons will default to Member */ }
+        Members = new ObservableCollection<MemberViewItem>(
+            onlineList.Select(u => new MemberViewItem(u, _memberRoles.GetValueOrDefault(u.Id))));
         SelectedChannel = null;
         Messages.Clear();
     }
@@ -557,7 +574,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         // Stop watching any previous stream
         if (ActiveStreamerName is not null && SelectedChannel is not null && !IsStreaming)
+        {
             await hub.StopWatchingAsync(SelectedChannel.Id);
+            audio.StopStreamPlayback();
+        }
         ActiveStreamerName = null;
         ActiveStreamerId = 0;
         StreamFrame = null;
@@ -578,6 +598,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         foreach (var c in Channels) c.IsSelected = false;
         item.IsSelected = true;
         item.UnreadCount = 0;
+        item.MentionCount = 0;
+        _slowmodeCts?.Cancel();
+        SlowmodeCooldown = 0;
+        CloseThread();
         SelectedChannel = item.Channel;
         await hub.JoinChannelAsync(item.Channel.Id);
 
@@ -589,9 +613,12 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                 item.Occupants.Add(u);
         });
 
-        // If there's an active stream in this channel, start receiving frames now
+        // If there's an active stream in this channel, start receiving frames and audio now
         if (!IsStreaming && _streamChannelId == item.Channel.Id)
+        {
             _ = hub.WatchStreamAsync(item.Channel.Id);
+            audio.StartStreamPlayback();
+        }
 
         var msgs = await api.GetMessagesAsync(item.Channel.Id);
         _textMsgs.Clear();
@@ -784,23 +811,15 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private async Task LoadGifsAsync()
     {
-        var apiKey = Preferences.Get("giphy_api_key", "");
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            GifErrorText = "No Giphy API key set. Enter your key in Settings → Giphy API Key.";
-            GifResults.Clear();
-            return;
-        }
-
         IsSearchingGifs = true;
         GifErrorText = "";
         try
         {
             var results = string.IsNullOrWhiteSpace(GifSearchQuery)
-                ? await gif.GetTrendingAsync(apiKey)
-                : await gif.SearchAsync(GifSearchQuery, apiKey);
+                ? await api.GetTrendingGifsAsync()
+                : await api.SearchGifsAsync(GifSearchQuery);
             GifResults.Clear();
-            foreach (var r in results) GifResults.Add(r);
+            foreach (var r in results ?? []) GifResults.Add(r);
             if (GifResults.Count == 0)
                 GifErrorText = "No GIFs found.";
         }
@@ -862,18 +881,196 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             text.Length > 0 ? text : null, url, fname);
     }
 
+    [ObservableProperty] private int _slowmodeCooldown;
+    [ObservableProperty] private bool _isCooldownActive;
+    public string SlowmodeCooldownLabel => SlowmodeCooldown > 0 ? $"⏱ Please wait {SlowmodeCooldown}s" : "";
+
+    partial void OnSlowmodeCooldownChanged(int value)
+    {
+        IsCooldownActive = value > 0;
+        OnPropertyChanged(nameof(SlowmodeCooldownLabel));
+    }
+
+    private CancellationTokenSource? _slowmodeCts;
+
+    private async Task StartSlowmodeCooldownAsync(int seconds)
+    {
+        _slowmodeCts?.Cancel();
+        _slowmodeCts = new CancellationTokenSource();
+        var cts = _slowmodeCts;
+        var remaining = seconds;
+        MainThread.BeginInvokeOnMainThread(() => SlowmodeCooldown = remaining);
+        while (remaining > 0)
+        {
+            try { await Task.Delay(1000, cts.Token); }
+            catch (OperationCanceledException) { break; }
+            if (cts.IsCancellationRequested) break;
+            MainThread.BeginInvokeOnMainThread(() => SlowmodeCooldown = --remaining);
+        }
+    }
+
+    [ObservableProperty] private MessageViewItem? _threadRootItem;
+    [ObservableProperty] private bool _isThreadOpen;
+    [ObservableProperty] private string _threadInput = "";
+    public ObservableCollection<MessageViewItem> ThreadMessages { get; } = [];
+
+    [RelayCommand]
+    private async Task OpenThreadAsync(MessageViewItem item)
+    {
+        ThreadRootItem = item;
+        IsThreadOpen = true;
+        ThreadMessages.Clear();
+        ThreadInput = "";
+        if (SelectedChannel is null) return;
+        var dtos = await api.GetThreadMessagesAsync(SelectedChannel.Id, item.Message.Id);
+        if (dtos is null) return;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            ThreadMessages.Clear();
+            foreach (var dto in dtos)
+            {
+                var m = Wire(new MessageViewItem(dto, api.CurrentUsername, api.CurrentUserId));
+                if (!ThreadMessages.Any(x => x.Message.Id == m.Message.Id))
+                    ThreadMessages.Add(m);
+            }
+        });
+    }
+
+    [RelayCommand]
+    private void CloseThread()
+    {
+        IsThreadOpen = false;
+        ThreadRootItem = null;
+        ThreadMessages.Clear();
+        ThreadInput = "";
+    }
+
+    [RelayCommand]
+    private async Task SendThreadMessageAsync()
+    {
+        if (ThreadRootItem is null || SelectedChannel is null) return;
+        var text = ThreadInput.Trim();
+        if (string.IsNullOrEmpty(text)) return;
+        ThreadInput = "";
+        var (dto, err) = await api.SendMessageAsync(SelectedChannel.Id, text, threadId: ThreadRootItem.Message.Id);
+        if (dto is not null)
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                var item = Wire(new MessageViewItem(dto, api.CurrentUsername, api.CurrentUserId));
+                if (!ThreadMessages.Any(x => x.Message.Id == item.Message.Id))
+                    ThreadMessages.Add(item);
+            });
+        }
+        else if (!string.IsNullOrEmpty(err))
+        {
+            var clean = err.Trim('"');
+            toast.Show("Cannot send message", clean);
+        }
+    }
+
+    private void OnThreadReplyReceived(MessageDto reply, int rootMessageId, int newCount)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var root = _textMsgs.FirstOrDefault(m => m.Message.Id == rootMessageId);
+            if (root is not null) root.ReplyCount = newCount;
+
+            if (IsThreadOpen && ThreadRootItem?.Message.Id == rootMessageId
+                && !ThreadMessages.Any(m => m.Message.Id == reply.Id))
+            {
+                var item = Wire(new MessageViewItem(reply, api.CurrentUsername, api.CurrentUserId));
+                ThreadMessages.Add(item);
+            }
+        });
+    }
+
+    private void OnUserMuted(int userId, DateTime? mutedUntil)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (userId == api.CurrentUserId)
+            {
+                var msg = mutedUntil.HasValue
+                    ? $"You have been muted until {mutedUntil.Value.ToLocalTime():HH:mm}."
+                    : "Your mute has been lifted.";
+                toast.Show("Muted", msg);
+            }
+        });
+    }
+
+    private void OnUserTempBanned(int userId, DateTime expiresAt)
+    {
+        if (userId == api.CurrentUserId)
+            MainThread.BeginInvokeOnMainThread(() =>
+                toast.Show("Banned", $"You have been temporarily banned until {expiresAt.ToLocalTime():HH:mm}."));
+    }
+
+    [RelayCommand]
+    public async Task MuteUserByIdAsync(int userId)
+    {
+        if (SelectedServer is null) return;
+        var result = await Shell.Current.DisplayActionSheet(
+            "Mute duration", "Cancel", null,
+            "5 minutes", "30 minutes", "1 hour", "24 hours");
+        var seconds = result switch
+        {
+            "5 minutes"  => 300,
+            "30 minutes" => 1800,
+            "1 hour"     => 3600,
+            "24 hours"   => 86400,
+            _ => 0
+        };
+        if (seconds == 0) return;
+        await api.MuteUserAsync(SelectedServer.Id, userId, seconds);
+    }
+
+    [RelayCommand]
+    public async Task TempBanUserByIdAsync(int userId)
+    {
+        if (SelectedServer is null) return;
+        var result = await Shell.Current.DisplayActionSheet(
+            "Temp ban duration", "Cancel", null,
+            "1 hour", "24 hours", "7 days", "30 days");
+        var seconds = result switch
+        {
+            "1 hour"  => 3600,
+            "24 hours" => 86400,
+            "7 days"  => 604800,
+            "30 days" => 2592000,
+            _ => 0
+        };
+        if (seconds == 0) return;
+        await api.TempBanUserAsync(SelectedServer.Id, userId, seconds);
+    }
+
     private async Task PostMessageAsync(string text, MessageSource source, string? attachmentUrl = null, string? attachmentFileName = null)
     {
         if (SelectedChannel is null) return;
         if (string.IsNullOrWhiteSpace(text) && attachmentUrl is null) return;
+        if (IsCooldownActive)
+        {
+            toast.Show("Slowmode", SlowmodeCooldownLabel);
+            return;
+        }
         var replyToId = _replyingToItem?.Message.Id;
         CancelReply();
-        var msg = await api.SendMessageAsync(SelectedChannel.Id, text, source, attachmentUrl, replyToId, attachmentFileName);
+        var (msg, err) = await api.SendMessageAsync(SelectedChannel.Id, text, source, attachmentUrl, replyToId, attachmentFileName);
         if (msg is not null)
         {
             var item = Wire(new MessageViewItem(msg, api.CurrentUsername, api.CurrentUserId));
             AddToStore(item);
             _ = LoadPreviewAsync(item);
+
+            var channelItem = Channels.FirstOrDefault(c => c.Channel.Id == SelectedChannel.Id);
+            if (channelItem?.SlowmodeSeconds > 0
+                && _memberRoles.GetValueOrDefault(api.CurrentUserId) < ServerRole.Moderator)
+                _ = StartSlowmodeCooldownAsync(channelItem.SlowmodeSeconds);
+        }
+        else if (!string.IsNullOrEmpty(err))
+        {
+            var clean = err.Trim('"');
+            toast.Show("Cannot send message", clean);
         }
     }
 
@@ -985,29 +1182,34 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             ok = await api.DeleteDmMessageAsync(SelectedDmConversation.ConversationId, item.Message.Id);
         else
             ok = await api.DeleteMessageAsync(item.Message.ChannelId, item.Message.Id);
-        if (ok) item.ApplyDelete();
+        if (ok) RemoveFromStore(item);
     }
 
     [RelayCommand]
     public async Task ToggleBlockUser(MessageViewItem item)
     {
-        int targetId = item.Message.AuthorId;
-        if (targetId == 0 || targetId == api.CurrentUserId) return;
-        if (_blockedUserIds.Contains(targetId))
+        await BlockUserByIdAsync(item.Message.AuthorId);
+    }
+
+    [RelayCommand]
+    public async Task BlockUserByIdAsync(int userId)
+    {
+        if (userId == 0 || userId == api.CurrentUserId) return;
+        if (_blockedUserIds.Contains(userId))
         {
-            await api.UnblockUserAsync(targetId);
-            _blockedUserIds.Remove(targetId);
+            await api.UnblockUserAsync(userId);
+            _blockedUserIds.Remove(userId);
         }
         else
         {
-            var ok = await api.BlockUserAsync(targetId);
+            var ok = await api.BlockUserAsync(userId);
             if (!ok) return;
-            _blockedUserIds.Add(targetId);
+            _blockedUserIds.Add(userId);
             MainThread.BeginInvokeOnMainThread(() =>
             {
-                var purge = _textMsgs.Where(m => m.Message.AuthorId == targetId).ToList();
+                var purge = _textMsgs.Where(m => m.Message.AuthorId == userId).ToList();
                 foreach (var m in purge) _textMsgs.Remove(m);
-                purge = _voiceMsgs.Where(m => m.Message.AuthorId == targetId).ToList();
+                purge = _voiceMsgs.Where(m => m.Message.AuthorId == userId).ToList();
                 foreach (var m in purge) _voiceMsgs.Remove(m);
                 Messages = SelectedTab == "Voice"
                     ? new ObservableCollection<MessageViewItem>(_voiceMsgs)
@@ -1069,26 +1271,78 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     }
 
     [RelayCommand]
-    public async Task CreateServerAsync(string name)
-    {
-        var server = await api.CreateServerAsync(new CreateServerRequest(name, null));
-        if (server is not null)
-        {
-            var item = ServerViewItem.FromDto(server);
-            Servers.Add(item);
-            await SelectServerAsync(item);
-        }
-    }
-
-    [RelayCommand]
     public async Task JoinServerAsync(int serverId)
     {
         var ok = await api.JoinServerAsync(serverId);
         if (ok)
         {
             var list = await api.GetServersAsync();
-            Servers = new ObservableCollection<ServerViewItem>((list ?? []).Select(ServerViewItem.FromDto));
+            Servers = new ObservableCollection<ServerViewItem>(
+                (list ?? []).Select(s => ServerViewItem.FromDto(s, s.HasIcon ? api.GetServerIconUrl(s.Id) : null)));
         }
+    }
+
+    [RelayCommand]
+    public async Task ChangeServerIconAsync()
+    {
+        if (SelectedServer is null || !IsServerAdmin) return;
+
+        var result = await FilePicker.PickAsync(new PickOptions
+        {
+            PickerTitle = "Pick a server icon",
+            FileTypes = FilePickerFileType.Images,
+        });
+        if (result is null) return;
+
+        using var stream = await result.OpenReadAsync();
+        var contentType = result.ContentType ?? "image/png";
+        bool ok = await api.UploadServerIconAsync(SelectedServer.Id, stream, result.FileName, contentType);
+        if (ok)
+            await RefreshServerListAsync();
+        else
+            await Shell.Current.DisplayAlert("Error", "Failed to upload icon.", "OK");
+    }
+
+    [RelayCommand]
+    public async Task RemoveServerIconAsync()
+    {
+        if (SelectedServer is null || !IsServerAdmin) return;
+        bool ok = await api.DeleteServerIconAsync(SelectedServer.Id);
+        if (ok)
+            await RefreshServerListAsync();
+    }
+
+    private async Task RefreshServerListAsync()
+    {
+        var list = await api.GetServersAsync();
+        var currentId = SelectedServer?.Id;
+        Servers = new ObservableCollection<ServerViewItem>(
+            (list ?? []).Select(s => ServerViewItem.FromDto(s, s.HasIcon ? api.GetServerIconUrl(s.Id) : null)));
+        if (currentId.HasValue)
+        {
+            var selected = Servers.FirstOrDefault(s => s.Server.Id == currentId.Value);
+            if (selected is not null) selected.IsSelected = true;
+        }
+    }
+
+    [RelayCommand]
+    public async Task SetServerNotifLevelAsync(string levelStr)
+    {
+        if (SelectedServer is null) return;
+        var level = Enum.Parse<NotifLevel>(levelStr);
+        await api.SetServerNotifLevelAsync(SelectedServer.Id, level);
+        var serverItem = Servers.FirstOrDefault(s => s.IsSelected);
+        if (serverItem is not null) serverItem.ServerNotifLevel = level;
+    }
+
+    [RelayCommand]
+    public async Task SetChannelNotifLevelAsync(string levelStr)
+    {
+        if (SelectedChannel is null) return;
+        var level = Enum.Parse<NotifLevel>(levelStr);
+        await api.SetChannelNotifLevelAsync(SelectedChannel.Id, level);
+        var channelItem = Channels.FirstOrDefault(c => c.Channel.Id == SelectedChannel.Id);
+        if (channelItem is not null) channelItem.NotifLevelOverride = level;
     }
 
     [RelayCommand]
@@ -1162,17 +1416,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         {
             await Shell.Current.DisplayAlert("Error", ex.Message, "OK");
         }
-    }
-
-    [RelayCommand]
-    public async Task CreateServerPromptAsync()
-    {
-        var name = await Shell.Current.DisplayPromptAsync(
-            "Create Server",
-            "Enter a name for your new server:",
-            placeholder: "My Awesome Server");
-        if (!string.IsNullOrWhiteSpace(name))
-            await CreateServerAsync(name.Trim());
     }
 
     [RelayCommand]
@@ -1375,20 +1618,25 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private void OnMessageReceived(MessageDto msg)
     {
-        // Only fires for the channel the user is currently in (server sends to channel-{id} group).
-        // Unread tracking for background channels is handled by OnNewMessageNotification.
-        if (SelectedChannel?.Id != msg.ChannelId) return;
-        if (_blockedUserIds.Contains(msg.AuthorId)) return;
-
-        var item = Wire(new MessageViewItem(msg, api.CurrentUsername, api.CurrentUserId));
-        AddToStore(item);
-        _ = LoadPreviewAsync(item);
-
-        if (item.IsMention)
+        // Dispatch to main thread to serialize with PostMessageAsync's AddToStore call.
+        // The server echoes ReceiveMessage back to the sender; PostMessageAsync also adds the
+        // message after the REST response. Both paths call AddToStore whose List<>.Any()+Add()
+        // is not atomic, so without this dispatch the same message can appear twice in the store.
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            var preview = msg.Content.Length > 80 ? msg.Content[..80] + "…" : msg.Content;
-            toast.Show($"@Mention from {msg.AuthorUsername}", preview);
-        }
+            if (SelectedChannel?.Id != msg.ChannelId) return;
+            if (_blockedUserIds.Contains(msg.AuthorId)) return;
+
+            var item = Wire(new MessageViewItem(msg, api.CurrentUsername, api.CurrentUserId));
+            AddToStore(item);
+            _ = LoadPreviewAsync(item);
+
+            if (item.IsMention)
+            {
+                var preview = msg.Content.Length > 80 ? msg.Content[..80] + "…" : msg.Content;
+                toast.Show($"@Mention from {msg.AuthorUsername}", preview);
+            }
+        });
     }
 
     private void OnNewMessageNotification(MessageDto msg)
@@ -1399,13 +1647,36 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (SelectedChannel?.Id == msg.ChannelId) return; // already shown via ReceiveMessage
 
         var channelItem = Channels.FirstOrDefault(c => c.Channel.Id == msg.ChannelId);
-        if (channelItem is not null)
-            MainThread.BeginInvokeOnMainThread(() => channelItem.UnreadCount++);
+        bool isMention = NotificationRules.IsMentionOf(msg.Content, api.CurrentUsername);
 
-        if (msg.AuthorId != api.CurrentUserId)
+        var serverItem = Servers.FirstOrDefault(s => s.IsSelected);
+        var effectiveLevel = channelItem?.NotifLevelOverride
+            ?? serverItem?.ServerNotifLevel
+            ?? NotifLevel.All;
+
+        if (effectiveLevel == NotifLevel.Muted) return;
+
+        if (channelItem is not null)
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                if (effectiveLevel == NotifLevel.OnlyMentions)
+                {
+                    if (isMention) channelItem.MentionCount++;
+                }
+                else
+                {
+                    channelItem.UnreadCount++;
+                    if (isMention) channelItem.MentionCount++;
+                }
+            });
+
+        if (msg.AuthorId != api.CurrentUserId && (effectiveLevel == NotifLevel.All || isMention))
         {
             var preview = msg.Content.Length > 80 ? msg.Content[..80] + "…" : msg.Content;
-            toast.Show(msg.AuthorUsername, preview);
+            if (isMention)
+                toast.Show($"@Mention from {msg.AuthorUsername}", preview);
+            else
+                toast.Show(msg.AuthorUsername, preview);
         }
     }
 
@@ -1423,7 +1694,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         MainThread.BeginInvokeOnMainThread(() =>
         {
             var item = _textMsgs.Concat(_voiceMsgs).FirstOrDefault(m => m.Message.Id == messageId);
-            item?.ApplyDelete();
+            if (item is not null) RemoveFromStore(item);
         });
     }
 
@@ -1433,7 +1704,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         {
             var existing = Members.FirstOrDefault(m => m.Id == userId);
             if (existing is null) return;
-            Members[Members.IndexOf(existing)] = existing with { Status = status };
+            existing.Status = status;
         });
     }
 
@@ -1449,8 +1720,17 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private MessageViewItem Wire(MessageViewItem item)
     {
         item.ReactionRequested = (msg, emoji) => _ = ToggleReactionAsync(msg, emoji);
-        item.CanModerate = IsAdminOrModerator;
+        item.CanModerate = IsServerAdmin;
+        item.AuthorRole = _memberRoles.GetValueOrDefault(item.Message.AuthorId, ServerRole.Member);
         return item;
+    }
+
+    private void RemoveFromStore(MessageViewItem item)
+    {
+        _textMsgs.Remove(item);
+        _voiceMsgs.Remove(item);
+        _streamMsgs.Remove(item);
+        Messages.Remove(item);
     }
 
     private async Task ToggleReactionAsync(MessageViewItem item, string emoji)
@@ -1815,7 +2095,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         MainThread.BeginInvokeOnMainThread(() =>
         {
             if (!Members.Any(m => m.Id == user.Id))
-                Members.Add(user);
+                Members.Add(new MemberViewItem(user, _memberRoles.GetValueOrDefault(user.Id)));
         });
     }
 
@@ -1833,7 +2113,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         MainThread.BeginInvokeOnMainThread(() =>
         {
             if (!Members.Any(m => m.Id == user.Id))
-                Members.Add(user);
+                Members.Add(new MemberViewItem(user, _memberRoles.GetValueOrDefault(user.Id)));
             if (!_memberRoles.ContainsKey(user.Id))
                 _memberRoles[user.Id] = ServerRole.Member;
         });
@@ -1848,6 +2128,46 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                     Channels.Add(new ChannelViewItem(channel));
                 RebuildCategorizedChannels();
             });
+    }
+
+    private void OnForceJoinChannel(int channelId)
+    {
+        var item = Channels.FirstOrDefault(c => c.Channel.Id == channelId);
+        if (item is null) return;
+        _ = SelectChannelAsync(item);
+    }
+
+    private void OnChannelUpdated(ChannelDto dto)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var idx = -1;
+            for (var i = 0; i < Channels.Count; i++)
+            {
+                if (Channels[i].Channel.Id == dto.Id) { idx = i; break; }
+            }
+            if (idx < 0) return;
+            Channels[idx] = new ChannelViewItem(dto);
+            if (SelectedChannel?.Id == dto.Id)
+                SelectedChannel = dto;
+            RebuildCategorizedChannels();
+        });
+    }
+
+    private void OnChannelDeleted(int channelId)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var item = Channels.FirstOrDefault(c => c.Channel.Id == channelId);
+            if (item is null) return;
+            Channels.Remove(item);
+            if (SelectedChannel?.Id == channelId)
+            {
+                SelectedChannel = null;
+                Messages.Clear();
+            }
+            RebuildCategorizedChannels();
+        });
     }
 
     private void RebuildCategorizedChannels()
@@ -1923,14 +2243,60 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         MainThread.BeginInvokeOnMainThread(() =>
         {
             _memberRoles[userId] = role;
+            // Update sidebar icon for this member
+            var member = Members.FirstOrDefault(m => m.Id == userId);
+            if (member is not null) member.Role = role;
+            // Update author role icon on any visible messages from this user
+            foreach (var m in _textMsgs.Concat(_voiceMsgs).Concat(_streamMsgs).Where(m => m.Message.AuthorId == userId))
+                m.AuthorRole = role;
             if (userId == api.CurrentUserId && SelectedServer is not null)
             {
                 SelectedServer = SelectedServer with { MyRole = role };
                 OnPropertyChanged(nameof(CurrentServerRole));
                 OnPropertyChanged(nameof(IsServerAdmin));
                 OnPropertyChanged(nameof(IsAdminOrModerator));
+                var isAdmin = role >= ServerRole.Admin;
+                foreach (var m in _textMsgs.Concat(_voiceMsgs).Concat(_streamMsgs))
+                    m.CanModerate = isAdmin;
             }
         });
+    }
+
+    private void OnChannelSlowmodeUpdated(int channelId, int seconds)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var channelItem = Channels.FirstOrDefault(c => c.Channel.Id == channelId);
+            if (channelItem is null) return;
+            channelItem.SlowmodeSeconds = seconds;
+            if (SelectedChannel?.Id == channelId)
+            {
+                OnPropertyChanged(nameof(CurrentChannelSlowmodeLabel));
+                OnPropertyChanged(nameof(CurrentChannelHasSlowmode));
+                if (seconds == 0) { _slowmodeCts?.Cancel(); SlowmodeCooldown = 0; }
+            }
+        });
+    }
+
+    [RelayCommand]
+    public async Task SetSlowmodeAsync(ChannelViewItem channelItem)
+    {
+        if (!IsServerAdmin || SelectedServer is null) return;
+        var options = new[] { "Off", "5 seconds", "10 seconds", "30 seconds", "1 minute", "5 minutes", "10 minutes" };
+        var pick = await Shell.Current.DisplayActionSheet($"Set Slowmode for #{channelItem.Channel.Name}", "Cancel", null, options);
+        var seconds = pick switch
+        {
+            "Off"        => 0,
+            "5 seconds"  => 5,
+            "10 seconds" => 10,
+            "30 seconds" => 30,
+            "1 minute"   => 60,
+            "5 minutes"  => 300,
+            "10 minutes" => 600,
+            _            => -1
+        };
+        if (seconds < 0) return;
+        await api.SetSlowmodeAsync(SelectedServer.Id, channelItem.Channel.Id, seconds);
     }
 
     [RelayCommand]
@@ -1939,6 +2305,16 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (!IsServerAdmin || SelectedServer is null) return;
         if (_memberRoles.GetValueOrDefault(userId) == ServerRole.Admin) return;
         var ok = await api.SetMemberRoleAsync(SelectedServer.Id, userId, ServerRole.Admin);
+        if (!ok)
+            toast.Show("FatGuysSpeak", "Failed to update role.");
+    }
+
+    [RelayCommand]
+    public async Task PromoteToModeratorAsync(int userId)
+    {
+        if (!IsServerAdmin || SelectedServer is null) return;
+        if (_memberRoles.GetValueOrDefault(userId) >= ServerRole.Moderator) return;
+        var ok = await api.SetMemberRoleAsync(SelectedServer.Id, userId, ServerRole.Moderator);
         if (!ok)
             toast.Show("FatGuysSpeak", "Failed to update role.");
     }
@@ -1955,6 +2331,53 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (result is null)
             toast.Show("FatGuysSpeak", "Failed to create channel.");
         // ChannelCreated SignalR event already appends the channel to the list for all clients
+    }
+
+    [RelayCommand]
+    public async Task ManageWordFilterAsync()
+    {
+        if (!IsServerAdmin || SelectedServer is null) return;
+        var action = await Shell.Current.DisplayActionSheet(
+            "Word Filter", "Cancel", null,
+            "Add pattern", "Remove pattern", "View all patterns");
+        if (action is null or "Cancel") return;
+
+        if (action == "Add pattern")
+        {
+            var pattern = await Shell.Current.DisplayPromptAsync(
+                "Add Word Filter", "Enter a word or phrase to filter:", "Add", "Cancel",
+                placeholder: "e.g. badword");
+            if (string.IsNullOrWhiteSpace(pattern)) return;
+            var result = await api.AddWordFilterAsync(SelectedServer.Id, pattern.Trim());
+            toast.Show("Word Filter", result is not null ? $"Added \"{pattern.Trim()}\"." : "Failed to add pattern.");
+        }
+        else if (action == "Remove pattern")
+        {
+            var filters = await api.GetWordFiltersAsync(SelectedServer.Id);
+            if (filters is null || filters.Count == 0)
+            {
+                toast.Show("Word Filter", "No patterns configured.");
+                return;
+            }
+            var pick = await Shell.Current.DisplayActionSheet(
+                "Remove Pattern", "Cancel", null,
+                filters.Select(f => f.Pattern).ToArray());
+            if (pick is null or "Cancel") return;
+            var target = filters.First(f => f.Pattern == pick);
+            var ok = await api.RemoveWordFilterAsync(SelectedServer.Id, target.Id);
+            toast.Show("Word Filter", ok ? $"Removed \"{pick}\"." : "Failed to remove pattern.");
+        }
+        else if (action == "View all patterns")
+        {
+            var filters = await api.GetWordFiltersAsync(SelectedServer.Id);
+            if (filters is null || filters.Count == 0)
+            {
+                await Shell.Current.DisplayAlert("Word Filter", "No patterns configured.", "OK");
+                return;
+            }
+            var list = string.Join("\n", filters.Select(f => $"• {f.Pattern}"));
+            await Shell.Current.DisplayAlert($"Word Filter ({filters.Count})", list, "OK");
+        }
     }
 
     [RelayCommand]
@@ -2137,7 +2560,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             ActiveStreamerName = username;
             _streamChannelId = channelId;
             if (!IsStreaming)
+            {
                 _ = hub.WatchStreamAsync(channelId);
+                audio.StartStreamPlayback();
+            }
         });
     }
 
@@ -2193,7 +2619,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             if (ActiveStreamerId != userId) return;
             if (IsFullScreen) CloseStreamWindow();
             if (!IsStreaming)
+            {
                 _ = hub.StopWatchingAsync(channelId);
+                audio.StopStreamPlayback();
+            }
             ActiveStreamerName = null;
             ActiveStreamerId = 0;
             _streamChannelId = 0;
@@ -2218,6 +2647,15 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (Interlocked.CompareExchange(ref _streamSending, 1, 0) != 0) return;
         _ = hub.SendStreamFrameAsync(data)
               .ContinueWith(_ => Interlocked.Exchange(ref _streamSending, 0));
+    }
+
+    private void OnStreamAudioCaptured(byte[] data) =>
+        _ = hub.SendStreamAudioAsync(data);
+
+    private void OnStreamAudioReceived(int streamerId, byte[] data)
+    {
+        if (ActiveStreamerId == streamerId)
+            audio.PlayStreamAudio(data);
     }
 
     private void OnUserJoinedChannel(int channelId, UserDto user)

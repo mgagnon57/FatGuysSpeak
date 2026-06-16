@@ -28,8 +28,9 @@ public class ChatHub(AppDbContext db) : Hub
     internal static int OnlineUserCount       => OnlineUsers.Count;
     internal static int VoiceParticipantCount => VoiceChannelMap.Count;
     internal static int ActiveStreamCount     => ActiveStreamers.Count;
-    internal static IReadOnlyDictionary<int, string> OnlineUserSnapshot => OnlineUsers;
-    internal static IReadOnlyDictionary<int, int>    VoiceChannelSnapshot => VoiceChannelMap;
+    internal static IReadOnlyDictionary<int, string> OnlineUserSnapshot    => OnlineUsers;
+    internal static IReadOnlyDictionary<int, int>    VoiceChannelSnapshot  => VoiceChannelMap;
+    internal static IReadOnlyDictionary<int, int>    TextChannelSnapshot   => UserTextChannelMap;
 
     private int UserId => int.Parse(Context.User!.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string Username => Context.User!.FindFirstValue(ClaimTypes.Name)!;
@@ -86,11 +87,16 @@ public class ChatHub(AppDbContext db) : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"channel-{channelId}");
     }
 
-    public Task<List<UserDto>> GetChannelOccupants(int channelId)
+    public async Task<List<UserDto>> GetChannelOccupants(int channelId)
     {
+        var channel = await db.Channels
+            .Include(c => c.Server).ThenInclude(s => s.Members)
+            .FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId))
+            return [];
         if (!ChannelOccupants.TryGetValue(channelId, out var occupants))
-            return Task.FromResult(new List<UserDto>());
-        return Task.FromResult(occupants.Select(kv => new UserDto(kv.Key, kv.Value, UserStatus.Online)).ToList());
+            return [];
+        return occupants.Select(kv => new UserDto(kv.Key, kv.Value, UserStatus.Online)).ToList();
     }
 
     public async Task JoinVoiceChannel(int channelId)
@@ -161,6 +167,7 @@ public class ChatHub(AppDbContext db) : Hub
 
     public async Task StopCamera(int channelId)
     {
+        if (!VoiceChannelMap.TryGetValue(UserId, out var voiceCh) || voiceCh != channelId) return;
         ActiveCameras.TryRemove(UserId, out _);
         await Clients.OthersInGroup($"voice-{channelId}")
             .SendAsync("CameraStopped", UserId, channelId);
@@ -256,6 +263,14 @@ public class ChatHub(AppDbContext db) : Hub
             await Clients.Group($"channel-{textChannelId}").SendAsync("UserLeftChannel", textChannelId, new UserDto(UserId, Username, UserStatus.Offline));
         }
 
+        var user = await db.Users.FindAsync(UserId);
+        if (user is not null)
+        {
+            user.Status = UserStatus.Offline;
+            user.LastSeenAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
         var serverIds = await db.ServerMembers
             .Where(sm => sm.UserId == UserId)
             .Select(sm => sm.ServerId)
@@ -307,6 +322,13 @@ public class ChatHub(AppDbContext db) : Hub
         await Clients.OthersInGroup($"stream-{info.ChannelId}").SendAsync("ReceiveStreamFrame", data);
     }
 
+    public async Task SendStreamAudio(byte[] data)
+    {
+        if (data.Length > 1275) return; // max Opus packet
+        if (!ActiveStreamers.TryGetValue(UserId, out var info)) return;
+        await Clients.OthersInGroup($"stream-{info.ChannelId}").SendAsync("ReceiveStreamAudio", UserId, data);
+    }
+
     public async Task StopStream()
     {
         if (!ActiveStreamers.TryRemove(UserId, out var info)) return;
@@ -317,8 +339,14 @@ public class ChatHub(AppDbContext db) : Hub
             $"⏹ {Username} ended screen share" + (channelName.Length > 0 ? $" in #{channelName}" : ""));
     }
 
-    public Task WatchStream(int channelId) =>
-        Groups.AddToGroupAsync(Context.ConnectionId, $"stream-{channelId}");
+    public async Task WatchStream(int channelId)
+    {
+        var channel = await db.Channels
+            .Include(c => c.Server).ThenInclude(s => s.Members)
+            .FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId)) return;
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"stream-{channelId}");
+    }
 
     public Task StopWatching(int channelId) =>
         Groups.RemoveFromGroupAsync(Context.ConnectionId, $"stream-{channelId}");
@@ -334,6 +362,7 @@ public class ChatHub(AppDbContext db) : Hub
 
     public async Task StopTyping(int channelId)
     {
+        if (!UserTextChannelMap.TryGetValue(UserId, out var current) || current != channelId) return;
         await Clients.OthersInGroup($"channel-{channelId}")
             .SendAsync("UserStoppedTyping", UserId, channelId);
     }

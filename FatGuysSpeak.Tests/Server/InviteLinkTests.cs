@@ -14,7 +14,7 @@ public class InviteLinkTests : IDisposable
     public InviteLinkTests()
     {
         _testDb = new TestDb();
-        _controller = new ServersController(_testDb.Db, TestHelpers.MockHub());
+        _controller = new ServersController(_testDb.Db, TestHelpers.MockHub(), TestHelpers.NullWebhooks());
     }
 
     public void Dispose() => _testDb.Dispose();

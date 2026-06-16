@@ -2,21 +2,21 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FatGuysSpeak.Client.Pages.SettingsPage"
-             BackgroundColor="#1a1a1a"
+             BackgroundColor="{DynamicResource ThemeBgPrimary}"
              Title="Settings">
     <Grid RowDefinitions="Auto,*">
 
         <!-- Header -->
-        <Grid Grid.Row="0" BackgroundColor="#252525" Padding="16,10"
+        <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="16,10"
               ColumnDefinitions="*,Auto">
             <HorizontalStackLayout Grid.Column="0" Spacing="10" VerticalOptions="Center">
-                <Label Text="⚙" FontSize="16" TextColor="#8ab4d4" VerticalOptions="Center" />
+                <Label Text="⚙" FontSize="16" TextColor="{DynamicResource ThemeAccentLight}" VerticalOptions="Center" />
                 <Label Text="Settings" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="14"
                        VerticalOptions="Center" />
             </HorizontalStackLayout>
             <Button Grid.Column="1" Text="✕ Close"
                     Clicked="OnCloseClicked"
-                    BackgroundColor="#3a3a3a" TextColor="#aaaaaa"
+                    BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#aaaaaa"
                     FontSize="11" HeightRequest="30" CornerRadius="3" Padding="12,0" />
         </Grid>
 
@@ -24,11 +24,41 @@
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Padding="24,20" Spacing="28">
 
+                <!-- ── APPEARANCE ────────────────────────────────── -->
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="APPEARANCE" TextColor="#666666" FontSize="10"
+                           FontAttributes="Bold" />
+                    <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" />
+
+                    <Grid ColumnDefinitions="140,*" Padding="0,4,0,0">
+                        <Label Grid.Column="0" Text="Theme"
+                               TextColor="#888888" FontSize="12" VerticalOptions="Center" />
+                        <Label Grid.Column="1" Text="{Binding SelectedTheme}"
+                               TextColor="#d0d0d0" FontSize="12" FontAttributes="Bold"
+                               VerticalOptions="Center" />
+                    </Grid>
+
+                    <HorizontalStackLayout Spacing="8" Padding="140,0,0,0">
+                        <Button Text="Dark"
+                                Command="{Binding SetThemeCommand}" CommandParameter="Dark"
+                                BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#d0d0d0"
+                                FontSize="12" CornerRadius="4" HeightRequest="32" Padding="16,0" />
+                        <Button Text="Midnight"
+                                Command="{Binding SetThemeCommand}" CommandParameter="Midnight"
+                                BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#d0d0d0"
+                                FontSize="12" CornerRadius="4" HeightRequest="32" Padding="16,0" />
+                        <Button Text="OLED"
+                                Command="{Binding SetThemeCommand}" CommandParameter="OLED"
+                                BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#d0d0d0"
+                                FontSize="12" CornerRadius="4" HeightRequest="32" Padding="16,0" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+
                 <!-- ── ACCOUNT ─────────────────────────────────────── -->
                 <VerticalStackLayout Spacing="10">
                     <Label Text="ACCOUNT" TextColor="#666666" FontSize="10"
                            FontAttributes="Bold"/>
-                    <BoxView HeightRequest="1" BackgroundColor="#2e2e2e" />
+                    <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" />
 
                     <Grid ColumnDefinitions="140,*" RowDefinitions="Auto" Padding="0,4,0,0">
                         <Label Grid.Column="0" Text="Username"
@@ -43,7 +73,7 @@
                 <VerticalStackLayout Spacing="12">
                     <Label Text="AUDIO" TextColor="#666666" FontSize="10"
                            FontAttributes="Bold"/>
-                    <BoxView HeightRequest="1" BackgroundColor="#2e2e2e" />
+                    <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" />
 
                     <!-- Input device -->
                     <Grid ColumnDefinitions="140,*" Padding="0,2,0,0">
@@ -52,7 +82,7 @@
                         <Picker Grid.Column="1"
                                 ItemsSource="{Binding InputDevices}"
                                 SelectedItem="{Binding SelectedInputDevice}"
-                                TextColor="#d0d0d0" BackgroundColor="#2a2a2a"
+                                TextColor="#d0d0d0" BackgroundColor="{DynamicResource ThemeBgPanel}"
                                 FontSize="12" HeightRequest="36" />
                     </Grid>
 
@@ -63,7 +93,7 @@
                         <Picker Grid.Column="1"
                                 ItemsSource="{Binding OutputDevices}"
                                 SelectedItem="{Binding SelectedOutputDevice}"
-                                TextColor="#d0d0d0" BackgroundColor="#2a2a2a"
+                                TextColor="#d0d0d0" BackgroundColor="{DynamicResource ThemeBgPanel}"
                                 FontSize="12" HeightRequest="36" />
                     </Grid>
 
@@ -73,7 +103,7 @@
                                TextColor="#888888" FontSize="12" VerticalOptions="Center" />
                         <Slider Grid.Column="1"
                                 Minimum="0" Maximum="2" Value="{Binding InputGain}"
-                                ThumbColor="#8ab4d4" MinimumTrackColor="#8ab4d4"
+                                ThumbColor="{DynamicResource ThemeAccentLight}" MinimumTrackColor="{DynamicResource ThemeAccentLight}"
                                 MaximumTrackColor="#444444" VerticalOptions="Center" />
                         <Label Grid.Column="2" Text="{Binding InputGainPercent}"
                                TextColor="#aaaaaa" FontSize="11"
@@ -86,7 +116,7 @@
                                TextColor="#888888" FontSize="12" VerticalOptions="Center" />
                         <Slider Grid.Column="1"
                                 Minimum="0" Maximum="1" Value="{Binding OutputVolume}"
-                                ThumbColor="#8ab4d4" MinimumTrackColor="#8ab4d4"
+                                ThumbColor="{DynamicResource ThemeAccentLight}" MinimumTrackColor="{DynamicResource ThemeAccentLight}"
                                 MaximumTrackColor="#444444" VerticalOptions="Center" />
                         <Label Grid.Column="2" Text="{Binding OutputVolumePercent}"
                                TextColor="#aaaaaa" FontSize="11"
@@ -102,14 +132,14 @@
                 <VerticalStackLayout Spacing="12">
                     <Label Text="NOISE SUPPRESSION" TextColor="#666666" FontSize="10"
                            FontAttributes="Bold"/>
-                    <BoxView HeightRequest="1" BackgroundColor="#2e2e2e" />
+                    <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" />
 
                     <Grid ColumnDefinitions="140,Auto,*" Padding="0,4,0,0">
                         <Label Grid.Column="0" Text="Enable"
                                TextColor="#888888" FontSize="12" VerticalOptions="Center" />
                         <Switch Grid.Column="1"
                                 IsToggled="{Binding IsNoiseSuppressionEnabled}"
-                                OnColor="#8ab4d4" ThumbColor="White"
+                                OnColor="{DynamicResource ThemeAccentLight}" ThumbColor="White"
                                 VerticalOptions="Center" />
                         <Label Grid.Column="2"
                                Text="Silence audio below the noise floor threshold"
@@ -123,7 +153,7 @@
                                TextColor="#888888" FontSize="12" VerticalOptions="Center" />
                         <Switch Grid.Column="1"
                                 IsToggled="{Binding IsAdaptiveThresholdEnabled}"
-                                OnColor="#8ab4d4" ThumbColor="White"
+                                OnColor="{DynamicResource ThemeAccentLight}" ThumbColor="White"
                                 VerticalOptions="Center" />
                         <Label Grid.Column="2"
                                Text="Auto-tune threshold to ambient noise floor"
@@ -139,7 +169,7 @@
                                 Minimum="0.01" Maximum="0.50"
                                 Value="{Binding NoiseGateThreshold}"
                                 IsEnabled="{Binding IsThresholdSliderEnabled}"
-                                ThumbColor="#8ab4d4" MinimumTrackColor="#8ab4d4"
+                                ThumbColor="{DynamicResource ThemeAccentLight}" MinimumTrackColor="{DynamicResource ThemeAccentLight}"
                                 MaximumTrackColor="#444444" VerticalOptions="Center" />
                         <Label Grid.Column="2" Text="{Binding NoiseGateThresholdPercent}"
                                TextColor="#aaaaaa" FontSize="11"
@@ -156,7 +186,7 @@
                 <VerticalStackLayout Spacing="12">
                     <Label Text="PUSH TO TALK" TextColor="#666666" FontSize="10"
                            FontAttributes="Bold"/>
-                    <BoxView HeightRequest="1" BackgroundColor="#2e2e2e" />
+                    <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" />
 
                     <!-- Warning when PTT is not configured -->
                     <Grid BackgroundColor="#3d1a0a" Padding="12,10" ColumnDefinitions="Auto,*"
@@ -190,14 +220,14 @@
                 <VerticalStackLayout Spacing="12">
                     <Label Text="STREAM" TextColor="#666666" FontSize="10"
                            FontAttributes="Bold"/>
-                    <BoxView HeightRequest="1" BackgroundColor="#2e2e2e" />
+                    <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" />
 
                     <Grid ColumnDefinitions="140,Auto,*" Padding="0,4,0,0">
                         <Label Grid.Column="0" Text="Adaptive Quality"
                                TextColor="#888888" FontSize="12" VerticalOptions="Center" />
                         <Switch Grid.Column="1"
                                 IsToggled="{Binding AdaptiveStreamQuality}"
-                                OnColor="#8ab4d4" ThumbColor="White"
+                                OnColor="{DynamicResource ThemeAccentLight}" ThumbColor="White"
                                 VerticalOptions="Center" />
                         <Label Grid.Column="2"
                                Text="Auto-adjust FPS and quality based on latency"
@@ -210,33 +240,20 @@
                 <VerticalStackLayout Spacing="12">
                     <Label Text="CONNECTION" TextColor="#666666" FontSize="10"
                            FontAttributes="Bold"/>
-                    <BoxView HeightRequest="1" BackgroundColor="#2e2e2e" />
+                    <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" />
 
                     <Grid ColumnDefinitions="140,*" Padding="0,4,0,0">
                         <Label Grid.Column="0" Text="Server Address"
                                TextColor="#888888" FontSize="12" VerticalOptions="Center" />
                         <Entry Grid.Column="1"
                                Text="{Binding ServerUrl}"
-                               TextColor="#d0d0d0" BackgroundColor="#2a2a2a"
+                               TextColor="#d0d0d0" BackgroundColor="{DynamicResource ThemeBgPanel}"
                                FontSize="12" />
                     </Grid>
                     <Label Text="Takes effect on next login."
                            TextColor="#555555" FontSize="10" FontAttributes="Italic"
                            Margin="140,0,0,0" />
 
-                    <Grid ColumnDefinitions="140,*" Padding="0,4,0,0">
-                        <Label Grid.Column="0" Text="Giphy API Key"
-                               TextColor="#888888" FontSize="12" VerticalOptions="Center" />
-                        <Entry Grid.Column="1"
-                               Text="{Binding GiphyApiKey}"
-                               Placeholder="Paste your Giphy API key…"
-                               PlaceholderColor="#555555"
-                               TextColor="#d0d0d0" BackgroundColor="#2a2a2a"
-                               FontSize="12" />
-                    </Grid>
-                    <Label Text="Free key at developers.giphy.com — required for the GIF picker."
-                           TextColor="#555555" FontSize="10" FontAttributes="Italic"
-                           Margin="140,0,0,0" />
                 </VerticalStackLayout>
 
             </VerticalStackLayout>

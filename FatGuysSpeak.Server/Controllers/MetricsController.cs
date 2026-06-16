@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace FatGuysSpeak.Server.Controllers;
 
 [ApiController]
-[AllowAnonymous]
+[Authorize(Policy = "DashboardAdmin")]
 public class MetricsController(ServerMetricsService metrics) : ControllerBase
 {
     [HttpGet("/api/metrics")]
@@ -167,60 +167,61 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
 
         <header>
           <h1>🖥&nbsp; FatGuysSpeak &mdash; Server Dashboard</h1>
-          <div class="live-badge">
+          <div class="live-badge" title="Overview cards refresh every 2 s; tabs refresh every 5 s">
             <div class="live-dot" id="liveDot"></div>
             <span class="live-text" id="lastUpdated">connecting…</span>
           </div>
         </header>
 
         <div class="tabs">
-          <button class="tab-btn active" onclick="showTab('overview')">Overview</button>
-          <button class="tab-btn" onclick="showTab('users')">Users</button>
-          <button class="tab-btn" onclick="showTab('messages')">Message Log</button>
-          <button class="tab-btn" onclick="showTab('channels')">Channels</button>
-          <button class="tab-btn" onclick="showTab('audit')">Audit Log</button>
+          <button class="tab-btn active" onclick="showTab('overview')" title="Server health metrics, message throughput, and rate-limit overview">Overview</button>
+          <button class="tab-btn" onclick="showTab('users')" title="View all users — change roles, mute, kick, or temporarily ban">Users</button>
+          <button class="tab-btn" onclick="showTab('messages')" title="Search and moderate all server messages">Message Log</button>
+          <button class="tab-btn" onclick="showTab('channels')" title="Configure the minimum role required to read or write in each channel">Channels</button>
+          <button class="tab-btn" onclick="showTab('wordfilter')" title="Manage blocked words and phrases — Members who trigger the filter have their message blocked or the word replaced">Word Filter</button>
+          <button class="tab-btn" onclick="showTab('audit')" title="Track every moderation action taken by admins and moderators">Audit Log</button>
         </div>
 
         <!-- ── Overview ─────────────────────────────────── -->
         <div id="tab-overview" class="tab-panel active">
 
           <div class="cards">
-            <div class="card" id="c-online">
+            <div class="card" id="c-online" title="Users currently connected via SignalR (includes idle/away/DnD)">
               <span class="icon">👥</span>
               <div class="value" id="onlineUsers">—</div>
               <div class="label">Online Users</div>
             </div>
-            <div class="card" id="c-voice">
+            <div class="card" id="c-voice" title="Users actively inside a voice channel right now">
               <span class="icon">🎙</span>
               <div class="value" id="voiceParticipants">—</div>
               <div class="label">Voice Sessions</div>
             </div>
-            <div class="card" id="c-streams">
+            <div class="card" id="c-streams" title="Users broadcasting their screen or webcam via MJPEG stream">
               <span class="icon">📺</span>
               <div class="value" id="activeStreams">—</div>
               <div class="label">Active Streams</div>
             </div>
-            <div class="card" id="c-msgsmin">
+            <div class="card" id="c-msgsmin" title="Text messages received in the last 60 seconds">
               <span class="icon">💬</span>
               <div class="value" id="msgsPerMin">—</div>
               <div class="label">Msgs / Min</div>
             </div>
-            <div class="card" id="c-total">
+            <div class="card" id="c-total" title="Total messages ever stored in the database">
               <span class="icon">📨</span>
               <div class="value" id="totalMsgs">—</div>
               <div class="label">Total Messages</div>
             </div>
-            <div class="card" id="c-mem">
+            <div class="card" id="c-mem" title="Server process working-set memory in megabytes">
               <span class="icon">🧠</span>
               <div class="value" id="memoryMb">—</div>
               <div class="label">Memory (MB)</div>
             </div>
-            <div class="card" id="c-cpu">
+            <div class="card" id="c-cpu" title="Server process CPU usage across all cores (0–100 %)">
               <span class="icon">⚡</span>
               <div class="value" id="cpuPct">—</div>
               <div class="label">CPU %</div>
             </div>
-            <div class="card" id="c-uptime">
+            <div class="card" id="c-uptime" title="Time elapsed since the server process started">
               <span class="icon">⏱</span>
               <div class="value" id="uptime">—</div>
               <div class="label">Uptime</div>
@@ -228,7 +229,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           </div>
 
           <div class="chart-card">
-            <div class="chart-header">
+            <div class="chart-header" title="Number of text messages sent per minute over the last hour. Bars turn red when traffic exceeds 20 messages/min.">
               <h2>Message Throughput &mdash; last 60 min</h2>
               <div class="chart-legend">
                 <span style="background:#2d5f9e"></span>normal &nbsp;
@@ -243,7 +244,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           <!-- Rate limits section -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
             <div class="chart-card">
-              <div class="chart-header">
+              <div class="chart-header" title="Requests rejected by the server's rate limiter (auth: 10/min per IP; messages: 30/min per user)">
                 <h2>Rate Limit Hits &mdash; last 60 min</h2>
                 <div class="chart-legend">
                   <span id="rl-min-badge" style="color:#f0a030;font-size:11px"></span>
@@ -256,7 +257,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
               </div>
             </div>
             <div class="chart-card">
-              <div class="chart-header"><h2>Top Offenders</h2></div>
+              <div class="chart-header" title="Users or IP addresses that have triggered the most rate-limit rejections in the last hour"><h2>Top Offenders</h2></div>
               <table class="user-table" style="font-size:11px">
                 <thead>
                   <tr>
@@ -277,24 +278,19 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
         <!-- ── Users ─────────────────────────────────────── -->
         <div id="tab-users" class="tab-panel">
           <div class="panel-header">
-            <h2>All Users</h2>
-            <div style="display:flex;gap:8px;align-items:center">
-              <select id="userServerFilter" onchange="loadServerMembers()"
-                style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
-                <option value="">All users</option>
-              </select>
-              <input class="search-box" id="userSearch" placeholder="Filter by username…" oninput="filterUsers()" />
-            </div>
+            <h2>Connected Clients</h2>
+            <input class="search-box" id="userSearch" placeholder="Filter by username…" oninput="filterUsers()" title="Type to filter the list by username" />
           </div>
           <table class="user-table" id="userTable">
             <thead>
               <tr>
                 <th>Username</th>
-                <th>Status</th>
-                <th>Role</th>
-                <th>Connection</th>
+                <th title="Current presence status and whether the user is in a voice channel">Status</th>
+                <th title="Server role — hover a badge for a full list of permissions. Use ▲/▼ to promote or demote.">Role</th>
+                <th title="Active mute prevents the user from sending messages. Admins cannot be muted.">Mute</th>
+                <th title="Whether the user has an active SignalR connection to this server">Connection</th>
                 <th>Member Since</th>
-                <th>Actions</th>
+                <th title="Kick Voice: disconnect from voice only. Kick: remove from server (rejoinable). Temp Ban: block entry for a chosen duration.">Actions</th>
               </tr>
             </thead>
             <tbody id="userTableBody">
@@ -308,16 +304,16 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           <div class="panel-header">
             <h2>Message Log</h2>
             <div style="display:flex;gap:8px;align-items:center">
-              <input class="search-box" id="msgAuthor"  placeholder="Author…"  oninput="loadMessages()" style="width:120px" />
-              <input class="search-box" id="msgChannel" placeholder="Channel…" oninput="loadMessages()" style="width:120px" />
-              <select id="msgSource" onchange="loadMessages()"
+              <input class="search-box" id="msgAuthor"  placeholder="Author…"  oninput="loadMessages()" style="width:120px" title="Filter by the username who sent the message" />
+              <input class="search-box" id="msgChannel" placeholder="Channel…" oninput="loadMessages()" style="width:120px" title="Filter by channel name (without #)" />
+              <select id="msgSource" onchange="loadMessages()" title="Filter by message type: text chat, Whisper voice transcription, or stream event"
                 style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
                 <option value="">All sources</option>
                 <option value="Text">Text</option>
                 <option value="Voice">Voice</option>
                 <option value="Stream">Stream</option>
               </select>
-              <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:5px;cursor:pointer">
+              <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:5px;cursor:pointer" title="Also show messages that were soft-deleted by an admin — content is retained in the database">
                 <input type="checkbox" id="msgShowDeleted" onchange="loadMessages()" style="accent-color:#8ab4d4" />
                 Show deleted
               </label>
@@ -345,10 +341,14 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
         <div id="tab-channels" class="tab-panel">
           <div class="panel-header">
             <h2>Channel Permissions</h2>
-            <select id="channelServerFilter" onchange="loadChannels()"
-              style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
-              <option value="">All servers</option>
-            </select>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+            <input id="newChannelName" type="text" placeholder="channel-name" maxlength="64"
+              title="Name for the new channel (lowercase, hyphens allowed)"
+              style="background:#1a1a1a;border:1px solid #3a3a3a;border-radius:6px;color:#d0d0d0;font-size:13px;padding:7px 12px;font-family:inherit;outline:none;width:200px"
+              onkeydown="if(event.key==='Enter')createChannel()" />
+            <button class="btn-sm" onclick="createChannel()" title="Create this channel in the current server">Create Channel</button>
+            <span id="createChannelStatus" style="font-size:12px;color:#555"></span>
           </div>
           <table class="user-table">
             <thead>
@@ -356,31 +356,58 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
                 <th>Server</th>
                 <th>Channel</th>
                 <th>Type</th>
-                <th>Min Read Role</th>
-                <th>Min Write Role</th>
-                <th>Actions</th>
+                <th title="Users below this role cannot see or read this channel">Min Read Role</th>
+                <th title="Users below this role can read but cannot send messages in this channel">Min Write Role</th>
+                <th title="Permission changes are saved immediately when you change the dropdown">Actions</th>
               </tr>
             </thead>
             <tbody id="channelTableBody">
-              <tr><td colspan="6" style="color:#444;padding:20px 10px;">Select a server to view channels.</td></tr>
+              <tr><td colspan="6" style="color:#444;padding:20px 10px;">Loading…</td></tr>
             </tbody>
           </table>
         </div><!-- /tab-channels -->
+
+        <!-- ── Word Filter ────────────────────────────────── -->
+        <div id="tab-wordfilter" class="tab-panel">
+          <div class="panel-header">
+            <h2>Word / Phrase Filter</h2>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input class="search-box" id="wfNewPattern" placeholder="New pattern…" style="width:180px"
+                onkeydown="if(event.key==='Enter')addWordFilter()"
+                title="Enter a word or phrase to block. Whole-word matching is used (&#34;ass&#34; won't match &#34;assassination&#34;). Leet-speak variants (e.g. b4d → bad) are also caught." />
+              <button class="btn-sm" onclick="addWordFilter()" title="Add this word or phrase to the filter list (press Enter in the text box to do the same)">Add</button>
+            </div>
+          </div>
+          <p style="font-size:11px;color:#555;margin-bottom:12px">
+            New patterns use <strong style="color:#888">Delete</strong> severity — the message is blocked and the sender sees an error. Moderators and Admins bypass the filter. The API supports <em>Log</em> (replace with ***) and <em>Mute</em> (block + auto-mute 10 min) severities.
+          </p>
+          <table class="user-table" id="wfTable">
+            <thead>
+              <tr>
+                <th>Pattern</th>
+                <th style="width:160px">Added</th>
+                <th style="width:70px">Action</th>
+              </tr>
+            </thead>
+            <tbody id="wfTableBody">
+              <tr><td colspan="3" style="color:#444;padding:20px 10px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div><!-- /tab-wordfilter -->
 
         <!-- ── Audit Log ──────────────────────────────────── -->
         <div id="tab-audit" class="tab-panel">
           <div class="panel-header">
             <h2>Audit Log</h2>
             <div style="display:flex;gap:8px;align-items:center">
-              <select id="auditServerFilter" onchange="loadAudit()"
-                style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
-                <option value="">All servers</option>
-              </select>
-              <select id="auditActionFilter" onchange="loadAudit()"
+              <select id="auditActionFilter" onchange="loadAudit()" title="Filter the audit log to a specific type of moderation action"
                 style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
                 <option value="">All actions</option>
                 <option value="RoleChanged">Role Changed</option>
                 <option value="MemberKicked">Member Kicked</option>
+                <option value="UserMuted">User Muted</option>
+                <option value="UserUnmuted">User Unmuted</option>
+                <option value="UserTempBanned">User Temp Banned</option>
                 <option value="MessageDeleted">Message Deleted</option>
                 <option value="ChannelCreated">Channel Created</option>
                 <option value="ChannelDeleted">Channel Deleted</option>
@@ -405,21 +432,25 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
         </div><!-- /tab-audit -->
 
         <div class="status-bar">
-          <span id="serverUrl">http://localhost:5238</span>
-          <span id="refreshNote">auto-refreshes every 2s</span>
+          <span id="serverUrl" title="The address this server is currently listening on">http://localhost:5238</span>
+          <span id="refreshNote" title="Overview and rate-limit charts update every 2–5 s automatically; open tabs refresh every 5 s">auto-refreshes every 2s</span>
         </div>
 
         <script>
+        function escapeHtml(s) {
+          return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
         // ── Tab switching ──────────────────────────────────
         function showTab(name) {
           document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
           document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
           document.getElementById('tab-' + name).classList.add('active');
           event.currentTarget.classList.add('active');
-          if (name === 'users')    loadUsers();
-          if (name === 'messages') loadMessages();
-          if (name === 'channels') loadChannels();
-          if (name === 'audit')    loadAudit();
+          if (name === 'users')      { loadUsers(); }
+          if (name === 'messages')   { loadMessages(); }
+          if (name === 'channels')   { loadChannels(); }
+          if (name === 'wordfilter') { loadWordFilters(); }
+          if (name === 'audit')      { loadAudit(); }
         }
 
         // ── Overview ──────────────────────────────────────
@@ -514,6 +545,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
         let allUsers = [];
         let serverMembers = [];
         let currentServerId = null;
+        let serverName = '';
 
         function statusBadge(u) {
           if (u.voiceChannelId !== null) return '<span class="badge badge-voice">🎙 In Voice</span>';
@@ -550,9 +582,10 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
         function renderUsers(users) {
           const tbody = document.getElementById('userTableBody');
           if (!users.length) {
-            tbody.innerHTML = '<tr><td colspan="6" style="color:#444;padding:20px 10px;">No users found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="color:#444;padding:20px 10px;">No users found.</td></tr>';
             return;
           }
+          const now = Date.now();
           tbody.innerHTML = users.map(u => {
             const member = serverMembers.find(m => m.userId === u.id);
             const role = member?.role ?? null;
@@ -560,21 +593,31 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
             const nextDown = role === 'Admin'  ? 'Moderator' : 'Member';
             const roleCell = role
               ? `${roleBadge(role)}
-                 <button class="btn-sm" style="margin-left:4px" title="Promote to ${nextUp}" onclick="promoteUser(${u.id},this)" ${role==='Admin'?'disabled':''}>▲</button>
-                 <button class="btn-sm danger" title="Demote to ${nextDown}" onclick="demoteUser(${u.id},this)" ${role==='Member'?'disabled':''}>▼</button>`
+                 <button class="btn-sm" style="margin-left:4px" title="Promote to ${nextUp}" onclick="promoteUser(${u.id},this)" ${role==='Admin'?'disabled':''} aria-label="Promote to ${nextUp}">▲</button>
+                 <button class="btn-sm danger" title="Demote to ${nextDown}" onclick="demoteUser(${u.id},this)" ${role==='Member'?'disabled':''} aria-label="Demote to ${nextDown}">▼</button>`
+              : '<span style="color:#555">—</span>';
+            const mutedUntil = member?.mutedUntil ? new Date(member.mutedUntil) : null;
+            const isMuted = mutedUntil && mutedUntil.getTime() > now;
+            const muteCell = member
+              ? isMuted
+                ? `<span style="color:#f0a030;font-size:10px">until ${mutedUntil.toLocaleTimeString()}</span>
+                   <button class="btn-sm" style="margin-left:4px" title="Remove the active mute — user can send messages immediately" onclick="muteUser(${currentServerId},${u.id},0,this)">Unmute</button>`
+                : `<button class="btn-sm" title="Temporarily prevent this user from sending messages" onclick="pickMute(${currentServerId},${u.id},this)" ${role==='Admin'?'disabled':''}>Mute…</button>`
               : '<span style="color:#555">—</span>';
             return `<tr>
-              <td><strong style="color:#d0d0d0">${u.username}</strong></td>
+              <td><strong style="color:#d0d0d0">${escapeHtml(u.username)}</strong></td>
               <td>${statusBadge(u)}</td>
               <td>${roleCell}</td>
+              <td>${muteCell}</td>
               <td>${connBadge(u)}</td>
               <td style="color:#555">${new Date(u.createdAt).toLocaleDateString()}</td>
               <td>
                 ${u.voiceChannelId !== null
-                  ? `<button class="btn-sm danger" onclick="kickVoice(${u.id}, this)">Kick Voice</button>`
-                  : `<button class="btn-sm" disabled>Kick Voice</button>`}
+                  ? `<button class="btn-sm danger" title="Disconnect this user from their current voice channel (they can rejoin)" onclick="kickVoice(${u.id}, this)">Kick Voice</button>`
+                  : `<button class="btn-sm" title="User is not in a voice channel" disabled>Kick Voice</button>`}
                 ${member && role !== 'Admin'
-                  ? ` <button class="btn-sm danger" onclick="kickFromServer(${currentServerId},${u.id},this)">Kick</button>`
+                  ? ` <button class="btn-sm danger" title="Remove this user from the server — they can rejoin via invite link" onclick="kickFromServer(${currentServerId},${u.id},this)">Kick</button>
+                      <button class="btn-sm danger" title="Block this user from rejoining the server for a chosen duration" onclick="pickTempBan(${currentServerId},${u.id},this)">Temp Ban…</button>`
                   : ''}
               </td>
             </tr>`;
@@ -588,30 +631,83 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
 
         async function loadUsers() {
           try {
-            const res = await fetch('/api/admin/users');
-            if (!res.ok) throw new Error(res.status);
-            allUsers = await res.json();
+            const [usersRes, membersRes] = await Promise.all([
+              fetch('/api/admin/users'),
+              currentServerId ? fetch(`/api/admin/servers/${currentServerId}/members`) : Promise.resolve(null),
+            ]);
+            if (!usersRes.ok) throw new Error(usersRes.status);
+            allUsers = await usersRes.json();
+            serverMembers = [];
+            if (membersRes?.ok) {
+              const data = await membersRes.json();
+              serverMembers = data.map(m => ({ ...m, role: toRoleStr(m.role) }));
+            }
             filterUsers();
           } catch (e) {
             document.getElementById('userTableBody').innerHTML =
-              `<tr><td colspan="6" style="color:#ed4245;padding:20px 10px;">Failed to load users: ${e.message}</td></tr>`;
+              `<tr><td colspan="7" style="color:#ed4245;padding:20px 10px;">Failed to load users: ${e.message}</td></tr>`;
           }
         }
 
         async function loadServerMembers() {
-          const sid = document.getElementById('userServerFilter').value;
-          currentServerId = sid ? parseInt(sid) : null;
-          serverMembers = [];
-          if (sid) {
-            try {
-              const res = await fetch(`/api/admin/servers/${sid}/members`);
-              if (res.ok) {
-                const data = await res.json();
-                serverMembers = data.map(m => ({ ...m, role: toRoleStr(m.role) }));
-              }
-            } catch {}
-          }
+          if (!currentServerId) return;
+          try {
+            const res = await fetch(`/api/admin/servers/${currentServerId}/members`);
+            if (res.ok) {
+              const data = await res.json();
+              serverMembers = data.map(m => ({ ...m, role: toRoleStr(m.role) }));
+            }
+          } catch {}
           filterUsers();
+        }
+
+        async function pickMute(serverId, userId, btn) {
+          const options = ['5 minutes','30 minutes','1 hour','24 hours'];
+          const choice = prompt('Mute duration:\n1: 5 minutes\n2: 30 minutes\n3: 1 hour\n4: 24 hours\n\nEnter 1–4:');
+          const secs = [300, 1800, 3600, 86400][parseInt(choice) - 1];
+          if (!secs) return;
+          await muteUser(serverId, userId, secs, btn);
+        }
+
+        async function muteUser(serverId, userId, seconds, btn) {
+          btn.disabled = true;
+          try {
+            const res = await fetch(`/api/admin/servers/${serverId}/members/${userId}/mute`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ seconds })
+            });
+            if (!res.ok) throw new Error(await res.text() || res.status);
+            await loadServerMembers();
+          } catch (e) {
+            btn.disabled = false;
+            alert('Mute failed: ' + e.message);
+          }
+        }
+
+        async function pickTempBan(serverId, userId, btn) {
+          const choice = prompt('Temp ban duration:\n1: 1 hour\n2: 24 hours\n3: 7 days\n4: 30 days\n\nEnter 1–4:');
+          const secs = [3600, 86400, 604800, 2592000][parseInt(choice) - 1];
+          if (!secs) return;
+          if (!confirm(`Temp ban this user for ${['1 hour','24 hours','7 days','30 days'][parseInt(choice)-1]}?`)) return;
+          await tempBanUser(serverId, userId, secs, btn);
+        }
+
+        async function tempBanUser(serverId, userId, seconds, btn) {
+          btn.disabled = true;
+          try {
+            const res = await fetch(`/api/admin/servers/${serverId}/members/${userId}/tempban`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ seconds })
+            });
+            if (!res.ok) throw new Error(await res.text() || res.status);
+            await loadServerMembers();
+            await loadUsers();
+          } catch (e) {
+            btn.disabled = false;
+            alert('Temp ban failed: ' + e.message);
+          }
         }
 
         async function kickVoice(userId, btn) {
@@ -736,7 +832,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
               tbody.innerHTML = d.topOffenders.map(o => {
                 const last = new Date(o.lastSeen).toLocaleTimeString();
                 return `<tr>
-                  <td style="color:#d0d0d0">${o.who}</td>
+                  <td style="color:#d0d0d0">${escapeHtml(o.who)}</td>
                   <td style="text-align:right;color:#f0a030;font-weight:600">${o.hits}</td>
                   <td style="color:#555">${last}</td>
                 </tr>`;
@@ -795,14 +891,14 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
             const escapedContent = content.replace(/</g,'&lt;').replace(/>/g,'&gt;');
             return `<tr style="${deleted ? 'opacity:.55' : ''}">
               <td style="color:#555;font-size:11px;white-space:nowrap">${timeStr}</td>
-              <td style="color:#8ab4d4;font-weight:500">${m.author}</td>
-              <td style="color:#666">#${m.channel}</td>
-              <td style="color:#555;font-size:11px">${m.server}</td>
+              <td style="color:#8ab4d4;font-weight:500">${escapeHtml(m.author)}</td>
+              <td style="color:#666">#${escapeHtml(m.channel)}</td>
+              <td style="color:#555;font-size:11px">${escapeHtml(m.server)}</td>
               <td>${sourceBadge(m.source)}</td>
               <td style="${contentStyle}">${escapedContent}</td>
               <td>${deleted
                 ? '<span style="color:#444;font-size:10px">Deleted</span>'
-                : `<button class="btn-sm danger" onclick="adminDeleteMsg(${m.id},this)">Delete</button>`}</td>
+                : `<button class="btn-sm danger" title="Soft-delete this message — it will be hidden from clients but remains in the database" onclick="adminDeleteMsg(${m.id},this)">Delete</button>`}</td>
             </tr>`;
           }).join('');
         }
@@ -822,31 +918,24 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           }
         }
 
-        // ── Server list helper ────────────────────────────
-        async function loadServerList() {
+        // ── Server initialisation ─────────────────────────
+        async function initServer() {
           try {
             const res = await fetch('/api/admin/servers');
             if (!res.ok) return;
             const servers = await res.json();
-            document.querySelectorAll('select[id$="ServerFilter"]').forEach(s => {
-              while (s.options.length > 1) s.remove(1);
-              servers.forEach(srv => {
-                const opt = document.createElement('option');
-                opt.value = srv.id;
-                opt.text = srv.name;
-                s.appendChild(opt);
-              });
-            });
+            if (!servers.length) return;
+            currentServerId = servers[0].id;
+            serverName = servers[0].name;
           } catch {}
         }
 
         // ── Audit Log ─────────────────────────────────────
         async function loadAudit() {
-          const serverId = document.getElementById('auditServerFilter').value;
-          const action   = document.getElementById('auditActionFilter').value;
-          const params   = new URLSearchParams({ limit: 200 });
-          if (serverId) params.set('serverId', serverId);
-          if (action)   params.set('action', action);
+          const action = document.getElementById('auditActionFilter').value;
+          const params = new URLSearchParams({ limit: 200 });
+          if (currentServerId) params.set('serverId', currentServerId);
+          if (action)          params.set('action', action);
           try {
             const res = await fetch('/api/admin/audit?' + params);
             if (!res.ok) throw new Error(res.status);
@@ -862,6 +951,9 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           const map = {
             RoleChanged:              '#8ab4d4',
             MemberKicked:             '#ed4245',
+            UserMuted:                '#f0a030',
+            UserUnmuted:              '#44bb44',
+            UserTempBanned:           '#ed4245',
             MessageDeleted:           '#f0a030',
             ChannelCreated:           '#44bb44',
             ChannelDeleted:           '#ed4245',
@@ -881,9 +973,9 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
             const ts = new Date(a.createdAt);
             return `<tr>
               <td style="color:#555;font-size:11px;white-space:nowrap">${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}</td>
-              <td style="color:#8ab4d4">${a.actorUsername}</td>
+              <td style="color:#8ab4d4">${escapeHtml(a.actorUsername)}</td>
               <td>${actionBadge(a.action)}</td>
-              <td style="color:#aaa">${a.targetUsername ?? '—'}</td>
+              <td style="color:#aaa">${escapeHtml(a.targetUsername ?? '—')}</td>
               <td style="color:#777;font-size:11px">${(a.detail ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
             </tr>`;
           }).join('');
@@ -891,14 +983,13 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
 
         // ── Channels ──────────────────────────────────────
         async function loadChannels() {
-          const serverId = document.getElementById('channelServerFilter').value;
-          const params   = new URLSearchParams();
-          if (serverId) params.set('serverId', serverId);
+          const params = new URLSearchParams();
+          if (currentServerId) params.set('serverId', currentServerId);
           try {
             const res = await fetch('/api/admin/channels?' + params);
             if (!res.ok) throw new Error(res.status);
             const channels = await res.json();
-            renderChannels(channels, serverId ? parseInt(serverId) : null);
+            renderChannels(channels, currentServerId);
           } catch (e) {
             document.getElementById('channelTableBody').innerHTML =
               `<tr><td colspan="6" style="color:#ed4245;padding:20px 10px;">Failed: ${e.message}</td></tr>`;
@@ -915,12 +1006,13 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           }
           tbody.innerHTML = channels.map(c => `
             <tr id="ch-row-${c.id}">
-              <td style="color:#555">${c.serverName}</td>
-              <td style="color:#d0d0d0">#${c.name}</td>
+              <td style="color:#555">${escapeHtml(c.serverName)}</td>
+              <td style="color:#d0d0d0">#${escapeHtml(c.name)}</td>
               <td style="color:#666">${c.type}</td>
               <td>
                 <select onchange="saveChannelPerm(${c.serverId},${c.id})"
                   id="read-${c.id}"
+                  title="Minimum role required to see and read this channel"
                   style="background:#252525;border:1px solid #333;border-radius:3px;color:#d0d0d0;font-size:11px;padding:3px 6px">
                   ${roles.map(r => `<option value="${r}" ${c.minRoleToRead===r?'selected':''}>${r}</option>`).join('')}
                 </select>
@@ -928,12 +1020,49 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
               <td>
                 <select onchange="saveChannelPerm(${c.serverId},${c.id})"
                   id="write-${c.id}"
+                  title="Minimum role required to send messages in this channel (must be ≥ Min Read Role)"
                   style="background:#252525;border:1px solid #333;border-radius:3px;color:#d0d0d0;font-size:11px;padding:3px 6px">
                   ${roles.map(r => `<option value="${r}" ${c.minRoleToWrite===r?'selected':''}>${r}</option>`).join('')}
                 </select>
               </td>
-              <td><span id="ch-status-${c.id}" style="font-size:10px;color:#555"></span></td>
+              <td style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <input id="ch-rename-${c.id}" value="${escapeHtml(c.name)}"
+                  style="background:#1a1a1a;border:1px solid #3a3a3a;border-radius:4px;color:#d0d0d0;font-size:11px;padding:3px 7px;font-family:inherit;outline:none;width:110px"
+                  onkeydown="if(event.key==='Enter')renameChannel(${c.serverId},${c.id})" />
+                <button class="btn-sm" style="padding:3px 8px;font-size:11px"
+                  onclick="renameChannel(${c.serverId},${c.id})"
+                  title="Rename this channel">Rename</button>
+                <span id="ch-status-${c.id}" style="font-size:10px;color:#555"></span>
+                <button class="btn-sm" style="background:#3a1a1a;color:#ed4245;border-color:#5a2a2a;padding:3px 8px;font-size:11px"
+                  onclick="deleteChannel(${c.serverId},${c.id},'${escapeHtml(c.name)}')"
+                  title="Permanently delete this channel and all its messages">Delete</button>
+              </td>
             </tr>`).join('');
+        }
+
+        async function createChannel() {
+          const nameEl   = document.getElementById('newChannelName');
+          const statusEl = document.getElementById('createChannelStatus');
+          const name = nameEl.value.trim().toLowerCase().replace(/\s+/g, '-');
+          if (!name) { statusEl.textContent = 'Enter a channel name.'; statusEl.style.color = '#ed4245'; return; }
+          if (!currentServerId) { statusEl.textContent = 'No server selected.'; statusEl.style.color = '#ed4245'; return; }
+          statusEl.textContent = 'Creating…'; statusEl.style.color = '#555';
+          try {
+            const res = await fetch(`/api/admin/servers/${currentServerId}/channels`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name })
+            });
+            if (!res.ok) { const t = await res.text(); throw new Error(t || res.status); }
+            nameEl.value = '';
+            statusEl.textContent = `#${name} created.`;
+            statusEl.style.color = '#57f287';
+            setTimeout(() => { statusEl.textContent = ''; }, 3000);
+            loadChannels();
+          } catch (e) {
+            statusEl.textContent = `Error: ${e.message}`;
+            statusEl.style.color = '#ed4245';
+          }
         }
 
         async function saveChannelPerm(serverId, channelId) {
@@ -958,15 +1087,110 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           }
         }
 
+        async function renameChannel(serverId, channelId) {
+          const input  = document.getElementById(`ch-rename-${channelId}`);
+          const status = document.getElementById(`ch-status-${channelId}`);
+          const name   = input.value.trim().toLowerCase().replace(/\s+/g, '-');
+          if (!name) { status.textContent = 'Name required'; status.style.color = '#ed4245'; return; }
+          status.textContent = 'Saving…'; status.style.color = '#888';
+          try {
+            const res = await fetch(`/api/admin/servers/${serverId}/channels/${channelId}/name`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name })
+            });
+            if (!res.ok) throw new Error(await res.text() || res.status);
+            input.value = name;
+            status.textContent = 'Renamed ✓'; status.style.color = '#44bb44';
+            setTimeout(() => { status.textContent = ''; }, 2000);
+          } catch (e) {
+            status.textContent = `Error: ${e.message}`; status.style.color = '#ed4245';
+          }
+        }
+
+        async function deleteChannel(serverId, channelId, channelName) {
+          if (!confirm(`Delete #${channelName}? This cannot be undone.`)) return;
+          const status = document.getElementById(`ch-status-${channelId}`);
+          status.textContent = 'Deleting…'; status.style.color = '#888';
+          try {
+            const res = await fetch(`/api/admin/servers/${serverId}/channels/${channelId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(await res.text() || res.status);
+            document.getElementById(`ch-row-${channelId}`)?.remove();
+          } catch (e) {
+            status.textContent = `Error: ${e.message}`; status.style.color = '#ed4245';
+          }
+        }
+
+        // ── Word Filter ───────────────────────────────────
+        async function loadWordFilters() {
+          const tbody = document.getElementById('wfTableBody');
+          if (!currentServerId) {
+            tbody.innerHTML = '<tr><td colspan="3" style="color:#444;padding:20px 10px;">Loading…</td></tr>';
+            return;
+          }
+          try {
+            const res = await fetch(`/api/admin/servers/${currentServerId}/wordfilter`);
+            if (!res.ok) throw new Error(res.status);
+            const filters = await res.json();
+            if (!filters.length) {
+              tbody.innerHTML = '<tr><td colspan="3" style="color:#444;padding:20px 10px;">No patterns configured.</td></tr>';
+              return;
+            }
+            tbody.innerHTML = filters.map(f => {
+              const ts = new Date(f.createdAt).toLocaleDateString();
+              return `<tr>
+                <td style="color:#d0d0d0;font-family:monospace">${escapeHtml(f.pattern)}</td>
+                <td style="color:#555;font-size:11px">${ts}</td>
+                <td><button class="btn-sm danger" title="Remove this pattern — messages containing it will no longer be filtered" onclick="removeWordFilter(${currentServerId},${f.id},this)">Remove</button></td>
+              </tr>`;
+            }).join('');
+          } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="3" style="color:#ed4245;padding:20px 10px;">Failed: ${e.message}</td></tr>`;
+          }
+        }
+
+        async function addWordFilter() {
+          const input = document.getElementById('wfNewPattern');
+          const pattern = input.value.trim();
+          if (!currentServerId || !pattern) return;
+          try {
+            const res = await fetch(`/api/admin/servers/${currentServerId}/wordfilter`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ pattern })
+            });
+            if (!res.ok) throw new Error(await res.text() || res.status);
+            input.value = '';
+            await loadWordFilters();
+          } catch (e) {
+            alert('Failed to add pattern: ' + e.message);
+          }
+        }
+
+        async function removeWordFilter(serverId, filterId, btn) {
+          btn.disabled = true;
+          try {
+            const res = await fetch(`/api/admin/servers/${serverId}/wordfilter/${filterId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(res.status);
+            await loadWordFilters();
+          } catch (e) {
+            btn.disabled = false;
+            alert('Failed: ' + e.message);
+          }
+        }
+
         // ── Boot ──────────────────────────────────────────
-        loadServerList();
-        refreshMetrics();
-        refreshRateLimits();
+        (async () => {
+          await initServer();
+          refreshMetrics();
+          refreshRateLimits();
+        })();
         setInterval(refreshMetrics, 2000);
         setInterval(refreshRateLimits, 5000);
         setInterval(() => {
           if (document.getElementById('tab-users').classList.contains('active')) loadUsers();
           if (document.getElementById('tab-messages').classList.contains('active')) loadMessages();
+          if (document.getElementById('tab-wordfilter').classList.contains('active')) loadWordFilters();
           if (document.getElementById('tab-audit').classList.contains('active')) loadAudit();
         }, 5000);
         </script>
