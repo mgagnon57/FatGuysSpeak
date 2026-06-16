@@ -35,6 +35,8 @@ else
 
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<FatGuysSpeak.Server.Services.IGoogleTokenValidator, FatGuysSpeak.Server.Services.GoogleTokenValidator>();
+builder.Services.AddHttpClient("google", c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddScoped<FatGuysSpeak.Server.Services.IGoogleCodeExchanger, FatGuysSpeak.Server.Services.GoogleCodeExchanger>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.ServerMetricsService>();
 builder.Services.AddHttpClient("anthropic", c =>
 {
