@@ -108,6 +108,42 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
         return await ResolveGoogleIdentityAndIssueAsync(identity);
     }
 
+    [HttpPost("external/google/exchange")]
+    public async Task<ActionResult<AuthResponse>> GoogleExchange(
+        GoogleCodeExchangeRequest req,
+        [FromServices] IGoogleCodeExchanger exchanger,
+        [FromServices] IGoogleTokenValidator validator)
+    {
+        if (string.IsNullOrWhiteSpace(req.Code)
+            || string.IsNullOrWhiteSpace(req.CodeVerifier)
+            || string.IsNullOrWhiteSpace(req.RedirectUri))
+            return Unauthorized("Missing Google authorization code.");
+
+        GoogleIdentity identity;
+        try
+        {
+            var idToken = await exchanger.ExchangeAsync(req.Code, req.CodeVerifier, req.RedirectUri);
+            identity = await validator.ValidateAsync(idToken);
+        }
+        catch (InvalidOperationException)
+        {
+            return StatusCode(503, "Google sign-in is not configured on this server.");
+        }
+        catch (GoogleExchangeException)
+        {
+            return Unauthorized("Google sign-in failed.");
+        }
+        catch (Google.Apis.Auth.InvalidJwtException)
+        {
+            return Unauthorized("Invalid Google token.");
+        }
+
+        if (!identity.EmailVerified)
+            return Unauthorized("Your Google email must be verified to sign in.");
+
+        return await ResolveGoogleIdentityAndIssueAsync(identity);
+    }
+
     // Resolve a validated Google identity to a local account (existing link -> email auto-link ->
     // create) and issue the normal JWT. Shared by the id-token and code-exchange endpoints.
     private async Task<ActionResult<AuthResponse>> ResolveGoogleIdentityAndIssueAsync(GoogleIdentity identity)
