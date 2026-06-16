@@ -142,4 +142,45 @@ public class UsersControllerTests : IDisposable
 
         Assert.Null(result.Value!.LastSeenAt);
     }
+
+    [Fact]
+    public async Task UpdateUsername_Success_ChangesName()
+    {
+        var user = new User { Username = "oldname", Email = "u@test.com", PasswordHash = "x" };
+        _testDb.Db.Users.Add(user);
+        await _testDb.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_controller, user.Id);
+
+        var result = await _controller.UpdateUsername(new UpdateUsernameRequest("newname"));
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Equal("newname", _testDb.Db.Users.Single(u => u.Id == user.Id).Username);
+    }
+
+    [Fact]
+    public async Task UpdateUsername_InvalidChars_ReturnsBadRequest()
+    {
+        var user = new User { Username = "oldname", Email = "u@test.com", PasswordHash = "x" };
+        _testDb.Db.Users.Add(user);
+        await _testDb.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_controller, user.Id);
+
+        var result = await _controller.UpdateUsername(new UpdateUsernameRequest("bad name!"));
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task UpdateUsername_Taken_ReturnsConflict()
+    {
+        var user = new User { Username = "oldname", Email = "u@test.com", PasswordHash = "x" };
+        var other = new User { Username = "taken", Email = "o@test.com", PasswordHash = "x" };
+        _testDb.Db.Users.AddRange(user, other);
+        await _testDb.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_controller, user.Id);
+
+        var result = await _controller.UpdateUsername(new UpdateUsernameRequest("taken"));
+
+        Assert.IsType<ConflictObjectResult>(result);
+    }
 }

@@ -85,6 +85,25 @@ public class UsersController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
+    [HttpPut("me/username")]
+    public async Task<IActionResult> UpdateUsername(UpdateUsernameRequest req)
+    {
+        var name = req.Username?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 32)
+            return BadRequest("Username must be 1–32 characters.");
+        if (!System.Text.RegularExpressions.Regex.IsMatch(name, @"^[a-zA-Z0-9._\-]+$"))
+            return BadRequest("Username may only contain letters, digits, underscores, hyphens, and periods.");
+
+        var user = await db.Users.FindAsync(UserId);
+        if (user is null) return NotFound();
+        if (name != user.Username && await db.Users.AnyAsync(u => u.Username == name))
+            return Conflict("Username already taken.");
+
+        user.Username = name;
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
     [HttpPut("me/status")]
     public async Task<IActionResult> UpdateStatus(UpdateStatusRequest req, [FromServices] IHubContext<ChatHub> hub)
     {

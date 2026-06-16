@@ -74,6 +74,7 @@ public record UserProfileDto(
 
 public record UpdateStatusRequest(UserStatus Status);
 public record UpdateBioRequest(string? Bio);
+public record UpdateUsernameRequest(string Username);
 public record BlockedUserDto(int UserId, string Username, DateTime BlockedAt);
 
 public record UserDto(int Id, string Username, UserStatus Status, string? AvatarUrl = null);
