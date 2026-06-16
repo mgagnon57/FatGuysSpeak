@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace FatGuysSpeak.Server.Controllers;
 
@@ -143,6 +144,10 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
 
         return await ResolveGoogleIdentityAndIssueAsync(identity);
     }
+
+    [HttpGet("external/google/config")]
+    public ActionResult<GoogleConfigResponse> GoogleConfig([FromServices] IConfiguration config)
+        => Ok(new GoogleConfigResponse(config["Google:ClientId"] ?? ""));
 
     // Resolve a validated Google identity to a local account (existing link -> email auto-link ->
     // create) and issue the normal JWT. Shared by the id-token and code-exchange endpoints.

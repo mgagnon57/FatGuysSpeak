@@ -3,6 +3,7 @@ using FatGuysSpeak.Server.Services;
 using FatGuysSpeak.Shared;
 using FatGuysSpeak.Tests.Helpers;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace FatGuysSpeak.Tests.Server;
 
@@ -72,5 +73,31 @@ public class GoogleExchangeTests : IDisposable
             new GoogleCodeExchangeRequest("", "", ""), _exchanger, _validator);
 
         Assert.IsType<UnauthorizedObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public void Config_ReturnsConfiguredClientId()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Google:ClientId"] = "abc.apps.googleusercontent.com" })
+            .Build();
+
+        var result = _controller.GoogleConfig(config);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var cfg = Assert.IsType<GoogleConfigResponse>(ok.Value);
+        Assert.Equal("abc.apps.googleusercontent.com", cfg.ClientId);
+    }
+
+    [Fact]
+    public void Config_ReturnsEmptyWhenUnset()
+    {
+        var config = new ConfigurationBuilder().Build();
+
+        var result = _controller.GoogleConfig(config);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var cfg = Assert.IsType<GoogleConfigResponse>(ok.Value);
+        Assert.Equal("", cfg.ClientId);
     }
 }
