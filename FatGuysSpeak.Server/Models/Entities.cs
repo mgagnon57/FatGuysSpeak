@@ -18,6 +18,16 @@ public class User
     public List<Message> Messages { get; set; } = [];
 }
 
+public class ExternalLogin
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public string Provider { get; set; } = "";
+    public string ProviderUserId { get; set; } = "";
+    public string Email { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 public class GuildServer
 {
     public int Id { get; set; }

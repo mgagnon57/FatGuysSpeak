@@ -32,6 +32,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GroupConversationMember> GroupConversationMembers => Set<GroupConversationMember>();
     public DbSet<GroupMessage> GroupMessages => Set<GroupMessage>();
     public DbSet<AppSequence> AppSequences => Set<AppSequence>();
+    public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -96,5 +97,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<AppSequence>()
             .HasKey(s => s.Name);
+
+        b.Entity<ExternalLogin>()
+            .HasIndex(e => new { e.Provider, e.ProviderUserId }).IsUnique();
     }
 }
