@@ -954,7 +954,10 @@
     WARNING SYSTEM <span class="tick-sep">·</span>
     WEBHOOKS <span class="tick-sep">·</span>
     WINDOWS INSTALLER <span class="tick-sep">·</span>
-    CLIENT INSTALLER <span class="tick-sep">·</span>&nbsp;
+    CLIENT INSTALLER <span class="tick-sep">·</span>
+    MENTION GATING <span class="tick-sep">·</span>
+    WORD FILTER SEVERITY <span class="tick-sep">·</span>
+    PASSWORD RESET <span class="tick-sep">·</span>&nbsp;
     PUSH-TO-TALK <span class="tick-sep">·</span>
     SCREEN SHARE <span class="tick-sep">·</span>
     WHISPER AI <span class="tick-sep">·</span>
@@ -970,7 +973,10 @@
     WARNING SYSTEM <span class="tick-sep">·</span>
     WEBHOOKS <span class="tick-sep">·</span>
     WINDOWS INSTALLER <span class="tick-sep">·</span>
-    CLIENT INSTALLER <span class="tick-sep">·</span>&nbsp;
+    CLIENT INSTALLER <span class="tick-sep">·</span>
+    MENTION GATING <span class="tick-sep">·</span>
+    WORD FILTER SEVERITY <span class="tick-sep">·</span>
+    PASSWORD RESET <span class="tick-sep">·</span>&nbsp;
   </div>
 </div>
 
@@ -985,7 +991,7 @@
     <div class="stat-lbl">Trackers / Ads</div>
   </div>
   <div class="stat-cell">
-    <div class="stat-num">20<span class="accent">+</span></div>
+    <div class="stat-num">25<span class="accent">+</span></div>
     <div class="stat-lbl">Core Features</div>
   </div>
   <div class="stat-cell">
@@ -1014,6 +1020,7 @@
         <li>Full message search</li>
         <li>Unread + mention badges</li>
         <li>DMs &amp; Group DMs (up to 10)</li>
+        <li>Block users in DMs</li>
         <li>Slowmode per channel</li>
       </ul>
     </div>
@@ -1038,12 +1045,13 @@
       <p>Web-based dashboard with full moderation controls and real-time server insight.</p>
       <ul>
         <li>Member / Moderator / Admin roles</li>
-        <li>Word filter with leet-speak detection</li>
-        <li>Anti-spam automod</li>
+        <li>Word filter: leet-speak + severity levels</li>
+        <li>Anti-spam &amp; duplicate message automod</li>
         <li>Warning &amp; strike system</li>
         <li>Temp bans with auto-expiry</li>
+        <li>@everyone / @role mention gating</li>
         <li>Per-channel permissions</li>
-        <li>Full audit log</li>
+        <li>Audit log with retention policy</li>
         <li>Webhook delivery</li>
       </ul>
     </div>
@@ -1060,7 +1068,7 @@
     <div class="feat-card">
       <span class="feat-icon">🔐</span>
       <h4>Session Management</h4>
-      <p>JWT auth with token blacklisting and server-side session tracking. Sign out of all devices at once. Full IP audit trail on every login.</p>
+      <p>JWT auth with token blacklisting and server-side session tracking. Sign out of all devices at once. Full IP audit trail on every login. Password reset via secure token — no SMTP required.</p>
       <span class="feat-tag">Security</span>
     </div>
     <div class="feat-card">
@@ -1110,6 +1118,18 @@
       <h4>Group DMs</h4>
       <p>Direct messages and group conversations with up to 10 participants. Same rich message format as channels — reactions, replies, attachments, the works.</p>
       <span class="feat-tag">Messaging</span>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">🔇</span>
+      <h4>Word Filter Severity</h4>
+      <p>Three escalating actions per filter word: Log (replace with asterisks), Delete (block the message outright), or Mute (block + auto-mute the sender for 10 minutes). Leet-speak evasion caught server-side.</p>
+      <span class="feat-tag">Moderation</span>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">📣</span>
+      <h4>Mention Gating</h4>
+      <p>Set the minimum role required to use @everyone on a per-server basis. Prevent regular members from pinging the whole server — only Mods or Admins can blast everyone.</p>
+      <span class="feat-tag">Moderation</span>
     </div>
   </div>
 </section>
