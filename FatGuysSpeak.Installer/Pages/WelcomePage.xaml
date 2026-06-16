@@ -1,0 +1,57 @@
+<UserControl x:Class="FatGuysSpeak.Installer.Pages.WelcomePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0d0d0d">
+    <Grid Margin="40,32,40,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <TextBlock Grid.Row="0" Text="FATGUYS SPEAK"
+                   FontSize="32" FontWeight="Black" Foreground="#f04010"
+                   FontFamily="Segoe UI Black"/>
+        <TextBlock Grid.Row="1" Text="Server Setup"
+                   FontSize="15" Foreground="#888888" Margin="2,4,0,0"/>
+
+        <!-- Divider -->
+        <Rectangle Grid.Row="2" Fill="#1e1e1e" Height="1" Margin="0,8,0,0"/>
+
+        <!-- Description -->
+        <StackPanel Grid.Row="3" Margin="0,0,0,0">
+            <TextBlock Text="This wizard will install FatGuysSpeak Server on your machine and walk you through initial configuration."
+                       TextWrapping="Wrap" FontSize="13" Foreground="#cccccc" LineHeight="20"/>
+
+            <TextBlock Text="The following will be configured:" FontSize="12" Foreground="#666666"
+                       Margin="0,16,0,8"/>
+
+            <StackPanel Margin="8,0,0,0">
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock Text="•" Foreground="#f04010" Margin="0,0,8,0"/>
+                    <TextBlock Text="Admin dashboard account" FontSize="13" Foreground="#bbbbbb"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock Text="•" Foreground="#f04010" Margin="0,0,8,0"/>
+                    <TextBlock Text="Network port and IP binding" FontSize="13" Foreground="#bbbbbb"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock Text="•" Foreground="#f04010" Margin="0,0,8,0"/>
+                    <TextBlock Text="Windows Firewall rule (optional)" FontSize="13" Foreground="#bbbbbb"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <TextBlock Text="•" Foreground="#f04010" Margin="0,0,8,0"/>
+                    <TextBlock Text="Windows Service auto-start (optional)" FontSize="13" Foreground="#bbbbbb"/>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Footer note -->
+        <TextBlock Grid.Row="5" Text="Administrator rights are required. Click Next to begin."
+                   FontSize="11" Foreground="#555555" TextWrapping="Wrap"/>
+    </Grid>
+</UserControl>

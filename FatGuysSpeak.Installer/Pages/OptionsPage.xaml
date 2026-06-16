@@ -1,0 +1,85 @@
+<UserControl x:Class="FatGuysSpeak.Installer.Pages.OptionsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#0d0d0d">
+    <StackPanel Margin="40,32,40,24">
+
+        <TextBlock Text="Installation Options" FontSize="22" FontWeight="SemiBold" Foreground="#e8e8e8"/>
+        <TextBlock Text="Choose where to install and how the server runs"
+                   FontSize="12" Foreground="#666666" Margin="0,6,0,0"/>
+
+        <Rectangle Fill="#1e1e1e" Height="1" Margin="0,16,0,20"/>
+
+        <!-- Install path -->
+        <TextBlock Text="INSTALL LOCATION" Style="{StaticResource FieldLabel}"/>
+        <Grid Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="10"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="TxtPath" Text="C:\Program Files\FatGuysSpeak\Server"/>
+            <Button Grid.Column="2" Content="Browse" Style="{StaticResource NavButton}"
+                    Padding="14,7" Click="Browse_Click"/>
+        </Grid>
+
+        <!-- How should the server run? -->
+        <TextBlock Text="HOW SHOULD THE SERVER RUN?" Style="{StaticResource FieldLabel}" Margin="0,0,0,10"/>
+
+        <!-- Standalone card -->
+        <Border x:Name="StandaloneCard" CornerRadius="4" Padding="14,12" Margin="0,0,0,8"
+                Cursor="Hand" MouseDown="Standalone_Click"
+                BorderThickness="1">
+            <Border.Background><SolidColorBrush Color="#141414"/></Border.Background>
+            <Border.BorderBrush><SolidColorBrush x:Name="StandaloneBorder" Color="#f04010"/></Border.BorderBrush>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <RadioButton x:Name="RadioStandalone" GroupName="RunMode" IsChecked="True"
+                             VerticalAlignment="Top" Margin="0,3,12,0"
+                             Checked="RadioStandalone_Checked"/>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Standalone" FontSize="14" FontWeight="SemiBold"/>
+                    <TextBlock Text="Launch manually from the install folder"
+                               FontSize="12" Foreground="#888888" Margin="0,3,0,0"/>
+                    <TextBlock FontSize="12" Foreground="#666666" Margin="0,6,0,0" TextWrapping="Wrap"
+                               Text="You start FatGuysSpeak.Server.exe whenever you want the server running, and close it when you're done. The server is not running unless you launch it. Best for home use, game nights with friends, or testing."/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Service card -->
+        <Border x:Name="ServiceCard" CornerRadius="4" Padding="14,12"
+                Cursor="Hand" MouseDown="Service_Click"
+                BorderThickness="1">
+            <Border.Background><SolidColorBrush Color="#141414"/></Border.Background>
+            <Border.BorderBrush><SolidColorBrush x:Name="ServiceBorder" Color="#252525"/></Border.BorderBrush>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <RadioButton x:Name="RadioService" GroupName="RunMode" IsChecked="False"
+                             VerticalAlignment="Top" Margin="0,3,12,0"
+                             Checked="RadioService_Checked"/>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Windows Service" FontSize="14" FontWeight="SemiBold"/>
+                    <TextBlock Text="Starts automatically with Windows, runs in the background"
+                               FontSize="12" Foreground="#888888" Margin="0,3,0,0"/>
+                    <TextBlock FontSize="12" Foreground="#666666" Margin="0,6,0,0" TextWrapping="Wrap"
+                               Text="Windows registers the server as a system service and starts it at boot, even when no user is logged in. Clients can always connect as long as the machine is on. Best for a dedicated always-on server."/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Error -->
+        <Border x:Name="ErrorBorder" Background="#1a0808" BorderBrush="#5a1a1a"
+                BorderThickness="1" CornerRadius="3" Padding="10,7"
+                Margin="0,12,0,0" Visibility="Collapsed">
+            <TextBlock x:Name="ErrorText" Foreground="#e05555" FontSize="12" TextWrapping="Wrap"/>
+        </Border>
+
+    </StackPanel>
+</UserControl>

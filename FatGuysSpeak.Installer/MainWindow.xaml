@@ -1,0 +1,90 @@
+<Window x:Class="FatGuysSpeak.Installer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FatGuysSpeak — Server Setup"
+        Height="530" Width="620"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        Background="#0d0d0d">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Step indicator -->
+        <Border Grid.Row="0" Background="#111111" BorderBrush="#1e1e1e" BorderThickness="0,0,0,1" Padding="0,16">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                <StackPanel x:Name="Step0Panel" Orientation="Vertical" HorizontalAlignment="Center" Width="80">
+                    <Ellipse x:Name="Dot0" Width="28" Height="28" HorizontalAlignment="Center">
+                        <Ellipse.Fill><SolidColorBrush x:Name="Dot0Fill" Color="#f04010"/></Ellipse.Fill>
+                    </Ellipse>
+                    <TextBlock x:Name="Lbl0" Text="Welcome" FontSize="10" HorizontalAlignment="Center"
+                               Margin="0,5,0,0" Foreground="#f04010"/>
+                </StackPanel>
+
+                <Rectangle Fill="#333333" Width="30" Height="1" VerticalAlignment="Center" Margin="0,0,0,14"/>
+
+                <StackPanel x:Name="Step1Panel" Orientation="Vertical" HorizontalAlignment="Center" Width="80">
+                    <Ellipse x:Name="Dot1" Width="28" Height="28" HorizontalAlignment="Center">
+                        <Ellipse.Fill><SolidColorBrush x:Name="Dot1Fill" Color="#252525"/></Ellipse.Fill>
+                    </Ellipse>
+                    <TextBlock x:Name="Lbl1" Text="Account" FontSize="10" HorizontalAlignment="Center"
+                               Margin="0,5,0,0" Foreground="#555555"/>
+                </StackPanel>
+
+                <Rectangle Fill="#333333" Width="30" Height="1" VerticalAlignment="Center" Margin="0,0,0,14"/>
+
+                <StackPanel x:Name="Step2Panel" Orientation="Vertical" HorizontalAlignment="Center" Width="80">
+                    <Ellipse x:Name="Dot2" Width="28" Height="28" HorizontalAlignment="Center">
+                        <Ellipse.Fill><SolidColorBrush x:Name="Dot2Fill" Color="#252525"/></Ellipse.Fill>
+                    </Ellipse>
+                    <TextBlock x:Name="Lbl2" Text="Network" FontSize="10" HorizontalAlignment="Center"
+                               Margin="0,5,0,0" Foreground="#555555"/>
+                </StackPanel>
+
+                <Rectangle Fill="#333333" Width="30" Height="1" VerticalAlignment="Center" Margin="0,0,0,14"/>
+
+                <StackPanel x:Name="Step3Panel" Orientation="Vertical" HorizontalAlignment="Center" Width="80">
+                    <Ellipse x:Name="Dot3" Width="28" Height="28" HorizontalAlignment="Center">
+                        <Ellipse.Fill><SolidColorBrush x:Name="Dot3Fill" Color="#252525"/></Ellipse.Fill>
+                    </Ellipse>
+                    <TextBlock x:Name="Lbl3" Text="Options" FontSize="10" HorizontalAlignment="Center"
+                               Margin="0,5,0,0" Foreground="#555555"/>
+                </StackPanel>
+
+                <Rectangle Fill="#333333" Width="30" Height="1" VerticalAlignment="Center" Margin="0,0,0,14"/>
+
+                <StackPanel x:Name="Step4Panel" Orientation="Vertical" HorizontalAlignment="Center" Width="80">
+                    <Ellipse x:Name="Dot4" Width="28" Height="28" HorizontalAlignment="Center">
+                        <Ellipse.Fill><SolidColorBrush x:Name="Dot4Fill" Color="#252525"/></Ellipse.Fill>
+                    </Ellipse>
+                    <TextBlock x:Name="Lbl4" Text="Install" FontSize="10" HorizontalAlignment="Center"
+                               Margin="0,5,0,0" Foreground="#555555"/>
+                </StackPanel>
+
+            </StackPanel>
+        </Border>
+
+        <!-- Page content -->
+        <ContentControl x:Name="ContentHost" Grid.Row="1"/>
+
+        <!-- Navigation buttons -->
+        <Border Grid.Row="2" Background="#0d0d0d" BorderBrush="#1e1e1e" BorderThickness="0,1,0,0" Padding="20,12">
+            <DockPanel x:Name="ButtonBar">
+                <Button x:Name="BtnBack" DockPanel.Dock="Left"
+                        Content="← Back" Style="{StaticResource NavButton}"
+                        Click="Back_Click"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="BtnCancel" Content="Cancel"
+                            Style="{StaticResource NavButton}" Click="Cancel_Click"
+                            Margin="0,0,10,0"/>
+                    <Button x:Name="BtnNext" Content="Next →"
+                            Style="{StaticResource PrimaryButton}" Click="Next_Click"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>
