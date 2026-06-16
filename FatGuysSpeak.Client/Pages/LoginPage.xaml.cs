@@ -10,6 +10,13 @@ public partial class LoginPage : ContentPage
         BindingContext = vm;
     }
 
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        if (BindingContext is AuthViewModel vm)
+            await vm.CheckGoogleAvailabilityAsync();
+    }
+
     private async void OnRegisterTapped(object sender, EventArgs e)
     {
         await Shell.Current.GoToAsync("//register");

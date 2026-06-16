@@ -46,6 +46,12 @@
                     CornerRadius="4" HeightRequest="44"
                     IsEnabled="{Binding IsLoading, Converter={StaticResource InvertBoolConverter}}" />
 
+            <Button Text="Continue with Google" Command="{Binding GoogleSignInCommand}"
+                    IsVisible="{Binding IsGoogleAvailable}"
+                    BackgroundColor="#ffffff" TextColor="#1e1f22"
+                    CornerRadius="4" HeightRequest="44"
+                    IsEnabled="{Binding IsLoading, Converter={StaticResource InvertBoolConverter}}" />
+
             <HorizontalStackLayout HorizontalOptions="Center" Spacing="4">
                 <Label Text="Need an account?" TextColor="#b5bac1" />
                 <Label Text="Register" TextColor="#00b0f4" >

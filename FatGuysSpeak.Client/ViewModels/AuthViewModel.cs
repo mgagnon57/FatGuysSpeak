@@ -5,13 +5,14 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class AuthViewModel(ApiService api, ChatHubService hub, PttService ptt) : ObservableObject
+public partial class AuthViewModel(ApiService api, ChatHubService hub, PttService ptt, GoogleAuthService google) : ObservableObject
 {
     [ObservableProperty] private string _username = "";
     [ObservableProperty] private string _password = "";
     [ObservableProperty] private string _email = "";
     [ObservableProperty] private string _errorMessage = "";
     [ObservableProperty] private bool _isLoading;
+    [ObservableProperty] private bool _isGoogleAvailable;
     [ObservableProperty] private string _serverUrl = Preferences.Get("server_url", ApiService.DefaultServerUrl);
 
     [ObservableProperty]
@@ -101,6 +102,55 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
             PersistServer(ServerUrl);
             ptt.LoadForUser(result.UserId);
             await hub.ConnectAsync(result.Token, api.ServerUrl);
+            await Shell.Current.GoToAsync("//main");
+        }
+        catch (Exception ex) { ErrorMessage = ex.Message; }
+        finally { IsLoading = false; }
+    }
+
+    public async Task CheckGoogleAvailabilityAsync()
+    {
+        if (!OperatingSystem.IsWindows()) { IsGoogleAvailable = false; return; }
+        try
+        {
+            api.SetServerUrl(ServerUrl);
+            var cfg = await api.GetGoogleConfigAsync();
+            IsGoogleAvailable = cfg is not null && !string.IsNullOrWhiteSpace(cfg.ClientId);
+        }
+        catch { IsGoogleAvailable = false; }
+    }
+
+    [RelayCommand]
+    private async Task GoogleSignInAsync()
+    {
+        ErrorMessage = "";
+        IsLoading = true;
+        try
+        {
+            api.SetServerUrl(ServerUrl);
+            var cfg = await api.GetGoogleConfigAsync();
+            if (cfg is null || string.IsNullOrWhiteSpace(cfg.ClientId))
+            {
+                ErrorMessage = "Google sign-in is not available on this server.";
+                return;
+            }
+
+            var result = await google.SignInAsync(cfg.ClientId);
+            if (!result.Success)
+            {
+                ErrorMessage = result.Error ?? "Google sign-in failed.";
+                return;
+            }
+
+            var auth = await api.ExchangeGoogleCodeAsync(
+                new FatGuysSpeak.Shared.GoogleCodeExchangeRequest(result.Code!, result.CodeVerifier!, result.RedirectUri!));
+            if (auth is null) { ErrorMessage = "Google sign-in failed."; return; }
+
+            api.SetToken(auth.Token);
+            api.SetCurrentUser(auth.UserId, auth.Username, auth.AvatarUrl);
+            PersistServer(ServerUrl);
+            ptt.LoadForUser(auth.UserId);
+            await hub.ConnectAsync(auth.Token, api.ServerUrl);
             await Shell.Current.GoToAsync("//main");
         }
         catch (Exception ex) { ErrorMessage = ex.Message; }
