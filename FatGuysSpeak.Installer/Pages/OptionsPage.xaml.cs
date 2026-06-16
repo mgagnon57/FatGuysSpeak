@@ -55,6 +55,7 @@ public partial class OptionsPage : UserControl, IWizardPage
 
     private void RadioStandalone_Checked(object sender, RoutedEventArgs e)
     {
+        if (StandaloneBorder is null || ServiceBorder is null) return;
         StandaloneBorder.Color = Color.FromRgb(0xf0, 0x40, 0x10);
         ServiceBorder.Color    = Color.FromRgb(0x25, 0x25, 0x25);
         _config.InstallAsService = false;
@@ -62,6 +63,7 @@ public partial class OptionsPage : UserControl, IWizardPage
 
     private void RadioService_Checked(object sender, RoutedEventArgs e)
     {
+        if (StandaloneBorder is null || ServiceBorder is null) return;
         StandaloneBorder.Color = Color.FromRgb(0x25, 0x25, 0x25);
         ServiceBorder.Color    = Color.FromRgb(0xf0, 0x40, 0x10);
         _config.InstallAsService = true;
