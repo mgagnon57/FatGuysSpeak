@@ -19,6 +19,12 @@ dotnet build FatGuysSpeak.Server --framework net9.0
 dotnet build FatGuysSpeak.Client --framework net9.0-windows10.0.19041.0
 ```
 
+**Build installer (Windows only):**
+```
+dotnet build FatGuysSpeak.Installer --framework net9.0-windows10.0.19041.0
+```
+Output binary: `FatGuysSpeak.Installer\bin\Debug\net9.0-windows10.0.19041.0\FatGuysSpeak-Server-Setup.exe`. Requires UAC elevation (requireAdministrator manifest). Copies server files from a `server\` subfolder next to the exe; if that folder is absent, the wizard runs in demo mode (skips all install steps).
+
 **Run all tests:**
 ```
 dotnet test FatGuysSpeak.Tests
@@ -44,12 +50,13 @@ The server binary must be in `FatGuysSpeak.Server\bin\Debug\net9.0\` (not net9.0
 
 ## Architecture
 
-Four projects in one solution:
+Five projects in one solution:
 
 - **FatGuysSpeak.Server** — ASP.NET Core 9 Web API + SignalR. Targets both `net9.0` (Railway/Linux) and `net9.0-windows10.0.19041.0` (local dev with WPF dashboard window). On Windows the dashboard opens as a WPF window; closing it stops the server.
 - **FatGuysSpeak.Client** — .NET MAUI app targeting Windows (primary), Android, iOS, macCatalyst. All features are Windows-only except basic chat.
 - **FatGuysSpeak.Shared** — DTOs, enums, and pure-logic helpers referenced by both Server and Client. Client-only logic that must be testable (e.g. `VideoUrlHelper`) lives here instead of in Client.
 - **FatGuysSpeak.Tests** — xUnit tests against Server + Shared only (no MAUI dependency). Uses in-memory SQLite via `TestDb` helper.
+- **FatGuysSpeak.Installer** — WPF wizard (5 pages) for installing the server on Windows. Dark-themed, UAC-elevated. Pages: Welcome → Credentials → Network → Options → Install. `InstallConfig` carries state across pages; each page implements `IWizardPage` (CanAdvance/OnActivated). The Install page writes `appsettings.Production.json` with a generated JWT key and optionally registers a Windows Service. Page content area is ~391px tall; all pages use `Margin="28,20,28,16"` to fit without scrolling.
 
 ### Database
 
