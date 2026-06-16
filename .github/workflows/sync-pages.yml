@@ -1,0 +1,31 @@
+name: Sync landing page to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - website/index.html
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Copy website/index.html to docs/
+        run: cp website/index.html docs/index.html
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          git diff --cached --quiet && echo "No changes" || git commit -m "chore: sync docs/index.html from website [skip ci]"
+          git push
