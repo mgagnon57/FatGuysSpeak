@@ -7,7 +7,7 @@ namespace FatGuysSpeak.Installer;
 
 public partial class MainWindow : Window
 {
-    public readonly InstallConfig Config = new();
+    public readonly InstallConfig Config;
 
     private readonly UserControl[] _pages;
     private int _step;
@@ -18,8 +18,9 @@ public partial class MainWindow : Window
 
     private readonly (SolidColorBrush fill, TextBlock label)[] _dots;
 
-    public MainWindow()
+    public MainWindow(InstallConfig config)
     {
+        Config = config;
         InitializeComponent();
 
         var welcomePage     = new WelcomePage();

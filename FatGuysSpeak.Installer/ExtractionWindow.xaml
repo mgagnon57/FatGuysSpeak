@@ -1,0 +1,54 @@
+<Window x:Class="FatGuysSpeak.Installer.ExtractionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="FatGuysSpeak Setup"
+        Width="420" Height="170"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded">
+    <Border Background="#0d0d0d" BorderBrush="#292525" BorderThickness="1">
+        <Grid Margin="32,26,32,26">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       Text="FATGUYS SPEAK"
+                       FontFamily="Segoe UI Black"
+                       FontSize="22"
+                       FontWeight="Black"
+                       Foreground="#f04010"
+                       />
+
+            <TextBlock Grid.Row="1"
+                       Text="Server Setup"
+                       FontFamily="Segoe UI"
+                       FontSize="12"
+                       Foreground="#555555"
+                       Margin="2,3,0,0"/>
+
+            <TextBlock x:Name="StatusText"
+                       Grid.Row="3"
+                       Text="Extracting files..."
+                       FontFamily="Segoe UI"
+                       FontSize="11"
+                       Foreground="#756e62"
+                       Margin="0,0,0,6"/>
+
+            <ProgressBar x:Name="Progress"
+                         Grid.Row="4"
+                         Height="3"
+                         Minimum="0" Maximum="100"
+                         BorderThickness="0"
+                         Background="#191717"
+                         Foreground="#d42d00"/>
+        </Grid>
+    </Border>
+</Window>
