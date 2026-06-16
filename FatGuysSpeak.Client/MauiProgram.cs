@@ -26,6 +26,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<ScreenStreamService>();
         builder.Services.AddSingleton<CameraService>();
         builder.Services.AddSingleton<ToastNotificationService>();
+        builder.Services.AddSingleton<GoogleAuthService>();
         builder.Services.AddSingleton<SettingsViewModel>();
 
         builder.Services.AddTransient<AuthViewModel>();
