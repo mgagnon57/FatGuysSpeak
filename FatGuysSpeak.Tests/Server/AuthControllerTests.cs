@@ -110,4 +110,29 @@ public class AuthControllerTests : IDisposable
         var isMember = _testDb.Db.ServerMembers.Any(sm => sm.ServerId == server.Id && sm.UserId == user.Id);
         Assert.True(isMember);
     }
+
+    [Fact]
+    public async Task Login_PasswordlessAccount_ReturnsUnauthorized()
+    {
+        var user = new User { Username = "googleuser", Email = "g@test.com", PasswordHash = "" };
+        _testDb.Db.Users.Add(user);
+        await _testDb.Db.SaveChangesAsync();
+
+        var result = await _controller.Login(new LoginRequest("googleuser", "anything"));
+
+        var unauth = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+        Assert.Equal("Invalid credentials.", unauth.Value);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_PasswordlessAccount_CreatesNoResetToken()
+    {
+        var user = new User { Username = "googleuser", Email = "g@test.com", PasswordHash = "" };
+        _testDb.Db.Users.Add(user);
+        await _testDb.Db.SaveChangesAsync();
+
+        await _controller.ForgotPassword(new ForgotPasswordRequest("g@test.com"));
+
+        Assert.False(_testDb.Db.PasswordResetTokens.Any(t => t.UserId == user.Id));
+    }
 }

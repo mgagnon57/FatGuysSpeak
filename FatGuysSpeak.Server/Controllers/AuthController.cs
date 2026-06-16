@@ -55,8 +55,12 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest req)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == req.Username);
-        var passwordHash = user?.PasswordHash ?? BCrypt.Net.BCrypt.HashPassword("__dummy__");
-        if (user is null || !BCrypt.Net.BCrypt.Verify(req.Password, passwordHash))
+        var hasPassword = user is not null && !string.IsNullOrEmpty(user.PasswordHash);
+        // Always run a BCrypt verify (against a dummy hash when there's no password) to keep
+        // login timing constant for unknown users and OAuth-only accounts.
+        var passwordHash = hasPassword ? user!.PasswordHash : BCrypt.Net.BCrypt.HashPassword("__dummy__");
+        var verified = BCrypt.Net.BCrypt.Verify(req.Password, passwordHash);
+        if (user is null || !hasPassword || !verified)
             return Unauthorized("Invalid credentials.");
 
         var ip = HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -81,7 +85,7 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest req)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-        if (user is not null)
+        if (user is not null && !string.IsNullOrEmpty(user.PasswordHash))
         {
             // Expire previous tokens for this user
             var old = await db.PasswordResetTokens.Where(t => t.UserId == user.Id && !t.IsUsed).ToListAsync();
