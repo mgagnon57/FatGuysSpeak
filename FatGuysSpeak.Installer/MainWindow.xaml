@@ -69,9 +69,7 @@
         </Border>
 
         <!-- Page content -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <ContentControl x:Name="ContentHost"/>
-        </ScrollViewer>
+        <ContentControl x:Name="ContentHost" Grid.Row="1"/>
 
         <!-- Navigation buttons -->
         <Border Grid.Row="2" Background="#0d0d0d" BorderBrush="#1e1e1e" BorderThickness="0,1,0,0" Padding="20,12">
