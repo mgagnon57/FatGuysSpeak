@@ -83,19 +83,18 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
 
     [HttpPost("external/google")]
     public async Task<ActionResult<AuthResponse>> GoogleSignIn(
-        GoogleAuthRequest req, [FromServices] FatGuysSpeak.Server.Services.IGoogleTokenValidator validator)
+        GoogleAuthRequest req, [FromServices] IGoogleTokenValidator validator)
     {
         if (string.IsNullOrWhiteSpace(req.IdToken))
             return Unauthorized("Missing Google token.");
 
-        FatGuysSpeak.Server.Services.GoogleIdentity identity;
+        GoogleIdentity identity;
         try
         {
             identity = await validator.ValidateAsync(req.IdToken);
         }
         catch (InvalidOperationException)
         {
-            // Google sign-in not configured on this server (no Google:ClientId).
             return StatusCode(503, "Google sign-in is not configured on this server.");
         }
         catch (Google.Apis.Auth.InvalidJwtException)
@@ -106,9 +105,15 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
         if (!identity.EmailVerified)
             return Unauthorized("Your Google email must be verified to sign in.");
 
+        return await ResolveGoogleIdentityAndIssueAsync(identity);
+    }
+
+    // Resolve a validated Google identity to a local account (existing link -> email auto-link ->
+    // create) and issue the normal JWT. Shared by the id-token and code-exchange endpoints.
+    private async Task<ActionResult<AuthResponse>> ResolveGoogleIdentityAndIssueAsync(GoogleIdentity identity)
+    {
         const string provider = "google";
 
-        // 1. Existing external login for this Google account?
         var link = await db.ExternalLogins
             .FirstOrDefaultAsync(e => e.Provider == provider && e.ProviderUserId == identity.Sub);
 
@@ -119,16 +124,13 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
         }
         else
         {
-            // 2. Existing account by verified email -> auto-link. Otherwise 3. create new.
-            // Wrap creation + linking in a transaction so a concurrent first-time sign-in
-            // for the same email surfaces as a clean 409 instead of a torn write / 500.
             await using var tx = await db.Database.BeginTransactionAsync();
             try
             {
                 user = await db.Users.FirstOrDefaultAsync(u => u.Email == identity.Email);
                 if (user is null)
                 {
-                    var baseName = FatGuysSpeak.Server.Services.UsernameGenerator.Sanitize(identity.Name, identity.Email);
+                    var baseName = UsernameGenerator.Sanitize(identity.Name, identity.Email);
                     var username = await GenerateUniqueUsernameAsync(baseName);
                     user = new User { Username = username, Email = identity.Email, PasswordHash = "" };
                     db.Users.Add(user);
