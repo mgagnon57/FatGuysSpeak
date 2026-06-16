@@ -34,6 +34,7 @@ else
 }
 
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<FatGuysSpeak.Server.Services.IGoogleTokenValidator, FatGuysSpeak.Server.Services.GoogleTokenValidator>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.ServerMetricsService>();
 builder.Services.AddHttpClient("anthropic", c =>
 {
