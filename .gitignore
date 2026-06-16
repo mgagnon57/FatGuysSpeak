@@ -33,3 +33,18 @@ claude.exe
 
 ## Runtime logs
 *.log
+server-out.txt
+server-err.txt
+test-out.txt
+
+## SQLite write-ahead-log sidecars
+*.db-shm
+*.db-wal
+
+## Local uploads (server stores files here at runtime)
+FatGuysSpeak.Server/uploads/
+
+## Release / packaging artifacts
+release-output/
+release-staging/
+release-zips/
