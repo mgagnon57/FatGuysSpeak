@@ -81,6 +81,84 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
         return Ok(new AuthResponse(token, user.Username, user.Id, user.AvatarUrl));
     }
 
+    [HttpPost("external/google")]
+    public async Task<ActionResult<AuthResponse>> GoogleSignIn(
+        GoogleAuthRequest req, [FromServices] FatGuysSpeak.Server.Services.IGoogleTokenValidator validator)
+    {
+        if (string.IsNullOrWhiteSpace(req.IdToken))
+            return Unauthorized("Missing Google token.");
+
+        FatGuysSpeak.Server.Services.GoogleIdentity identity;
+        try
+        {
+            identity = await validator.ValidateAsync(req.IdToken);
+        }
+        catch (Google.Apis.Auth.InvalidJwtException)
+        {
+            return Unauthorized("Invalid Google token.");
+        }
+
+        if (!identity.EmailVerified)
+            return Unauthorized("Your Google email must be verified to sign in.");
+
+        const string provider = "google";
+
+        // 1. Existing external login for this Google account?
+        var link = await db.ExternalLogins
+            .FirstOrDefaultAsync(e => e.Provider == provider && e.ProviderUserId == identity.Sub);
+
+        User? user;
+        if (link is not null)
+        {
+            user = await db.Users.FindAsync(link.UserId);
+        }
+        else
+        {
+            // 2. Existing account by verified email -> auto-link. Otherwise 3. create new.
+            user = await db.Users.FirstOrDefaultAsync(u => u.Email == identity.Email);
+            if (user is null)
+            {
+                var baseName = FatGuysSpeak.Server.Services.UsernameGenerator.Sanitize(identity.Name, identity.Email);
+                var username = await GenerateUniqueUsernameAsync(baseName);
+                user = new User { Username = username, Email = identity.Email, PasswordHash = "" };
+                db.Users.Add(user);
+                await db.SaveChangesAsync();
+            }
+            db.ExternalLogins.Add(new ExternalLogin
+            {
+                UserId = user.Id,
+                Provider = provider,
+                ProviderUserId = identity.Sub,
+                Email = identity.Email
+            });
+            await db.SaveChangesAsync();
+        }
+
+        if (user is null) return Unauthorized("Account could not be resolved.");
+
+        await AutoJoinDefaultServerAsync(user.Id);
+        var token = tokens.CreateToken(user);
+        await RecordSessionAsync(user.Id, token);
+        await db.SaveChangesAsync();
+        return Ok(new AuthResponse(token, user.Username, user.Id, user.AvatarUrl));
+    }
+
+    private async Task<string> GenerateUniqueUsernameAsync(string baseName)
+    {
+        if (!await db.Users.AnyAsync(u => u.Username == baseName))
+            return baseName;
+        for (int i = 1; i < 10000; i++)
+        {
+            var suffix = i.ToString();
+            var candidate = baseName.Length + suffix.Length > 32
+                ? baseName[..(32 - suffix.Length)] + suffix
+                : baseName + suffix;
+            if (!await db.Users.AnyAsync(u => u.Username == candidate))
+                return candidate;
+        }
+        return baseName[..Math.Min(baseName.Length, 24)] + Guid.NewGuid().ToString("N")[..8];
+    }
+
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest req)
     {

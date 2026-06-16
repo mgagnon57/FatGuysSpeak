@@ -3,6 +3,7 @@ namespace FatGuysSpeak.Shared;
 public record RegisterRequest(string Username, string Password, string Email);
 public record LoginRequest(string Username, string Password);
 public record AuthResponse(string Token, string Username, int UserId, string? AvatarUrl = null);
+public record GoogleAuthRequest(string IdToken);
 
 public record ServerDto(int Id, string Name, string? Description, string OwnerId, int MemberCount, ServerRole MyRole = ServerRole.Member, bool HasIcon = false, NotifLevel? UserNotifLevel = null);
 
