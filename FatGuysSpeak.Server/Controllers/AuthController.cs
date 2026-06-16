@@ -93,6 +93,11 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
         {
             identity = await validator.ValidateAsync(req.IdToken);
         }
+        catch (InvalidOperationException)
+        {
+            // Google sign-in not configured on this server (no Google:ClientId).
+            return StatusCode(503, "Google sign-in is not configured on this server.");
+        }
         catch (Google.Apis.Auth.InvalidJwtException)
         {
             return Unauthorized("Invalid Google token.");
@@ -115,26 +120,48 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
         else
         {
             // 2. Existing account by verified email -> auto-link. Otherwise 3. create new.
-            user = await db.Users.FirstOrDefaultAsync(u => u.Email == identity.Email);
-            if (user is null)
+            // Wrap creation + linking in a transaction so a concurrent first-time sign-in
+            // for the same email surfaces as a clean 409 instead of a torn write / 500.
+            await using var tx = await db.Database.BeginTransactionAsync();
+            try
             {
-                var baseName = FatGuysSpeak.Server.Services.UsernameGenerator.Sanitize(identity.Name, identity.Email);
-                var username = await GenerateUniqueUsernameAsync(baseName);
-                user = new User { Username = username, Email = identity.Email, PasswordHash = "" };
-                db.Users.Add(user);
+                user = await db.Users.FirstOrDefaultAsync(u => u.Email == identity.Email);
+                if (user is null)
+                {
+                    var baseName = FatGuysSpeak.Server.Services.UsernameGenerator.Sanitize(identity.Name, identity.Email);
+                    var username = await GenerateUniqueUsernameAsync(baseName);
+                    user = new User { Username = username, Email = identity.Email, PasswordHash = "" };
+                    db.Users.Add(user);
+                    await db.SaveChangesAsync();
+                }
+                db.ExternalLogins.Add(new ExternalLogin
+                {
+                    UserId = user.Id,
+                    Provider = provider,
+                    ProviderUserId = identity.Sub,
+                    Email = identity.Email
+                });
                 await db.SaveChangesAsync();
+                await tx.CommitAsync();
             }
-            db.ExternalLogins.Add(new ExternalLogin
+            catch (DbUpdateException)
             {
-                UserId = user.Id,
-                Provider = provider,
-                ProviderUserId = identity.Sub,
-                Email = identity.Email
-            });
-            await db.SaveChangesAsync();
+                await tx.RollbackAsync();
+                return Conflict("Account could not be created; please try signing in again.");
+            }
         }
 
         if (user is null) return Unauthorized("Account could not be resolved.");
+
+        var ip = HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        db.AuditLogs.Add(new AuditLog
+        {
+            ServerId = 0,
+            ActorId = user.Id,
+            ActorUsername = user.Username,
+            Action = "google_login",
+            Detail = ip
+        });
 
         await AutoJoinDefaultServerAsync(user.Id);
         var token = tokens.CreateToken(user);

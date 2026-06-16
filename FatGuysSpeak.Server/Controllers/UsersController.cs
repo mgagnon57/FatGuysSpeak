@@ -86,6 +86,7 @@ public class UsersController(AppDbContext db) : ControllerBase
     }
 
     [HttpPut("me/username")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("messages")]
     public async Task<IActionResult> UpdateUsername(UpdateUsernameRequest req)
     {
         var name = req.Username?.Trim() ?? "";

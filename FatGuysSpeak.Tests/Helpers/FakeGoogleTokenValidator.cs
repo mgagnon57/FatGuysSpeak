@@ -10,6 +10,7 @@ public sealed class FakeGoogleTokenValidator : IGoogleTokenValidator
     public Task<GoogleIdentity> ValidateAsync(string idToken)
     {
         if (ThrowOnValidate is not null) throw ThrowOnValidate;
-        return Task.FromResult(Identity!);
+        return Task.FromResult(Identity
+            ?? throw new InvalidOperationException("FakeGoogleTokenValidator.Identity must be set before use."));
     }
 }

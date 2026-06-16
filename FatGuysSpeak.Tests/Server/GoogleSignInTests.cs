@@ -102,6 +102,19 @@ public class GoogleSignInTests : IDisposable
     }
 
     [Fact]
+    public async Task NotConfigured_ReturnsServiceUnavailable()
+    {
+        _validator.ThrowOnValidate = new InvalidOperationException("Google sign-in is not configured (Google:ClientId is missing).");
+
+        var result = await SignIn();
+
+        var status = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(503, status.StatusCode);
+        Assert.Empty(_testDb.Db.Users);
+        Assert.Empty(_testDb.Db.ExternalLogins);
+    }
+
+    [Fact]
     public async Task UsernameCollision_AppendsSuffix()
     {
         _testDb.Db.Users.Add(new User { Username = "janedoe", Email = "other@gmail.com", PasswordHash = "x" });
