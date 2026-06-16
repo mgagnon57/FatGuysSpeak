@@ -65,10 +65,11 @@ public class AvatarTests : IDisposable
             var envMock = new Mock<IWebHostEnvironment>();
             envMock.Setup(e => e.ContentRootPath).Returns(tempDir);
 
-            var fileContent = new byte[] { 0xFF, 0xD8, 0xFF }; // JPEG magic bytes
+            var fileContent = new byte[] { 0xFF, 0xD8, 0xFF, 0x00 }; // JPEG magic bytes
             var fileMock = new Mock<IFormFile>();
             fileMock.Setup(f => f.Length).Returns(fileContent.Length);
             fileMock.Setup(f => f.FileName).Returns("photo.jpg");
+            fileMock.Setup(f => f.OpenReadStream()).Returns(() => new MemoryStream(fileContent));
             fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
                 .Callback<Stream, CancellationToken>((s, _) => s.Write(fileContent))
                 .Returns(Task.CompletedTask);

@@ -113,6 +113,14 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private readonly HashSet<int> _blockedUserIds = [];
     private readonly Dictionary<int, ServerRole> _memberRoles = new();
 
+    // Stored so they can be removed in UnsubscribeEvents on logout
+    private Action<Exception?>? _hubReconnectingHandler;
+    private Action<string?>? _hubReconnectedHandler;
+    private Action<Exception?>? _hubDisconnectedHandler;
+    private Action<double>? _micLevelHandler;
+    private Action<string>? _hypothesisChangedHandler;
+    private Action<string>? _keyLearnedHandler;
+
     [ObservableProperty] private int _streamLatencyMs;
     [ObservableProperty] private string _streamQualityLabel = "1080p 20fps";
 
@@ -505,26 +513,32 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.ThreadReplyReceived += OnThreadReplyReceived;
         hub.UserMuted += OnUserMuted;
         hub.UserTempBanned += OnUserTempBanned;
-        hub.Reconnecting += _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Reconnecting");
-        hub.Reconnected  += _ => MainThread.BeginInvokeOnMainThread(async () =>
+        _hubReconnectingHandler = _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Reconnecting");
+        hub.Reconnecting += _hubReconnectingHandler;
+        _hubReconnectedHandler = _ => MainThread.BeginInvokeOnMainThread(async () =>
         {
             HubConnectionState = "Connected";
             await OnReconnectedAsync();
         });
-        hub.Disconnected += _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Disconnected");
+        hub.Reconnected  += _hubReconnectedHandler;
+        _hubDisconnectedHandler = _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Disconnected");
+        hub.Disconnected += _hubDisconnectedHandler;
         screen.FrameCaptured       += OnScreenFrameCaptured;
         screen.StreamAudioCaptured += OnStreamAudioCaptured;
-        audio.MicLevelChanged += level => MainThread.BeginInvokeOnMainThread(() => MicLevel = level);
+        _micLevelHandler = level => MainThread.BeginInvokeOnMainThread(() => MicLevel = level);
+        audio.MicLevelChanged += _micLevelHandler;
         speech.TextRecognized  += OnSpeechRecognized;
-        speech.HypothesisChanged += text => MainThread.BeginInvokeOnMainThread(() => HypothesisText = text);
+        _hypothesisChangedHandler = text => MainThread.BeginInvokeOnMainThread(() => HypothesisText = text);
+        speech.HypothesisChanged += _hypothesisChangedHandler;
         ptt.PttDown    += OnPttDown;
         ptt.PttUp      += OnPttUp;
-        ptt.KeyLearned += name =>
+        _keyLearnedHandler = name =>
         {
             PttKeyName = name;
             IsSettingPttKey = false;
             _ = Shell.Current.DisplayAlert("Push to Talk Key Set", $"Push to Talk key bound to: {name}\n\nHold that key while in a voice channel to transmit.", "OK");
         };
+        ptt.KeyLearned += _keyLearnedHandler;
         PttKeyName = ptt.PttKeyName;
         IsStreamChatOverlayVisible = Preferences.Get("stream_chat_overlay", false);
     }
@@ -1440,8 +1454,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             return;
         }
 
-        // SignalR group memberships are lost on reconnect — re-join channel group
+        // SignalR group memberships are lost on reconnect — re-join channel and voice groups
         await hub.JoinChannelAsync(SelectedChannel.Id);
+        if (InVoice && _voiceChannelId != 0)
+            await hub.JoinVoiceChannelAsync(_voiceChannelId);
 
         // Find the highest message ID we already have across all stores
         var lastId = _textMsgs.Concat(_voiceMsgs).Concat(_streamMsgs)
@@ -1478,20 +1494,27 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            var item = Servers.FirstOrDefault(s => s.Server.Id == serverId);
-            if (item is null) return;
-            Servers.Remove(item);
-            if (SelectedServer?.Id == serverId)
+            try
             {
-                if (Servers.Count > 0)
-                    await SelectServerAsync(Servers[0]);
-                else
+                var item = Servers.FirstOrDefault(s => s.Server.Id == serverId);
+                if (item is null) return;
+                Servers.Remove(item);
+                if (SelectedServer?.Id == serverId)
                 {
-                    SelectedServer = null;
-                    Channels.Clear();
-                    Members.Clear();
-                    Messages.Clear();
+                    if (Servers.Count > 0)
+                        await SelectServerAsync(Servers[0]);
+                    else
+                    {
+                        SelectedServer = null;
+                        Channels.Clear();
+                        Members.Clear();
+                        Messages.Clear();
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[OnKickedFromServer] {ex}");
             }
         });
     }
@@ -1501,8 +1524,15 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (!InVoice) return;
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            await LeaveVoiceAsync();
-            await Shell.Current.DisplayAlert("Removed from Voice", "You were removed from the voice channel by an admin.", "OK");
+            try
+            {
+                await LeaveVoiceAsync();
+                await Shell.Current.DisplayAlert("Removed from Voice", "You were removed from the voice channel by an admin.", "OK");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[OnKickedFromVoice] {ex}");
+            }
         });
     }
 
@@ -1517,6 +1547,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         audio.StopCapture();
         audio.StopPlayback();
         InVoice = false;
+        _voiceChannelId = 0;
         IsTestMic = false;
         IsPttActive = false;
         VoiceParticipants.Clear();
@@ -1552,8 +1583,23 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         if (!ptt.IsHookInstalled)
         {
-            await Shell.Current.DisplayAlert("Error", "Keyboard hook could not be installed. Try restarting the app.", "OK");
-            return;
+            bool consented = Preferences.Get("PttConsentGiven", false);
+            if (!consented)
+            {
+                bool accept = await Shell.Current.DisplayAlert(
+                    "Push to Talk — Keyboard Access",
+                    "PTT requires a global keyboard hook that reads key events from all applications, including when FatGuysSpeak is in the background. No keystrokes are logged or transmitted.\n\nAllow this?",
+                    "Allow", "Cancel");
+                if (!accept) return;
+                Preferences.Set("PttConsentGiven", true);
+            }
+            ptt.TryInstall();
+            await Task.Delay(200);
+            if (!ptt.IsHookInstalled)
+            {
+                await Shell.Current.DisplayAlert("Error", "Keyboard hook could not be installed. Try restarting the app.", "OK");
+                return;
+            }
         }
         await Shell.Current.DisplayAlert("Set Push to Talk Key",
             "Click OK, then press any key you want to use for Push to Talk.", "OK");
@@ -1586,13 +1632,81 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         speech.StopListening();
         if (InVoice) await LeaveVoiceAsync();
         await hub.DisconnectAsync();
+        UnsubscribeEvents();
         api.ClearToken();
         _initialized = false;
         await Shell.Current.GoToAsync("//login");
     }
 
+    private void UnsubscribeEvents()
+    {
+        hub.MessageReceived        -= OnMessageReceived;
+        hub.UserJoinedVoice        -= OnUserJoinedVoice;
+        hub.UserLeftVoice          -= OnUserLeftVoice;
+        hub.UserConnected          -= OnUserConnected;
+        hub.UserDisconnected       -= OnUserDisconnected;
+        hub.UserJoinedServer       -= OnUserJoinedServer;
+        hub.ChannelCreated         -= OnChannelCreated;
+        hub.ChannelUpdated         -= OnChannelUpdated;
+        hub.ChannelDeleted         -= OnChannelDeleted;
+        hub.ForceJoinChannel       -= OnForceJoinChannel;
+        hub.UserJoinedChannel      -= OnUserJoinedChannel;
+        hub.UserLeftChannel        -= OnUserLeftChannel;
+        hub.VoiceDataReceived      -= OnVoiceDataReceived;
+        hub.StreamStarted          -= OnStreamStarted;
+        hub.StreamStopped          -= OnStreamStopped;
+        hub.StreamFrameReceived    -= OnStreamFrameReceived;
+        hub.StreamAudioReceived    -= OnStreamAudioReceived;
+        hub.StreamNotification     -= OnStreamNotification;
+        hub.UserTyping             -= OnUserTyping;
+        hub.UserStoppedTyping      -= OnUserStoppedTyping;
+        hub.MessageEdited          -= OnMessageEdited;
+        hub.MessageDeleted         -= OnMessageDeleted;
+        hub.NewMessageNotification -= OnNewMessageNotification;
+        hub.ReactionsUpdated       -= OnReactionsUpdated;
+        hub.UserStatusChanged      -= OnUserStatusChanged;
+        hub.KickedFromVoice        -= OnKickedFromVoice;
+        hub.UserSpeaking           -= OnUserSpeaking;
+        hub.CameraStarted          -= OnCameraStarted;
+        hub.CameraStopped          -= OnCameraStopped;
+        hub.CameraFrameReceived    -= OnCameraFrameReceived;
+        hub.DirectMessageReceived  -= OnDirectMessageReceived;
+        hub.DirectMessageDeleted   -= OnDirectMessageDeleted;
+        hub.DmUserTyping           -= OnDmUserTyping;
+        hub.DmUserStoppedTyping    -= OnDmUserStoppedTyping;
+        hub.DmConversationRead     -= OnDmConversationRead;
+        hub.MessagePinned          -= OnMessagePinned;
+        hub.MessageUnpinned        -= OnMessageUnpinned;
+        hub.DmMessagePinned        -= OnDmMessagePinned;
+        hub.DmMessageUnpinned      -= OnDmMessageUnpinned;
+        hub.KickedFromServer       -= OnKickedFromServer;
+        hub.CategoryCreated        -= OnCategoryCreated;
+        hub.CategoryDeleted        -= OnCategoryDeleted;
+        hub.CategoryRenamed        -= OnCategoryRenamed;
+        hub.ChannelCategoryChanged -= OnChannelCategoryChanged;
+        hub.MemberRoleChanged      -= OnMemberRoleChanged;
+        hub.ChannelSlowmodeUpdated -= OnChannelSlowmodeUpdated;
+        hub.ThreadReplyReceived    -= OnThreadReplyReceived;
+        hub.UserMuted              -= OnUserMuted;
+        hub.UserTempBanned         -= OnUserTempBanned;
+        if (_hubReconnectingHandler is not null)  hub.Reconnecting -= _hubReconnectingHandler;
+        if (_hubReconnectedHandler is not null)   hub.Reconnected  -= _hubReconnectedHandler;
+        if (_hubDisconnectedHandler is not null)  hub.Disconnected -= _hubDisconnectedHandler;
+        screen.FrameCaptured       -= OnScreenFrameCaptured;
+        screen.StreamAudioCaptured -= OnStreamAudioCaptured;
+        if (_micLevelHandler is not null)         audio.MicLevelChanged    -= _micLevelHandler;
+        speech.TextRecognized                     -= OnSpeechRecognized;
+        if (_hypothesisChangedHandler is not null) speech.HypothesisChanged -= _hypothesisChangedHandler;
+        ptt.PttDown -= OnPttDown;
+        ptt.PttUp   -= OnPttUp;
+        if (_keyLearnedHandler is not null) ptt.KeyLearned -= _keyLearnedHandler;
+    }
+
+    private int _voiceChannelId;
+
     private async Task JoinVoiceAsync(ChannelDto channel)
     {
+        _voiceChannelId = channel.Id;
         await hub.JoinVoiceChannelAsync(channel.Id);
         audio.AudioCaptured += OnAudioCaptured;
         audio.StartPlayback();
@@ -1846,6 +1960,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         }
 
         var preview = await api.GetLinkPreviewAsync(url);
+        if (PreviewCache.Count >= 1000)
+            PreviewCache.TryRemove(PreviewCache.Keys.First(), out _);
         PreviewCache[url] = preview;
         item.Preview = preview;
     }

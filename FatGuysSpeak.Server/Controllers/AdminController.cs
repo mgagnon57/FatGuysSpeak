@@ -396,6 +396,8 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
             .OrderBy(c => c.Position)
             .FirstOrDefaultAsync();
 
+        // Messages are kept as a server-side log; they never resurface because channel ids
+        // are never reused (see ServersController.NextChannelIdAsync).
         db.Channels.Remove(channel);
         db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
         {
@@ -437,6 +439,9 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         {
             Name = name, Type = FatGuysSpeak.Shared.ChannelType.Text, ServerId = serverId, Position = pos
         };
+        // Never reuse a channel id on SQLite (see ServersController.NextChannelIdAsync).
+        if (db.Database.IsSqlite())
+            channel.Id = await ServersController.NextChannelIdAsync(db);
         db.Channels.Add(channel);
         db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
         {

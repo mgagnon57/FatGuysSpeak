@@ -37,6 +37,24 @@ public class ReplyTests : IDisposable
     }
 
     [Fact]
+    public async Task SendMessage_ReplyToMessageInAnotherChannel_ReturnsBadRequest()
+    {
+        await SeedAsync();
+        // A message in a different channel — replying to it would leak its content via the preview.
+        var otherChannel = new Channel { Name = "secret", Type = ChannelType.Text, ServerId = _server.Id, Position = 5 };
+        _db.Db.Channels.Add(otherChannel);
+        await _db.Db.SaveChangesAsync();
+        var foreign = new Message { Content = "top secret", AuthorId = _other.Id, ChannelId = otherChannel.Id };
+        _db.Db.Messages.Add(foreign);
+        await _db.Db.SaveChangesAsync();
+
+        var req = new SendMessageRequest("leak attempt", ReplyToMessageId: foreign.Id);
+        var result = await _ctrl.SendMessage(_channel.Id, req);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
     public async Task SendMessage_WithReply_SetsReplyToId()
     {
         await SeedAsync();

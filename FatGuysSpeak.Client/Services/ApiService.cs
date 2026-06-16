@@ -23,6 +23,7 @@ public class ApiService
     public void SetServerUrl(string url)
     {
         var normalized = url.TrimEnd('/');
+        ValidateServerUrl(normalized);
         ServerUrl = normalized;
         Preferences.Set("server_url", normalized);
         _http = BuildClient(normalized);
@@ -31,8 +32,18 @@ public class ApiService
                 new AuthenticationHeaderValue("Bearer", _token);
     }
 
+    private static void ValidateServerUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            throw new ArgumentException($"Invalid server URL: {url}");
+        var host = uri.Host;
+        bool isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1";
+        if (!isLocal && uri.Scheme != "https")
+            throw new ArgumentException("Remote server connections require HTTPS.");
+    }
+
     private static HttpClient BuildClient(string baseUrl) =>
-        new() { BaseAddress = new Uri(baseUrl + "/") };
+        new() { BaseAddress = new Uri(baseUrl + "/"), Timeout = TimeSpan.FromSeconds(30) };
 
     public int CurrentUserId { get; private set; }
     public string CurrentUsername { get; private set; } = "";
@@ -86,8 +97,12 @@ public class ApiService
     public Task<List<ChannelDto>?> GetChannelsAsync(int serverId) =>
         _http.GetFromJsonAsync<List<ChannelDto>>($"api/servers/{serverId}/channels");
 
-    public Task<ChannelDto?> CreateChannelAsync(int serverId, CreateChannelRequest req) =>
-        _http.PostAsJsonAsync($"api/servers/{serverId}/channels", req).ContinueWith(t => t.Result.Content.ReadFromJsonAsync<ChannelDto>().Result);
+    public async Task<ChannelDto?> CreateChannelAsync(int serverId, CreateChannelRequest req)
+    {
+        var resp = await _http.PostAsJsonAsync($"api/servers/{serverId}/channels", req);
+        if (!resp.IsSuccessStatusCode) return null;
+        return await resp.Content.ReadFromJsonAsync<ChannelDto>();
+    }
 
     public Task<List<UserDto>?> GetMembersAsync(int serverId) =>
         _http.GetFromJsonAsync<List<UserDto>>($"api/servers/{serverId}/members");
@@ -142,7 +157,7 @@ public class ApiService
         using var content = new MultipartFormDataContent();
         var fileContent = new StreamContent(stream);
         fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-        content.Add(fileContent, "file", fileName);
+        content.Add(fileContent, "file", Path.GetFileName(fileName));
         var resp = await _http.PutAsync($"api/servers/{serverId}/icon", content);
         return resp.IsSuccessStatusCode;
     }
@@ -158,7 +173,7 @@ public class ApiService
         using var content = new MultipartFormDataContent();
         var fileContent = new StreamContent(stream);
         fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
-        content.Add(fileContent, "file", fileName);
+        content.Add(fileContent, "file", Path.GetFileName(fileName));
         var resp = await _http.PostAsync("api/users/me/avatar", content);
         if (!resp.IsSuccessStatusCode) return null;
         var dto = await resp.Content.ReadFromJsonAsync<AttachmentDto>();
@@ -170,7 +185,7 @@ public class ApiService
         using var content = new MultipartFormDataContent();
         var fileContent = new StreamContent(stream);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-        content.Add(fileContent, "file", fileName);
+        content.Add(fileContent, "file", Path.GetFileName(fileName));
         var resp = await _http.PostAsync("api/attachments", content);
         if (!resp.IsSuccessStatusCode)
         {

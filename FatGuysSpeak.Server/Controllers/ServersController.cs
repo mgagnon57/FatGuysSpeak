@@ -109,6 +109,14 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
         var server = await db.Servers.FindAsync(serverId);
         if (server is null) return NotFound();
 
+        // Only the public/default server (OwnerId 0) may be joined directly by id.
+        // User-created servers are private and require an invite code (see JoinByInvite).
+        if (server.OwnerId != 0) return Forbid();
+
+        // Enforce active temp-bans so a banned user cannot rejoin.
+        if (await db.TempBans.AnyAsync(tb => tb.ServerId == serverId && tb.UserId == UserId && tb.ExpiresAt > DateTime.UtcNow))
+            return StatusCode(403, "You are temporarily banned from this server.");
+
         if (await db.ServerMembers.AnyAsync(sm => sm.ServerId == serverId && sm.UserId == UserId))
             return Conflict("Already a member.");
 
@@ -165,6 +173,10 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
 
         var pos = await db.Channels.Where(c => c.ServerId == serverId).CountAsync();
         var channel = new Channel { Name = req.Name, Type = req.Type, ServerId = serverId, Position = pos };
+        // On SQLite, force a never-before-used id so this channel can't inherit a deleted
+        // channel's orphaned messages. PostgreSQL sequences never recycle, so leave it auto.
+        if (db.Database.IsSqlite())
+            channel.Id = await NextChannelIdAsync(db);
         db.Channels.Add(channel);
         db.AuditLogs.Add(new AuditLog
         {
@@ -187,6 +199,9 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
         var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
         if (channel is null) return NotFound();
 
+        // Note: the channel's messages are intentionally left in place (kept as a server-side
+        // log). They will never resurface because channel ids are never reused — see
+        // NextChannelIdAsync, which is what stops a new channel from inheriting old text.
         db.Channels.Remove(channel);
         db.AuditLogs.Add(new AuditLog
         {
@@ -197,6 +212,27 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
 
         await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelDeleted", channelId);
         return NoContent();
+    }
+
+    // Hands out a channel id that has never been used before, using a persistent monotonic
+    // counter that survives channel deletion (unlike the SQLite rowid, which is recycled).
+    // This guarantees a freshly created channel can never collide with a deleted channel's
+    // leftover content. Only needed for SQLite — PostgreSQL sequences never reuse ids.
+    public static async Task<int> NextChannelIdAsync(AppDbContext db)
+    {
+        var seq = await db.AppSequences.FindAsync("channel");
+        if (seq is null)
+        {
+            // First run on this DB: start the counter past the highest channel id ever seen,
+            // including ids that linger only in old messages (orphans on FK-disabled DBs).
+            int hiChannels = await db.Channels.MaxAsync(c => (int?)c.Id) ?? 0;
+            int hiMessages = await db.Messages.MaxAsync(m => (int?)m.ChannelId) ?? 0;
+            seq = new AppSequence { Name = "channel", Value = Math.Max(hiChannels, hiMessages) };
+            db.AppSequences.Add(seq);
+        }
+        seq.Value++;
+        await db.SaveChangesAsync();
+        return (int)seq.Value;
     }
 
     [HttpPut("{serverId}/channels/{channelId}/slowmode")]
@@ -267,8 +303,8 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
         // General no-op guard — no write, no broadcast when role doesn't change
         if (req.Role == target.Role) return BadRequest("User already has that role.");
 
-        // Only the server owner can demote an existing Admin (OwnerId=0 means dashboard handles this)
-        if (target.Role == ServerRole.Admin && UserId != server.OwnerId)
+        // Only the server owner can promote to Admin or demote an existing Admin
+        if ((req.Role == ServerRole.Admin || target.Role == ServerRole.Admin) && UserId != server.OwnerId)
             return Forbid();
 
         var oldRole = target.Role;
@@ -401,6 +437,10 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
             .Include(s => s.Members)
             .FirstOrDefaultAsync(s => s.InviteCode == code || s.VanityCode == code);
         if (server is null) return NotFound("Invalid or expired invite code.");
+
+        // Enforce active temp-bans so a banned user cannot rejoin via an invite link.
+        if (await db.TempBans.AnyAsync(tb => tb.ServerId == server.Id && tb.UserId == UserId && tb.ExpiresAt > DateTime.UtcNow))
+            return StatusCode(403, "You are temporarily banned from this server.");
 
         if (server.Members.Any(m => m.UserId == UserId))
             return Conflict("Already a member.");

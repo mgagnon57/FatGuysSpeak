@@ -39,12 +39,15 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
             Email = req.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password),
         };
+        await using var tx = await db.Database.BeginTransactionAsync();
         db.Users.Add(user);
         await db.SaveChangesAsync();
         await AutoJoinDefaultServerAsync(user.Id);
 
         var token = tokens.CreateToken(user);
         await RecordSessionAsync(user.Id, token);
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
         return Ok(new AuthResponse(token, user.Username, user.Id, user.AvatarUrl));
     }
 
@@ -103,8 +106,8 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword(ResetPasswordRequest req)
     {
-        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 6)
-            return BadRequest("Password must be at least 6 characters.");
+        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 8)
+            return BadRequest("Password must be at least 8 characters.");
 
         var token = await db.PasswordResetTokens
             .Include(t => t.User)

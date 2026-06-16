@@ -108,6 +108,15 @@ public class ChatHub(AppDbContext db) : Hub
         if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId))
             return;
 
+        // Enforce the same read permission as JoinChannel/WatchStream so a low-role member
+        // can't join a restricted channel's voice session.
+        var perm = await db.ChannelPermissions.FindAsync(channelId);
+        if (perm is not null && perm.MinRoleToRead > ServerRole.Member)
+        {
+            var member = channel.Server.Members.FirstOrDefault(m => m.UserId == UserId);
+            if (member is null || member.Role < perm.MinRoleToRead) return;
+        }
+
         if (VoiceChannelMap.TryGetValue(UserId, out var oldChannel))
         {
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"voice-{oldChannel}");
@@ -191,13 +200,17 @@ public class ChatHub(AppDbContext db) : Hub
             .Select(sm => sm.UserId)
             .ToListAsync();
 
-        var onlineIds = memberIds.Where(id => OnlineUsers.ContainsKey(id)).ToList();
+        var onlineUsers = memberIds
+            .Select(id => OnlineUsers.TryGetValue(id, out var name) ? (id, name) : default)
+            .Where(x => x.name is not null)
+            .ToList();
+        var onlineIds = onlineUsers.Select(x => x.id).ToList();
         var statusMap = await db.Users
             .Where(u => onlineIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => u.Status);
 
-        return onlineIds
-            .Select(id => new UserDto(id, OnlineUsers[id], statusMap.GetValueOrDefault(id, UserStatus.Online)))
+        return onlineUsers
+            .Select(x => new UserDto(x.id, x.name!, statusMap.GetValueOrDefault(x.id, UserStatus.Online)))
             .ToList();
     }
 
@@ -300,15 +313,23 @@ public class ChatHub(AppDbContext db) : Hub
         if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId))
             return;
 
-        // Replace any previous stream from this user
-        if (ActiveStreamers.TryRemove(UserId, out var prev))
+        // Atomically capture any previous stream entry before writing the new one,
+        // so concurrent StartStream calls can't both skip the StreamStopped notification.
+        (int ChannelId, int ServerId, string Username) prev = default;
+        bool hadPrev = false;
+        ActiveStreamers.AddOrUpdate(
+            UserId,
+            _ => (channelId, channel.ServerId, Username),
+            (_, old) => { prev = old; hadPrev = true; return (channelId, channel.ServerId, Username); });
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"stream-{channelId}");
+
+        if (hadPrev)
         {
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"stream-{prev.ChannelId}");
+            if (prev.ChannelId != channelId)
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"stream-{prev.ChannelId}");
             await Clients.Group($"server-{prev.ServerId}").SendAsync("StreamStopped", UserId, prev.ChannelId);
         }
-
-        ActiveStreamers[UserId] = (channelId, channel.ServerId, Username);
-        await Groups.AddToGroupAsync(Context.ConnectionId, $"stream-{channelId}");
         // Notify all server members so clients on any channel see the stream tab light up
         await Clients.Group($"server-{channel.ServerId}").SendAsync("StreamStarted", UserId, Username, channelId);
         await BroadcastStreamNotificationAsync(channel.ServerId,
@@ -345,6 +366,15 @@ public class ChatHub(AppDbContext db) : Hub
             .Include(c => c.Server).ThenInclude(s => s.Members)
             .FirstOrDefaultAsync(c => c.Id == channelId);
         if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId)) return;
+
+        // Enforce the same read permission as JoinChannel
+        var perm = await db.ChannelPermissions.FindAsync(channelId);
+        if (perm is not null && perm.MinRoleToRead > ServerRole.Member)
+        {
+            var member = channel.Server.Members.FirstOrDefault(m => m.UserId == UserId);
+            if (member is null || member.Role < perm.MinRoleToRead) return;
+        }
+
         await Groups.AddToGroupAsync(Context.ConnectionId, $"stream-{channelId}");
     }
 
@@ -362,7 +392,8 @@ public class ChatHub(AppDbContext db) : Hub
 
     public async Task StopTyping(int channelId)
     {
-        if (!UserTextChannelMap.TryGetValue(UserId, out var current) || current != channelId) return;
+        // No membership guard (unlike StartTyping): always broadcast the stop so a stale
+        // "user is typing" indicator is cleared even after the sender switched channels.
         await Clients.OthersInGroup($"channel-{channelId}")
             .SendAsync("UserStoppedTyping", UserId, channelId);
     }

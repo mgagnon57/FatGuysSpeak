@@ -90,6 +90,8 @@ public class DirectMessagesController(AppDbContext db, IHubContext<ChatHub> hub)
             return BadRequest("Message must have content or an attachment.");
         if (req.Content?.Length > 2000)
             return BadRequest("Message content must be 2000 characters or fewer.");
+        if (req.AttachmentUrl is not null && !IsValidAttachmentUrl(req.AttachmentUrl))
+            return BadRequest("Invalid attachment URL.");
 
         var convo = await db.DirectConversations.FindAsync(conversationId);
         if (convo is null) return NotFound();
@@ -191,4 +193,13 @@ public class DirectMessagesController(AppDbContext db, IHubContext<ChatHub> hub)
     private Task<bool> IsParticipantAsync(int conversationId) =>
         db.DirectConversations.AnyAsync(dc => dc.Id == conversationId
             && (dc.User1Id == UserId || dc.User2Id == UserId));
+
+    // Only allow attachments that point at our own uploads or giphy — mirrors MessagesController.
+    private static bool IsValidAttachmentUrl(string url)
+    {
+        if (url.Contains("/uploads/", StringComparison.OrdinalIgnoreCase)) return true;
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri)
+               && uri.Scheme == Uri.UriSchemeHttps
+               && uri.Host.EndsWith(".giphy.com", StringComparison.OrdinalIgnoreCase);
+    }
 }

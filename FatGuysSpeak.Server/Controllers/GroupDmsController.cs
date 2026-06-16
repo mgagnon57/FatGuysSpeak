@@ -47,6 +47,12 @@ public class GroupDmsController(AppDbContext db, IHubContext<ChatHub> hub) : Con
         var existing = await db.Users.Where(u => allIds.Contains(u.Id)).Select(u => u.Id).ToListAsync();
         if (existing.Count != allIds.Count) return BadRequest("One or more users not found.");
 
+        // Honor blocks: can't pull a user into a group if either party has blocked the other.
+        if (await db.UserBlocks.AnyAsync(b =>
+            (b.BlockerId == UserId && allIds.Contains(b.BlockedId)) ||
+            (b.BlockedId == UserId && allIds.Contains(b.BlockerId))))
+            return BadRequest("Cannot add a blocked user to the group.");
+
         var convo = new GroupConversation { Name = req.Name.Trim(), CreatedById = UserId };
         db.GroupConversations.Add(convo);
         await db.SaveChangesAsync();
@@ -133,6 +139,12 @@ public class GroupDmsController(AppDbContext db, IHubContext<ChatHub> hub) : Con
 
         var user = await db.Users.FindAsync(userId);
         if (user is null) return NotFound("User not found.");
+
+        // Prevent adding a user who has blocked or been blocked by the group creator
+        if (await db.UserBlocks.AnyAsync(b =>
+            (b.BlockerId == UserId && b.BlockedId == userId) ||
+            (b.BlockerId == userId && b.BlockedId == UserId)))
+            return BadRequest("Cannot add a blocked user to the group.");
 
         db.GroupConversationMembers.Add(new GroupConversationMember { GroupConversationId = groupId, UserId = userId });
         await db.SaveChangesAsync();

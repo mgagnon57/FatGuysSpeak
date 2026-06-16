@@ -115,12 +115,17 @@ builder.Services.AddAuthentication(opt =>
 // Rate limiters: auth (per-IP) + messages (per-user)
 builder.Services.AddRateLimiter(opt =>
 {
-    opt.AddFixedWindowLimiter("auth", limiter =>
+    // Per-IP (not global) so one client can't exhaust the budget and lock out everyone else.
+    opt.AddPolicy("auth", httpContext =>
     {
-        limiter.Window = TimeSpan.FromMinutes(1);
-        limiter.PermitLimit = 10;
-        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        limiter.QueueLimit = 0;
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(ip, _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = 10,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0,
+        });
     });
 
     opt.AddPolicy("messages", httpContext =>
@@ -138,12 +143,16 @@ builder.Services.AddRateLimiter(opt =>
         });
     });
 
-    opt.AddFixedWindowLimiter("dashboard", limiter =>
+    opt.AddPolicy("dashboard", httpContext =>
     {
-        limiter.Window = TimeSpan.FromMinutes(1);
-        limiter.PermitLimit = 5;
-        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        limiter.QueueLimit = 0;
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter($"dash:{ip}", _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = 5,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0,
+        });
     });
 
     opt.OnRejected = async (context, token) =>
@@ -170,7 +179,7 @@ builder.Services.AddHttpClient("preview", c =>
 {
     c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; FatGuysSpeak/1.0)");
     c.Timeout = TimeSpan.FromSeconds(8);
-});
+}).ConfigurePrimaryHttpMessageHandler(FatGuysSpeak.Server.Services.SsrfGuard.CreateHandler);
 builder.Services.AddHttpClient("giphy", c =>
 {
     c.BaseAddress = new Uri("https://api.giphy.com/v1/gifs/");
@@ -181,7 +190,8 @@ builder.Services.AddHostedService<FatGuysSpeak.Server.Services.AuditLogCleanupSe
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.SessionBlacklistService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.WebhookDeliveryService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.AutomodService>();
-builder.Services.AddHttpClient("webhook", c => c.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddHttpClient("webhook", c => c.Timeout = TimeSpan.FromSeconds(10))
+    .ConfigurePrimaryHttpMessageHandler(FatGuysSpeak.Server.Services.SsrfGuard.CreateHandler);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -661,6 +671,12 @@ using (var scope = app.Services.CreateScope())
         ctx.Database.ExecuteSqlRaw("CREATE UNIQUE INDEX IF NOT EXISTS IX_Servers_VanityCode ON Servers (VanityCode) WHERE VanityCode IS NOT NULL");
     }
 
+    // Monotonic counter table for never-reused channel ids (added for the channel-recycling fix).
+    if (isPostgres)
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""AppSequences"" (""Name"" TEXT PRIMARY KEY, ""Value"" BIGINT NOT NULL)");
+    else
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS AppSequences (Name TEXT PRIMARY KEY, Value INTEGER NOT NULL)");
+
     // Seed bot user
     var botUser = ctx.Users.FirstOrDefault(u => u.Username == FatGuysSpeak.Server.Services.BotService.BotUsername);
     if (botUser is null)
@@ -721,20 +737,31 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-// Forward proxy headers from Railway so rate-limiting and auth see the real client IP
-var forwardedOptions = new ForwardedHeadersOptions
+// Forward proxy headers ONLY when actually behind a cloud proxy (Railway sets DATABASE_URL,
+// and strips/overwrites client-supplied X-Forwarded-For at its edge). When running directly
+// (local/self-hosted), do NOT trust forwarded headers — otherwise any client could spoof its
+// IP, defeating per-IP rate limits and the dashboard's loopback (IsLocal) check.
+if (!string.IsNullOrEmpty(databaseUrl))
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-};
-forwardedOptions.KnownNetworks.Clear();
-forwardedOptions.KnownProxies.Clear();
-app.UseForwardedHeaders(forwardedOptions);
+    var forwardedOptions = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    };
+    forwardedOptions.KnownNetworks.Clear();
+    forwardedOptions.KnownProxies.Clear();
+    app.UseForwardedHeaders(forwardedOptions);
+}
 app.Use(async (ctx, next) =>
 {
     ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
     ctx.Response.Headers["X-Frame-Options"] = "DENY";
     ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
     ctx.Response.Headers["X-XSS-Protection"] = "1; mode=block";
+    // CSP for first-party HTML (dashboard/login). Skip Swagger UI, which needs inline script.
+    if (!ctx.Request.Path.StartsWithSegments("/swagger"))
+        ctx.Response.Headers["Content-Security-Policy"] =
+            "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; " +
+            "script-src 'self'; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'";
     if (ctx.Request.IsHttps)
         ctx.Response.Headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains";
     await next();

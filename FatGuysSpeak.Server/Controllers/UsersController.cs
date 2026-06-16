@@ -42,6 +42,7 @@ public class UsersController(AppDbContext db) : ControllerBase
     }
 
     [HttpPost("me/avatar")]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("messages")]
     [RequestSizeLimit(8 * 1024 * 1024 + 1024)]
     public async Task<ActionResult<AttachmentDto>> UploadAvatar(IFormFile file, [FromServices] IWebHostEnvironment env)
     {
@@ -51,6 +52,10 @@ public class UsersController(AppDbContext db) : ControllerBase
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (!AllowedImageExtensions.Contains(ext))
             return BadRequest($"File type not allowed. Allowed: {string.Join(", ", AllowedImageExtensions)}");
+
+        // Verify the bytes actually match the claimed image type, not just the extension.
+        if (!await FatGuysSpeak.Server.Services.ImageValidation.IsValidImageAsync(file, ext))
+            return BadRequest("File contents do not match a valid image of that type.");
 
         var filename = $"avatar_{UserId}_{Guid.NewGuid():N}{ext}";
         var uploadsDir = Path.Combine(env.ContentRootPath, "uploads");

@@ -52,12 +52,21 @@ public class AttachmentsControllerTests : IDisposable
         ctrl.ControllerContext = new ControllerContext { HttpContext = httpContext };
     }
 
+    // Magic-number prefixes so image uploads pass server-side content validation.
+    private static byte[] ImageMagic(string ext) => ext switch
+    {
+        ".png"            => new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A },
+        ".jpg" or ".jpeg" => new byte[] { 0xFF, 0xD8, 0xFF },
+        ".gif"            => System.Text.Encoding.ASCII.GetBytes("GIF89a"),
+        ".webp"           => System.Text.Encoding.ASCII.GetBytes("RIFF\0\0\0\0WEBP"),
+        _                 => Array.Empty<byte>()
+    };
+
     private static IFormFile MakeFile(string filename, string content = "fake image bytes", long? overrideLength = null, string? contentType = null)
     {
-        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
-        var stream = new MemoryStream(bytes);
-        long length = overrideLength ?? bytes.Length;
         var ext = Path.GetExtension(filename).ToLowerInvariant();
+        var bytes = ImageMagic(ext).Concat(System.Text.Encoding.UTF8.GetBytes(content)).ToArray();
+        long length = overrideLength ?? bytes.Length;
         var ct = contentType ?? ext switch
         {
             ".pdf"  => "application/pdf",
@@ -72,9 +81,9 @@ public class AttachmentsControllerTests : IDisposable
         fileMock.Setup(f => f.FileName).Returns(filename);
         fileMock.Setup(f => f.Length).Returns(length);
         fileMock.Setup(f => f.ContentType).Returns(ct);
+        fileMock.Setup(f => f.OpenReadStream()).Returns(() => new MemoryStream(bytes));
         fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
-            .Callback<Stream, CancellationToken>((dest, _) => stream.CopyTo(dest))
-            .Returns(Task.CompletedTask);
+            .Returns<Stream, CancellationToken>((dest, ct2) => new MemoryStream(bytes).CopyToAsync(dest, ct2));
         return fileMock.Object;
     }
 
@@ -199,6 +208,25 @@ public class AttachmentsControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Upload_PngExtensionButNonImageContent_ReturnsBadRequest()
+    {
+        // A non-image disguised with a .png extension must be rejected by magic-byte validation.
+        var fileMock = new Mock<IFormFile>();
+        var bytes = System.Text.Encoding.UTF8.GetBytes("MZ this is actually an executable");
+        fileMock.Setup(f => f.FileName).Returns("payload.png");
+        fileMock.Setup(f => f.Length).Returns(bytes.Length);
+        fileMock.Setup(f => f.OpenReadStream()).Returns(() => new MemoryStream(bytes));
+        fileMock.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
+            .Returns<Stream, CancellationToken>((dest, ct) => new MemoryStream(bytes).CopyToAsync(dest, ct));
+
+        var result = await _controller.Upload(fileMock.Object);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        // Rejected before any file is written (uploads dir is only created on success).
+        Assert.True(!Directory.Exists(_uploadsDir) || Directory.GetFiles(_uploadsDir).Length == 0);
+    }
+
+    [Fact]
     public async Task Upload_FileTooLarge_DoesNotWriteAnythingToUploadsDir()
     {
         var oversized = MakeFile("huge.jpg", overrideLength: 9 * 1024 * 1024L);
@@ -250,8 +278,10 @@ public class AttachmentsControllerTests : IDisposable
     {
         var result = await _controller.Upload(MakeFile("data.zip"));
 
+        // Non-image uploads report a server-determined generic MIME type to prevent
+        // client-supplied Content-Type spoofing (the client sends "application/zip").
         var dto = ((OkObjectResult)result.Result!).Value as AttachmentDto;
-        Assert.Equal("application/zip", dto!.ContentType);
+        Assert.Equal("application/octet-stream", dto!.ContentType);
     }
 
     [Fact]

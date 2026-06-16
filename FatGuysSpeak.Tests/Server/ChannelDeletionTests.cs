@@ -1,0 +1,129 @@
+using FatGuysSpeak.Server.Controllers;
+using FatGuysSpeak.Server.Models;
+using FatGuysSpeak.Shared;
+using FatGuysSpeak.Tests.Helpers;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace FatGuysSpeak.Tests.Server;
+
+// Regression tests for the channel-recycling bug: after a channel is deleted, a newly created
+// channel must NEVER reuse the freed id, so it can't inherit the old channel's content.
+// Guaranteed by a persistent monotonic counter (ServersController.NextChannelIdAsync).
+public class ChannelDeletionTests : IDisposable
+{
+    private readonly TestDb _db;
+    private readonly ServersController _servers;
+    private readonly MessagesController _messages;
+    private GuildServer _server = null!;
+    private User _admin = null!;
+
+    public ChannelDeletionTests()
+    {
+        _db = new TestDb();
+        _servers = new ServersController(_db.Db, TestHelpers.MockHub(), TestHelpers.NullWebhooks());
+        _messages = new MessagesController(_db.Db, TestHelpers.MockHub(), new FatGuysSpeak.Server.Services.ServerMetricsService(),
+            TestHelpers.NullBot(), TestHelpers.NullAutomod(), TestHelpers.NullWebhooks());
+    }
+
+    public void Dispose() => _db.Dispose();
+
+    private async Task SeedAsync()
+    {
+        (_server, _admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner"); // owner is Admin
+        TestHelpers.SetUser(_servers, _admin.Id, _admin.Username);
+        TestHelpers.SetUser(_messages, _admin.Id, _admin.Username);
+    }
+
+    private async Task<Channel> CreateChannelAsync(string name)
+    {
+        var result = await _servers.CreateChannel(_server.Id, new CreateChannelRequest(name, ChannelType.Text));
+        var dto = (ChannelDto)((OkObjectResult)result.Result!).Value!;
+        return (await _db.Db.Channels.FindAsync(dto.Id))!;
+    }
+
+    private async Task AddMessageAsync(int channelId, string content)
+    {
+        _db.Db.Messages.Add(new Message { Content = content, AuthorId = _admin.Id, ChannelId = channelId });
+        await _db.Db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task CreateAfterDelete_DoesNotReuseId_AndNewChannelIsEmpty()
+    {
+        await SeedAsync();
+        var a = await CreateChannelAsync("temp-a");
+        await AddMessageAsync(a.Id, "text that belonged to temp-a");
+        var oldId = a.Id;
+
+        var del = await _servers.DeleteChannel(_server.Id, a.Id);
+        Assert.IsType<NoContentResult>(del);
+
+        var b = await CreateChannelAsync("temp-b");
+
+        Assert.NotEqual(oldId, b.Id);                              // id was NOT reused
+        Assert.True(b.Id > oldId);                                 // strictly higher
+        Assert.Empty((await _messages.GetMessages(b.Id)).Value!);  // new channel shows nothing
+    }
+
+    [Fact]
+    public async Task ManyCreateDeleteCycles_NeverReuseAnId()
+    {
+        await SeedAsync();
+        var seen = new HashSet<int>(_db.Db.Channels.Select(c => c.Id));
+        for (var i = 0; i < 10; i++)
+        {
+            var ch = await CreateChannelAsync($"c{i}");
+            Assert.True(seen.Add(ch.Id), $"channel id {ch.Id} was reused on cycle {i}");
+            await AddMessageAsync(ch.Id, $"msg in c{i}");
+            await _servers.DeleteChannel(_server.Id, ch.Id);
+        }
+    }
+
+    [Fact]
+    public async Task NextChannelId_AlwaysIncreases_EvenAfterDelete()
+    {
+        await SeedAsync();
+        var a = await CreateChannelAsync("temp");
+        await _servers.DeleteChannel(_server.Id, a.Id);
+
+        var next = await ServersController.NextChannelIdAsync(_db.Db);
+        Assert.True(next > a.Id, $"next id {next} should be greater than deleted id {a.Id}");
+    }
+
+    [Fact]
+    public async Task NormalCreate_KeepsChannelsIsolated()
+    {
+        await SeedAsync();
+        var a = await CreateChannelAsync("a");
+        var b = await CreateChannelAsync("b");
+        await AddMessageAsync(a.Id, "in a");
+        await AddMessageAsync(b.Id, "in b only");
+
+        Assert.True(b.Id > a.Id);
+        var aMsgs = (await _messages.GetMessages(a.Id)).Value!;
+        var bMsgs = (await _messages.GetMessages(b.Id)).Value!;
+        Assert.Single(aMsgs);
+        Assert.Single(bMsgs);
+        Assert.Equal("in a", aMsgs[0].Content);
+        Assert.Equal("in b only", bMsgs[0].Content);
+    }
+
+    [Fact]
+    public async Task DeleteChannel_NonAdmin_Forbidden()
+    {
+        await SeedAsync();
+        var temp = await CreateChannelAsync("temp");
+        var member = new User { Username = "member", Email = "member@test.com", PasswordHash = "*" };
+        _db.Db.Users.Add(member);
+        await _db.Db.SaveChangesAsync();
+        _db.Db.ServerMembers.Add(new ServerMember { ServerId = _server.Id, UserId = member.Id, Role = ServerRole.Member });
+        await _db.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_servers, member.Id, member.Username);
+
+        var result = await _servers.DeleteChannel(_server.Id, temp.Id);
+
+        Assert.IsType<ForbidResult>(result);
+        Assert.True(await _db.Db.Channels.AnyAsync(c => c.Id == temp.Id)); // still there
+    }
+}

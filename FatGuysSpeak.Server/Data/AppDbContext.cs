@@ -31,6 +31,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GroupConversation> GroupConversations => Set<GroupConversation>();
     public DbSet<GroupConversationMember> GroupConversationMembers => Set<GroupConversationMember>();
     public DbSet<GroupMessage> GroupMessages => Set<GroupMessage>();
+    public DbSet<AppSequence> AppSequences => Set<AppSequence>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -92,5 +93,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<GuildServer>()
             .HasIndex(s => s.VanityCode).IsUnique();
+
+        b.Entity<AppSequence>()
+            .HasKey(s => s.Name);
     }
 }

@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,7 +26,10 @@ public class DashboardAuthController(IConfiguration config) : ControllerBase
         var expectedUser = config["Dashboard:Username"] ?? "";
         var expectedPass = config["Dashboard:Password"] ?? "";
 
-        if (username != expectedUser || password != expectedPass)
+        // Constant-time comparison to avoid leaking credential length/contents via timing.
+        var userOk = FixedTimeEquals(username, expectedUser);
+        var passOk = FixedTimeEquals(password, expectedPass);
+        if (!userOk || !passOk)
             return LocalRedirect("/dashboard/login?error=true");
 
         var claims = new List<Claim> { new(ClaimTypes.Name, "DashboardAdmin") };
@@ -34,6 +39,13 @@ public class DashboardAuthController(IConfiguration config) : ControllerBase
 
         return LocalRedirect("/dashboard");
     }
+
+    // Length-independent constant-time string comparison: hash both sides to a fixed
+    // 32-byte digest first so neither length nor contents leak via timing.
+    private static bool FixedTimeEquals(string? a, string? b) =>
+        CryptographicOperations.FixedTimeEquals(
+            SHA256.HashData(Encoding.UTF8.GetBytes(a ?? "")),
+            SHA256.HashData(Encoding.UTF8.GetBytes(b ?? "")));
 
     [HttpGet("/dashboard/logout")]
     public async Task<IActionResult> Logout()

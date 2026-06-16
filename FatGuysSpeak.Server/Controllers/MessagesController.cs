@@ -161,6 +161,15 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
             if (root is null || root.ChannelId != channelId) return BadRequest("Invalid thread root.");
         }
 
+        // Reply target must live in the same channel — otherwise the reply preview would
+        // leak the first 100 chars of a message from a channel the sender can't read.
+        if (req.ReplyToMessageId.HasValue)
+        {
+            var replyTarget = await db.Messages.FindAsync(req.ReplyToMessageId.Value);
+            if (replyTarget is null || replyTarget.ChannelId != channelId)
+                return BadRequest("Invalid reply target.");
+        }
+
         var user = await db.Users.FindAsync(UserId);
 
         var filteredContent = req.Content?.Trim() ?? "";
@@ -275,6 +284,14 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
         if (channel is null) return NotFound();
         if (!channel.Server.Members.Any(m => m.UserId == UserId)) return Forbid();
 
+        // Enforce the same read permission as GetMessages so search can't bypass it.
+        var perm = await db.ChannelPermissions.FindAsync(channelId);
+        if (perm is not null && perm.MinRoleToRead > ServerRole.Member)
+        {
+            var m = channel.Server.Members.FirstOrDefault(x => x.UserId == UserId);
+            if (m is null || m.Role < perm.MinRoleToRead) return Forbid();
+        }
+
         var ql = q.ToLower();
         var messages = await db.Messages
             .Where(m => m.ChannelId == channelId && !m.IsDeleted && m.Content.ToLower().Contains(ql))
@@ -316,7 +333,31 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
         if (message.AuthorId != UserId) return Forbid();
         if (message.IsDeleted) return BadRequest("Cannot edit a deleted message.");
 
-        message.Content = req.Content.Trim();
+        var content = req.Content.Trim();
+        var channel = await db.Channels.FindAsync(channelId);
+        if (channel is not null)
+        {
+            var member = await db.ServerMembers.FindAsync(channel.ServerId, UserId);
+            if (member is not null && member.Role < ServerRole.Moderator)
+            {
+                var filters = await db.WordFilters.Where(f => f.ServerId == channel.ServerId).ToListAsync();
+                if (filters.Count > 0)
+                {
+                    var wfResult = WordFiltersController.Apply(content, filters);
+                    if (wfResult.MaxSeverity == WordFilterSeverity.Mute)
+                    {
+                        member.MutedUntil = DateTime.UtcNow.AddMinutes(10);
+                        await db.SaveChangesAsync();
+                        return StatusCode(403, "Your message was blocked by word filter. You have been temporarily muted.");
+                    }
+                    if (wfResult.MaxSeverity == WordFilterSeverity.Delete)
+                        return StatusCode(403, "Your message was blocked by word filter.");
+                    content = wfResult.FilteredContent;
+                }
+            }
+        }
+
+        message.Content = content;
         message.EditedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
 

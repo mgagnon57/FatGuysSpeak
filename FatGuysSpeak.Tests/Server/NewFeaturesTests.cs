@@ -265,6 +265,21 @@ public class GroupDmsTests : IDisposable
     }
 
     [Fact]
+    public async Task Create_WithBlockedMember_ReturnsBadRequest()
+    {
+        await SeedAsync();
+        // bob blocked alice — alice must not be able to pull bob into a group.
+        _db.Db.UserBlocks.Add(new UserBlock { BlockerId = _bob.Id, BlockedId = _alice.Id });
+        await _db.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_ctrl, _alice.Id, _alice.Username);
+
+        var result = await _ctrl.Create(new CreateGroupConversationRequest("Test Group", [_bob.Id]));
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Empty(_db.Db.GroupConversations);
+    }
+
+    [Fact]
     public async Task SendMessage_AsMember_Succeeds()
     {
         await SeedAsync();

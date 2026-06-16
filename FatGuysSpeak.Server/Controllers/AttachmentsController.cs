@@ -23,6 +23,7 @@ public class AttachmentsController(IWebHostEnvironment env) : ControllerBase
          ".mp4", ".mov", ".mkv", ".webm"];
 
     [HttpPost]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("messages")]
     [RequestSizeLimit(25 * 1024 * 1024 + 1024)]
     public async Task<ActionResult<AttachmentDto>> Upload(IFormFile file)
     {
@@ -38,6 +39,10 @@ public class AttachmentsController(IWebHostEnvironment env) : ControllerBase
         long limit = isImage ? MaxImageBytes : MaxFileBytes;
         if (file.Length > limit)
             return BadRequest($"File too large. Maximum is {limit / (1024 * 1024)} MB for {(isImage ? "images" : "this file type")}.");
+
+        // For image types, verify the magic bytes match so a non-image can't masquerade as one.
+        if (isImage && !await FatGuysSpeak.Server.Services.ImageValidation.IsValidImageAsync(file, ext))
+            return BadRequest("File contents do not match a valid image of that type.");
 
         // Sanitize the original filename — keep extension, strip path separators
         var originalName = Path.GetFileName(file.FileName);

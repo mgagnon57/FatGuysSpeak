@@ -22,7 +22,7 @@ public class AuthControllerTests : IDisposable
     [Fact]
     public async Task Register_Success_ReturnsToken()
     {
-        var result = await _controller.Register(new RegisterRequest("alice", "pass123", "alice@test.com"));
+        var result = await _controller.Register(new RegisterRequest("alice", "password123", "alice@test.com"));
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var auth = Assert.IsType<AuthResponse>(ok.Value);
@@ -33,9 +33,9 @@ public class AuthControllerTests : IDisposable
     [Fact]
     public async Task Register_DuplicateUsername_ReturnsConflict()
     {
-        await _controller.Register(new RegisterRequest("alice", "pass", "alice@test.com"));
+        await _controller.Register(new RegisterRequest("alice", "password123", "alice@test.com"));
 
-        var result = await _controller.Register(new RegisterRequest("alice", "other", "other@test.com"));
+        var result = await _controller.Register(new RegisterRequest("alice", "password456", "other@test.com"));
 
         Assert.IsType<ConflictObjectResult>(result.Result);
     }
@@ -43,9 +43,9 @@ public class AuthControllerTests : IDisposable
     [Fact]
     public async Task Register_DuplicateEmail_ReturnsConflict()
     {
-        await _controller.Register(new RegisterRequest("alice", "pass", "shared@test.com"));
+        await _controller.Register(new RegisterRequest("alice", "password123", "shared@test.com"));
 
-        var result = await _controller.Register(new RegisterRequest("bob", "pass", "shared@test.com"));
+        var result = await _controller.Register(new RegisterRequest("bob", "password123", "shared@test.com"));
 
         Assert.IsType<ConflictObjectResult>(result.Result);
     }
@@ -53,9 +53,9 @@ public class AuthControllerTests : IDisposable
     [Fact]
     public async Task Login_Success_ReturnsToken()
     {
-        await _controller.Register(new RegisterRequest("alice", "pass123", "alice@test.com"));
+        await _controller.Register(new RegisterRequest("alice", "password123", "alice@test.com"));
 
-        var result = await _controller.Login(new LoginRequest("alice", "pass123"));
+        var result = await _controller.Login(new LoginRequest("alice", "password123"));
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var auth = Assert.IsType<AuthResponse>(ok.Value);
@@ -65,9 +65,9 @@ public class AuthControllerTests : IDisposable
     [Fact]
     public async Task Login_WrongPassword_ReturnsUnauthorizedWithMessage()
     {
-        await _controller.Register(new RegisterRequest("alice", "correct", "alice@test.com"));
+        await _controller.Register(new RegisterRequest("alice", "correctpass", "alice@test.com"));
 
-        var result = await _controller.Login(new LoginRequest("alice", "wrong"));
+        var result = await _controller.Login(new LoginRequest("alice", "wrongpass"));
 
         var unauth = Assert.IsType<UnauthorizedObjectResult>(result.Result);
         Assert.Equal("Invalid credentials.", unauth.Value);
@@ -87,7 +87,7 @@ public class AuthControllerTests : IDisposable
     {
         var (server, _) = await TestHelpers.SeedServerAsync(_testDb.Db, "owner");
 
-        await _controller.Register(new RegisterRequest("newuser", "pass", "new@test.com"));
+        await _controller.Register(new RegisterRequest("newuser", "password123", "new@test.com"));
 
         var newUser = _testDb.Db.Users.First(u => u.Username == "newuser");
         var isMember = _testDb.Db.ServerMembers

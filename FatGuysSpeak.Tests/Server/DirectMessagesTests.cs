@@ -47,6 +47,32 @@ public class DirectMessagesTests : IDisposable
         return (alice, bob);
     }
 
+    // ── Attachment URL validation ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task SendMessage_ArbitraryAttachmentUrl_ReturnsBadRequest()
+    {
+        var (alice, bob) = await SeedUsersAsync();
+        var convo = ((DirectConversationDto)((OkObjectResult)(await MakeController(alice.Id, "alice").OpenConversation(bob.Id)).Result!).Value!);
+
+        var req = new SendDirectMessageRequest(null, "https://evil.example.com/track.png", "track.png");
+        var result = await MakeController(alice.Id, "alice").SendMessage(convo.Id, req);
+
+        Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task SendMessage_UploadsAttachmentUrl_Succeeds()
+    {
+        var (alice, bob) = await SeedUsersAsync();
+        var convo = ((DirectConversationDto)((OkObjectResult)(await MakeController(alice.Id, "alice").OpenConversation(bob.Id)).Result!).Value!);
+
+        var req = new SendDirectMessageRequest(null, "http://localhost:5238/uploads/abc.png", "abc.png");
+        var result = await MakeController(alice.Id, "alice").SendMessage(convo.Id, req);
+
+        Assert.IsType<OkObjectResult>(result.Result);
+    }
+
     // ── OpenConversation ──────────────────────────────────────────────────────
 
     [Fact]

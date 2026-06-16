@@ -23,6 +23,7 @@ public class MarkdownView : ContentView
 
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseEmphasisExtras()
+        .DisableHtml()
         .Build();
 
     private void Render(string text)

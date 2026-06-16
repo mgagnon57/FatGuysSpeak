@@ -214,6 +214,14 @@ public class UserChannelNotif
     public NotifLevel Level { get; set; }
 }
 
+// Monotonic counters that must never go backwards even when rows are deleted.
+// Used to hand out channel ids that are never reused (SQLite recycles rowids otherwise).
+public class AppSequence
+{
+    public string Name { get; set; } = "";
+    public long Value { get; set; }
+}
+
 public class UserServerNotif
 {
     public int UserId { get; set; }

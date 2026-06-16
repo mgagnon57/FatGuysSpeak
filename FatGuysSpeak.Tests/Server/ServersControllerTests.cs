@@ -69,10 +69,18 @@ public class ServersControllerTests : IDisposable
         Assert.Contains(channels, c => c.Type == ChannelType.Voice);
     }
 
+    // Makes the seeded server the public/default one (OwnerId 0) so it can be joined by id.
+    private async Task MakeServerPublicAsync()
+    {
+        _server.OwnerId = 0;
+        await _testDb.Db.SaveChangesAsync();
+    }
+
     [Fact]
-    public async Task JoinServer_Success_AddsMembership()
+    public async Task JoinServer_PublicServer_AddsMembership()
     {
         await SeedAsync();
+        await MakeServerPublicAsync();
         var newUser = new User { Username = "newbie", Email = "newbie@test.com", PasswordHash = "*" };
         _testDb.Db.Users.Add(newUser);
         await _testDb.Db.SaveChangesAsync();
@@ -85,9 +93,44 @@ public class ServersControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task JoinServer_PrivateServer_ReturnsForbidden()
+    {
+        // Default seeded server is private (OwnerId = owner's id); joining by id must be blocked.
+        await SeedAsync();
+        var newUser = new User { Username = "intruder", Email = "intruder@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(newUser);
+        await _testDb.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_controller, newUser.Id, newUser.Username);
+
+        var result = await _controller.JoinServer(_server.Id);
+
+        Assert.IsType<ForbidResult>(result);
+        Assert.False(_testDb.Db.ServerMembers.Any(sm => sm.ServerId == _server.Id && sm.UserId == newUser.Id));
+    }
+
+    [Fact]
+    public async Task JoinServer_TempBanned_ReturnsForbidden()
+    {
+        await SeedAsync();
+        await MakeServerPublicAsync();
+        var banned = new User { Username = "banned", Email = "banned@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(banned);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.TempBans.Add(new TempBan { ServerId = _server.Id, UserId = banned.Id, ActorId = _user.Id, ExpiresAt = DateTime.UtcNow.AddHours(1) });
+        await _testDb.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_controller, banned.Id, banned.Username);
+
+        var result = await _controller.JoinServer(_server.Id);
+
+        Assert.Equal(403, Assert.IsType<ObjectResult>(result).StatusCode);
+        Assert.False(_testDb.Db.ServerMembers.Any(sm => sm.ServerId == _server.Id && sm.UserId == banned.Id));
+    }
+
+    [Fact]
     public async Task JoinServer_AlreadyMember_ReturnsConflict()
     {
         await SeedAsync();
+        await MakeServerPublicAsync();
 
         var result = await _controller.JoinServer(_server.Id);
 

@@ -43,8 +43,16 @@ public class PttService : IDisposable
         // Key is not loaded here — call LoadForUser(userId) after login
         _proc = HookCallback;
 
-        // hMod must be IntPtr.Zero for WH_KEYBOARD_LL — Windows ignores it for LL hooks.
-        // Installing from the UI thread ensures the thread has a message pump to deliver callbacks.
+        // Only auto-install if the user has already consented (first run skips this).
+        if (Preferences.Get("PttConsentGiven", false))
+            TryInstall();
+    }
+
+    // hMod must be IntPtr.Zero for WH_KEYBOARD_LL — Windows ignores it for LL hooks.
+    // Installing from the UI thread ensures the thread has a message pump to deliver callbacks.
+    public void TryInstall()
+    {
+        if (_hookHandle != IntPtr.Zero) return;
         if (MainThread.IsMainThread)
             Install();
         else
