@@ -91,6 +91,20 @@ public class ApiService
         return await resp.Content.ReadFromJsonAsync<AuthResponse>();
     }
 
+    public async Task<GoogleConfigResponse?> GetGoogleConfigAsync()
+    {
+        try { return await _http.GetFromJsonAsync<GoogleConfigResponse>("api/auth/external/google/config"); }
+        catch { return null; }
+    }
+
+    public async Task<AuthResponse?> ExchangeGoogleCodeAsync(GoogleCodeExchangeRequest req)
+    {
+        var resp = await _http.PostAsJsonAsync("api/auth/external/google/exchange", req);
+        if (!resp.IsSuccessStatusCode)
+            throw new Exception((await resp.Content.ReadAsStringAsync()).Trim('"'));
+        return await resp.Content.ReadFromJsonAsync<AuthResponse>();
+    }
+
     public Task<List<ServerDto>?> GetServersAsync() =>
         _http.GetFromJsonAsync<List<ServerDto>>("api/servers");
 
