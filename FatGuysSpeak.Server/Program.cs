@@ -678,6 +678,34 @@ using (var scope = app.Services.CreateScope())
     else
         ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS AppSequences (Name TEXT PRIMARY KEY, Value INTEGER NOT NULL)");
 
+    // OAuth external logins (added for Google sign-in).
+    if (isPostgres)
+    {
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""ExternalLogins"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""UserId"" INTEGER NOT NULL,
+                ""Provider"" TEXT NOT NULL,
+                ""ProviderUserId"" TEXT NOT NULL,
+                ""Email"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ExternalLogins_Provider_ProviderUserId"" ON ""ExternalLogins"" (""Provider"", ""ProviderUserId"")");
+    }
+    else
+    {
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ExternalLogins (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                UserId INTEGER NOT NULL,
+                Provider TEXT NOT NULL,
+                ProviderUserId TEXT NOT NULL,
+                Email TEXT NOT NULL DEFAULT '',
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ExternalLogins_Provider_ProviderUserId ON ExternalLogins (Provider, ProviderUserId)");
+    }
+
     // Seed bot user
     var botUser = ctx.Users.FirstOrDefault(u => u.Username == FatGuysSpeak.Server.Services.BotService.BotUsername);
     if (botUser is null)
