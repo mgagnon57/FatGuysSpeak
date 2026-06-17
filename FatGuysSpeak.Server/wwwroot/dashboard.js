@@ -572,7 +572,7 @@ async function loadMessages() {
 function sourceBadge(s) {
   const map = { Text: '#2d5f9e', Voice: '#3a6a3a', Stream: '#5a2d8e' };
   const col = map[s] || '#333';
-  return `<span class="badge" style="background:${col}20;color:${col === '#333' ? '#888' : col};border:1px solid ${col}40">${s}</span>`;
+  return `<span class="badge" style="background:${col}20;color:${col === '#333' ? '#888' : col};border:1px solid ${col}40">${escapeHtml(s)}</span>`;
 }
 
 let lastRenderedMsgs = [];
@@ -625,6 +625,7 @@ async function adminDeleteMsg(msgId, btn) {
 }
 
 async function adminRestoreMsg(msgId, btn) {
+  if (!confirm('Restore this message?')) return;
   btn.disabled = true; btn.textContent = '…';
   try {
     const res = await fetch('/api/admin/messages/restore', {
@@ -647,7 +648,11 @@ function expandMsg(msgId, el) {
 
 function exportMsgCsv() {
   if (!lastRenderedMsgs.length) { alert('Nothing to export.'); return; }
-  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const esc = v => {
+    const s = String(v ?? '');
+    const safe = /^[=+\-@]/.test(s) ? '\t' + s : s;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
   const header = ['Time', 'Author', 'Channel', 'Server', 'Source', 'Content', 'Deleted'];
   const rows = lastRenderedMsgs.map(m => [
     new Date(m.createdAt).toISOString(), m.author, m.channel, m.server,
@@ -658,7 +663,7 @@ function exportMsgCsv() {
   a.href = URL.createObjectURL(blob);
   a.download = `messages-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 100);
 }
 
 // ── Server initialisation ─────────────────────────
