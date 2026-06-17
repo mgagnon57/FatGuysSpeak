@@ -312,6 +312,9 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='LastSeenAt'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"LastSeenAt\" TIMESTAMP");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='TotalOnlineSeconds'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"TotalOnlineSeconds\" BIGINT NOT NULL DEFAULT 0");
     }
     else
     {
@@ -395,6 +398,9 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='LastSeenAt'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN LastSeenAt TEXT");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='TotalOnlineSeconds'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN TotalOnlineSeconds INTEGER NOT NULL DEFAULT 0");
     }
 
     // MessageReactions table (added for reactions feature)

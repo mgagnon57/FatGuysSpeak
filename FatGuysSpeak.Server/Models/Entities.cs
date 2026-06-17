@@ -13,6 +13,7 @@ public class User
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }
     public DateTime? LastSeenAt { get; set; }
+    public long TotalOnlineSeconds { get; set; }
 
     public List<ServerMember> ServerMemberships { get; set; } = [];
     public List<Message> Messages { get; set; } = [];
