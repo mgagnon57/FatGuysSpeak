@@ -197,9 +197,13 @@ let currentServerId = null;
 let serverName = '';
 
 function channelCell(u) {
+  const t = u.textChannel, v = u.voiceChannel;
+  // A channel here serves both text and voice, so a user's text and voice channel
+  // are often the same — show it once (with a mic) instead of duplicating it.
+  if (t && v && t === v) return '#' + escapeHtml(t) + ' 🎙';
   const parts = [];
-  if (u.textChannel)  parts.push('#' + escapeHtml(u.textChannel));
-  if (u.voiceChannel) parts.push('🎙 ' + escapeHtml(u.voiceChannel));
+  if (t) parts.push('#' + escapeHtml(t));
+  if (v) parts.push('🎙 ' + escapeHtml(v));
   return parts.length ? parts.join(' · ') : '<span style="color:#555">—</span>';
 }
 
