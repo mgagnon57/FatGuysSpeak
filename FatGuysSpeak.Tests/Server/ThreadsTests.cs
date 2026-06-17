@@ -151,4 +151,46 @@ public class ThreadsTests : IDisposable
 
         Assert.Equal(0, rootDto.ReplyCount);
     }
+
+    [Fact]
+    public async Task GetThreadMessages_ExcludesSoftDeletedReply()
+    {
+        await SeedAsync();
+        var root = await SendRootAsync("Root message");
+
+        // Add a reply directly via DB to set ThreadId
+        var reply = new Message
+        {
+            Content = "secret reply",
+            AuthorId = _user.Id,
+            ChannelId = _channel.Id,
+            ThreadId = root.Id,
+            IsDeleted = true
+        };
+        _testDb.Db.Messages.Add(reply);
+        await _testDb.Db.SaveChangesAsync();
+
+        var result = await _ctrl.GetThreadMessages(_channel.Id, root.Id);
+        var msgs = result.Value ?? [];
+
+        Assert.Single(msgs); // only root
+        Assert.Equal(root.Id, msgs[0].Id);
+        Assert.DoesNotContain(msgs, m => m.Content == "secret reply");
+    }
+
+    [Fact]
+    public async Task GetThreadMessages_SoftDeletedRoot_ReturnsNotFound()
+    {
+        await SeedAsync();
+        var root = await SendRootAsync("Root message");
+
+        // Soft-delete the root directly via DB
+        var rootEntity = _testDb.Db.Messages.Find(root.Id)!;
+        rootEntity.IsDeleted = true;
+        await _testDb.Db.SaveChangesAsync();
+
+        var result = await _ctrl.GetThreadMessages(_channel.Id, root.Id);
+
+        Assert.IsType<NotFoundResult>(result.Result);
+    }
 }

@@ -251,10 +251,10 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
         if (!hasRead) return Forbid();
 
         var root = await db.Messages.Include(m => m.Author).FirstOrDefaultAsync(m => m.Id == messageId);
-        if (root is null || root.ChannelId != channelId) return NotFound();
+        if (root is null || root.ChannelId != channelId || root.IsDeleted) return NotFound();
 
         var replies = await db.Messages
-            .Where(m => m.ThreadId == messageId)
+            .Where(m => m.ThreadId == messageId && !m.IsDeleted)
             .Include(m => m.Author)
             .OrderBy(m => m.CreatedAt)
             .ToListAsync();
