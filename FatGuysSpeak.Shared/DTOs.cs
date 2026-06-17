@@ -11,6 +11,13 @@ public record ServerDto(int Id, string Name, string? Description, string OwnerId
 
 public record ServerMemberDto(int UserId, string Username, UserStatus Status, ServerRole Role, DateTime JoinedAt);
 public record AuditLogDto(int Id, int ServerId, string ActorUsername, string Action, string? TargetUsername, string? Detail, DateTime CreatedAt);
+public record UserProfileAdminDto(
+    int Id, string Username, string Email, string? AvatarUrl, string? Bio,
+    string Status, bool InVoice,
+    DateTime CreatedAt, string Role, DateTime? MutedUntil, DateTime? TempBanExpiresAt,
+    DateTime? LastLoginAt, string? LastLoginIp, string? LastLoginUserAgent,
+    DateTime? LastSeenAt, int ActiveSessionCount,
+    int MessageCount, string? TopChannel, long TotalOnlineSeconds);
 public record ChannelPermissionDto(int ChannelId, ServerRole MinRoleToRead, ServerRole MinRoleToWrite);
 public record SetRoleRequest(ServerRole Role);
 public record SetChannelPermissionRequest(ServerRole MinRoleToRead, ServerRole MinRoleToWrite);
