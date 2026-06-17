@@ -241,9 +241,11 @@ function renderUsers(users) {
     const nextUp   = role === 'Member' ? 'Moderator' : 'Admin';
     const nextDown = role === 'Admin'  ? 'Moderator' : 'Member';
     const roleCell = role
-      ? `${roleBadge(role)}
-         <button class="btn-sm" style="margin-left:4px" title="Promote to ${nextUp}" data-click="promote" data-uid="${u.id}" ${role==='Admin'?'disabled':''} aria-label="Promote to ${nextUp}">▲</button>
-         <button class="btn-sm danger" title="Demote to ${nextDown}" data-click="demote" data-uid="${u.id}" ${role==='Member'?'disabled':''} aria-label="Demote to ${nextDown}">▼</button>`
+      ? `<div style="display:flex;align-items:center;gap:4px">${roleBadge(role)}
+         <span style="margin-left:auto;display:inline-flex;gap:4px">
+           <button class="btn-sm" title="Promote to ${nextUp}" data-click="promote" data-uid="${u.id}" ${role==='Admin'?'disabled':''} aria-label="Promote to ${nextUp}">▲</button>
+           <button class="btn-sm danger" title="Demote to ${nextDown}" data-click="demote" data-uid="${u.id}" ${role==='Member'?'disabled':''} aria-label="Demote to ${nextDown}">▼</button>
+         </span></div>`
       : '<span style="color:#555">—</span>';
     const mutedUntil = member?.mutedUntil ? new Date(member.mutedUntil) : null;
     const isMuted = mutedUntil && mutedUntil.getTime() > now;
