@@ -579,6 +579,7 @@ async function loadMessages() {
       oldestMsgId = rawMsgs.length ? rawMsgs[rawMsgs.length - 1].id : null;
       document.getElementById('msgLoadMore').style.display = (rawMsgs.length >= 100) ? '' : 'none';
       renderMessages(allLoadedMsgs);
+      reconcileSelection();
     } catch (e) {
       document.getElementById('msgTableBody').innerHTML =
         `<tr><td colspan="8" style="color:#ed4245;padding:20px 10px;">Failed: ${e.message}</td></tr>`;
@@ -598,6 +599,7 @@ async function loadMoreMsgs() {
     oldestMsgId = rawMsgs.length ? rawMsgs[rawMsgs.length - 1].id : oldestMsgId;
     document.getElementById('msgLoadMore').style.display = (rawMsgs.length >= 100) ? '' : 'none';
     renderMessages(allLoadedMsgs);
+    reconcileSelection();
   } catch (e) { alert('Load more failed: ' + e.message); }
 }
 
@@ -717,6 +719,14 @@ function updateBulkBar() {
   document.getElementById('msgSelCount').textContent = `${n} selected`;
 }
 
+function reconcileSelection() {
+  const visible = new Set(allLoadedMsgs.map(m => m.id));
+  for (const id of [...selectedMsgIds]) if (!visible.has(id)) selectedMsgIds.delete(id);
+  const selAll = document.getElementById('msgSelectAll');
+  if (selAll) selAll.checked = allLoadedMsgs.length > 0 && allLoadedMsgs.every(m => selectedMsgIds.has(m.id));
+  updateBulkBar();
+}
+
 function toggleMsgSel(el) {
   const id = +el.dataset.mid;
   if (el.checked) selectedMsgIds.add(id); else selectedMsgIds.delete(id);
@@ -739,13 +749,13 @@ function bulkClearSel() {
 
 async function postBulkDelete(body, label) {
   const hard = document.getElementById('msgHardDelete').checked;
-  body.mode = hard ? 'hard' : 'soft';
+  const payload = { ...body, mode: hard ? 'hard' : 'soft' };
   const warn = `${label}\n\nThis will ${hard ? 'PERMANENTLY delete' : 'soft-delete'} the matching messages.`;
   if (!confirm(warn)) return;
   if (hard && !confirm('Permanent delete is IRREVERSIBLE. Click OK only if you are sure.')) return;
   try {
     const res = await fetch('/api/admin/messages/delete', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
     });
     if (!res.ok) { alert('Delete failed: ' + (await res.text())); return; }
     const r = await res.json();
@@ -777,7 +787,7 @@ function bulkDelFilter() {
   const f = currentFilterObj();
   const hasAny = Object.values(f).some(v => v !== null && v !== undefined);
   if (!hasAny && !confirm('No filters set — this will delete EVERY message. Continue?')) return;
-  postBulkDelete({ filter: f }, 'Delete ALL messages matching the current filter?');
+  postBulkDelete({ filter: f }, 'Delete ALL messages matching the current filter?\n(Affects the entire matching set on the server, not just the rows loaded here.)');
 }
 
 async function bulkRestoreFilter() {
