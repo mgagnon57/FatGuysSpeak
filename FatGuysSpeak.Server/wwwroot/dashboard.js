@@ -575,7 +575,9 @@ function sourceBadge(s) {
   return `<span class="badge" style="background:${col}20;color:${col === '#333' ? '#888' : col};border:1px solid ${col}40">${s}</span>`;
 }
 
+let lastRenderedMsgs = [];
 function renderMessages(msgs) {
+  lastRenderedMsgs = msgs;
   const tbody = document.getElementById('msgTableBody');
   if (!msgs.length) {
     tbody.innerHTML = '<tr><td colspan="7" style="color:#444;padding:20px 10px;">No messages found.</td></tr>';
@@ -586,18 +588,23 @@ function renderMessages(msgs) {
     const timeStr = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString();
     const deleted = m.isDeleted;
     const contentStyle = deleted ? 'color:#555;font-style:italic' : 'color:#c0c0c0';
-    const content = (m.content || '').length > 120 ? m.content.slice(0, 120) + '…' : m.content;
-    const escapedContent = content.replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    return `<tr style="${deleted ? 'opacity:.55' : ''}">
+    const full = m.content || '';
+    const truncated = full.length > 120;
+    const shown = truncated ? full.slice(0, 120) + '…' : full;
+    const contentCell = truncated
+      ? `<span class="msg-content" data-click="expandMsg" data-mid="${m.id}" style="cursor:pointer" title="Click to expand">${escapeHtml(shown)}</span>`
+      : escapeHtml(shown);
+    const action = deleted
+      ? `<button class="btn-sm" title="Restore this message — un-hide it (content was preserved)" data-click="restoreMsg" data-mid="${m.id}">Restore</button>`
+      : `<button class="btn-sm danger" title="Soft-delete this message — hidden from clients but kept in the database" data-click="delMsg" data-mid="${m.id}">Delete</button>`;
+    return `<tr data-mid="${m.id}" style="${deleted ? 'opacity:.55' : ''}">
       <td style="color:#555;font-size:11px;white-space:nowrap">${timeStr}</td>
-      <td style="color:#8ab4d4;font-weight:500">${escapeHtml(m.author)}</td>
+      <td><span class="user-link" data-click="profile" data-uid="${m.authorId}" style="color:#8ab4d4;font-weight:500;cursor:pointer">${escapeHtml(m.author)}</span></td>
       <td style="color:#666">#${escapeHtml(m.channel)}</td>
       <td style="color:#555;font-size:11px">${escapeHtml(m.server)}</td>
       <td>${sourceBadge(m.source)}</td>
-      <td style="${contentStyle}">${escapedContent}</td>
-      <td>${deleted
-        ? '<span style="color:#444;font-size:10px">Deleted</span>'
-        : `<button class="btn-sm danger" title="Soft-delete this message — it will be hidden from clients but remains in the database" data-click="delMsg" data-mid="${m.id}">Delete</button>`}</td>
+      <td style="${contentStyle}">${contentCell}</td>
+      <td>${action}</td>
     </tr>`;
   }).join('');
 }
@@ -615,6 +622,43 @@ async function adminDeleteMsg(msgId, btn) {
     btn.textContent = 'Delete';
     alert('Failed: ' + e.message);
   }
+}
+
+async function adminRestoreMsg(msgId, btn) {
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const res = await fetch('/api/admin/messages/restore', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: [msgId] })
+    });
+    if (!res.ok) throw new Error(res.status);
+    loadMessages();
+  } catch (e) { btn.disabled = false; btn.textContent = 'Restore'; alert('Restore failed: ' + e.message); }
+}
+
+function expandMsg(msgId, el) {
+  const m = lastRenderedMsgs.find(x => x.id === msgId);
+  if (!m) return;
+  el.textContent = m.content || '';
+  el.removeAttribute('data-click');
+  el.style.cursor = 'default';
+  el.title = '';
+}
+
+function exportMsgCsv() {
+  if (!lastRenderedMsgs.length) { alert('Nothing to export.'); return; }
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const header = ['Time', 'Author', 'Channel', 'Server', 'Source', 'Content', 'Deleted'];
+  const rows = lastRenderedMsgs.map(m => [
+    new Date(m.createdAt).toISOString(), m.author, m.channel, m.server,
+    m.source, m.content, m.isDeleted ? 'yes' : 'no'
+  ].map(esc).join(','));
+  const blob = new Blob([header.join(',') + '\n' + rows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `messages-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 // ── Server initialisation ─────────────────────────
@@ -917,6 +961,9 @@ document.addEventListener('click', (e) => {
     case 'kickVoice':     kickVoice(+d.uid, el); break;
     case 'kick':          kickFromServer(currentServerId, +d.uid, el); break;
     case 'delMsg':        adminDeleteMsg(+d.mid, el); break;
+    case 'restoreMsg':    adminRestoreMsg(+d.mid, el); break;
+    case 'expandMsg':     expandMsg(+d.mid, el); break;
+    case 'exportMsgCsv':  exportMsgCsv(); break;
     case 'rmWf':          removeWordFilter(currentServerId, +d.fid, el); break;
     case 'createChannel': createChannel(); break;
     case 'addWf':         addWordFilter(); break;

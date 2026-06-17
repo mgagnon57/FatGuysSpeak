@@ -360,6 +360,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
                 <input type="checkbox" id="msgShowDeleted" data-change="loadMessages" style="accent-color:#8ab4d4" />
                 Show deleted
               </label>
+              <button class="btn-sm" id="msgExportCsv" data-click="exportMsgCsv" title="Download the currently shown rows as a CSV file">Export CSV</button>
             </div>
           </div>
           <table class="user-table">
