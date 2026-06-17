@@ -9,8 +9,10 @@ public class DashboardWindow : Window
     public DashboardWindow()
     {
         Title = "FatGuysSpeak — Server Dashboard";
-        Width = 1080;
-        Height = 720;
+        Width = 1200;
+        // Tall enough that the whole Overview tab (all stat cards + throughput
+        // and rate-limit charts, ~900px of content) is visible without scrolling.
+        Height = 940;
         MinWidth = 820;
         MinHeight = 540;
         Background = System.Windows.Media.Brushes.Black;
