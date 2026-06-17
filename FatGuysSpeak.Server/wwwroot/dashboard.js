@@ -44,7 +44,6 @@ function renderProfileModal(p) {
   const wrap = document.createElement('div');
   wrap.id = 'profileModal';
   wrap.className = 'modal-backdrop';
-  wrap.setAttribute('data-click', 'closeProfile');
 
   let body;
   if (!p) {
@@ -86,10 +85,8 @@ function renderProfileModal(p) {
       ${body}
     </div>`;
   document.body.appendChild(wrap);
-  // Clicks inside the card shouldn't reach the backdrop (which closes), except the × button.
-  wrap.querySelector('.modal-card').addEventListener('click', (e) => {
-    if (!e.target.closest('[data-click="closeProfile"]')) e.stopPropagation();
-  });
+  // Close only when the backdrop itself is clicked (not a click inside the card).
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) closeProfile(); });
 }
 
 // ── Tab switching ──────────────────────────────────
