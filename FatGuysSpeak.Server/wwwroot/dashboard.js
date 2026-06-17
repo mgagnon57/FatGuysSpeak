@@ -254,8 +254,8 @@ function renderUsers(users) {
         : `<select class="btn-sm" data-change="mute" data-uid="${u.id}" ${role==='Admin'?'disabled':''} title="Temporarily prevent this user from sending messages"><option value="">Mute…</option><option value="300">5 minutes</option><option value="1800">30 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select>`
       : '<span style="color:#555">—</span>';
     return `<tr>
-      <td>${connBadge(u)}</td>
       <td><span class="user-link" data-click="profile" data-uid="${u.id}">${escapeHtml(u.username)}</span></td>
+      <td>${connBadge(u)}</td>
       <td>${channelCell(u)}</td>
       <td>${roleCell}</td>
       <td>${muteCell}</td>

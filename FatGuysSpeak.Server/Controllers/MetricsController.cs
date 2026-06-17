@@ -308,8 +308,8 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           <table class="user-table" id="userTable">
             <thead>
               <tr>
-                <th title="Whether the user has an active SignalR connection to this server">Connection</th>
                 <th>Username</th>
+                <th title="Whether the user has an active SignalR connection to this server">Connection</th>
                 <th title="Text channel they're viewing and voice channel they're in (if any)">Channel</th>
                 <th title="Server role — hover a badge for a full list of permissions. Use ▲/▼ to promote or demote.">Role</th>
                 <th title="Active mute prevents the user from sending messages. Admins cannot be muted.">Mute</th>
