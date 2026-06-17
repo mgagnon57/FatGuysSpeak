@@ -5,13 +5,14 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class AuthViewModel(ApiService api, ChatHubService hub, PttService ptt) : ObservableObject
+public partial class AuthViewModel(ApiService api, ChatHubService hub, PttService ptt, GoogleAuthService google) : ObservableObject
 {
     [ObservableProperty] private string _username = "";
     [ObservableProperty] private string _password = "";
     [ObservableProperty] private string _email = "";
     [ObservableProperty] private string _errorMessage = "";
     [ObservableProperty] private bool _isLoading;
+    [ObservableProperty] private bool _isGoogleAvailable;
     [ObservableProperty] private string _serverUrl = Preferences.Get("server_url", ApiService.DefaultServerUrl);
 
     [ObservableProperty]
@@ -101,6 +102,62 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
             PersistServer(ServerUrl);
             ptt.LoadForUser(result.UserId);
             await hub.ConnectAsync(result.Token, api.ServerUrl);
+            await Shell.Current.GoToAsync("//main");
+        }
+        catch (Exception ex) { ErrorMessage = ex.Message; }
+        finally { IsLoading = false; }
+    }
+
+    private string? _googleClientId;
+
+    public async Task CheckGoogleAvailabilityAsync()
+    {
+        if (!OperatingSystem.IsWindows()) { IsGoogleAvailable = false; return; }
+        try
+        {
+            api.SetServerUrl(ServerUrl);
+            var cfg = await api.GetGoogleConfigAsync();
+            _googleClientId = cfg?.ClientId;
+            IsGoogleAvailable = !string.IsNullOrWhiteSpace(_googleClientId);
+        }
+        catch { IsGoogleAvailable = false; }
+    }
+
+    [RelayCommand]
+    private async Task GoogleSignInAsync()
+    {
+        ErrorMessage = "";
+        IsLoading = true;
+        try
+        {
+            api.SetServerUrl(ServerUrl);
+            // Use the client id fetched during the availability check; fall back to a fresh
+            // fetch if the page didn't run it (e.g. server changed since load).
+            var clientId = _googleClientId;
+            if (string.IsNullOrWhiteSpace(clientId))
+                clientId = (await api.GetGoogleConfigAsync())?.ClientId;
+            if (string.IsNullOrWhiteSpace(clientId))
+            {
+                ErrorMessage = "Google sign-in is not available on this server.";
+                return;
+            }
+
+            var result = await google.SignInAsync(clientId);
+            if (!result.Success)
+            {
+                ErrorMessage = result.Error ?? "Google sign-in failed.";
+                return;
+            }
+
+            var auth = await api.ExchangeGoogleCodeAsync(
+                new FatGuysSpeak.Shared.GoogleCodeExchangeRequest(result.Code!, result.CodeVerifier!, result.RedirectUri!));
+            if (auth is null) { ErrorMessage = "Google sign-in failed."; return; }
+
+            api.SetToken(auth.Token);
+            api.SetCurrentUser(auth.UserId, auth.Username, auth.AvatarUrl);
+            PersistServer(ServerUrl);
+            ptt.LoadForUser(auth.UserId);
+            await hub.ConnectAsync(auth.Token, api.ServerUrl);
             await Shell.Current.GoToAsync("//main");
         }
         catch (Exception ex) { ErrorMessage = ex.Message; }

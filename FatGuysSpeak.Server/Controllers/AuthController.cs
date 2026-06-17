@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace FatGuysSpeak.Server.Controllers;
 
@@ -55,8 +56,12 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest req)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == req.Username);
-        var passwordHash = user?.PasswordHash ?? BCrypt.Net.BCrypt.HashPassword("__dummy__");
-        if (user is null || !BCrypt.Net.BCrypt.Verify(req.Password, passwordHash))
+        var hasPassword = user is not null && !string.IsNullOrEmpty(user.PasswordHash);
+        // Always run a BCrypt verify (against a dummy hash when there's no password) to keep
+        // login timing constant for unknown users and OAuth-only accounts.
+        var passwordHash = hasPassword ? user!.PasswordHash : BCrypt.Net.BCrypt.HashPassword("__dummy__");
+        var verified = BCrypt.Net.BCrypt.Verify(req.Password, passwordHash);
+        if (user is null || !hasPassword || !verified)
             return Unauthorized("Invalid credentials.");
 
         var ip = HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -77,11 +82,158 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
         return Ok(new AuthResponse(token, user.Username, user.Id, user.AvatarUrl));
     }
 
+    [HttpPost("external/google")]
+    public async Task<ActionResult<AuthResponse>> GoogleSignIn(
+        GoogleAuthRequest req, [FromServices] IGoogleTokenValidator validator)
+    {
+        if (string.IsNullOrWhiteSpace(req.IdToken))
+            return Unauthorized("Missing Google token.");
+
+        GoogleIdentity identity;
+        try
+        {
+            identity = await validator.ValidateAsync(req.IdToken);
+        }
+        catch (InvalidOperationException)
+        {
+            return StatusCode(503, "Google sign-in is not configured on this server.");
+        }
+        catch (Google.Apis.Auth.InvalidJwtException)
+        {
+            return Unauthorized("Invalid Google token.");
+        }
+
+        if (!identity.EmailVerified)
+            return Unauthorized("Your Google email must be verified to sign in.");
+
+        return await ResolveGoogleIdentityAndIssueAsync(identity);
+    }
+
+    [HttpPost("external/google/exchange")]
+    public async Task<ActionResult<AuthResponse>> GoogleExchange(
+        GoogleCodeExchangeRequest req,
+        [FromServices] IGoogleCodeExchanger exchanger,
+        [FromServices] IGoogleTokenValidator validator)
+    {
+        if (string.IsNullOrWhiteSpace(req.Code)
+            || string.IsNullOrWhiteSpace(req.CodeVerifier)
+            || string.IsNullOrWhiteSpace(req.RedirectUri))
+            return Unauthorized("Missing Google authorization code.");
+
+        GoogleIdentity identity;
+        try
+        {
+            var idToken = await exchanger.ExchangeAsync(req.Code, req.CodeVerifier, req.RedirectUri);
+            identity = await validator.ValidateAsync(idToken);
+        }
+        catch (InvalidOperationException)
+        {
+            return StatusCode(503, "Google sign-in is not configured on this server.");
+        }
+        catch (GoogleExchangeException)
+        {
+            return Unauthorized("Google sign-in failed.");
+        }
+        catch (Google.Apis.Auth.InvalidJwtException)
+        {
+            return Unauthorized("Invalid Google token.");
+        }
+
+        if (!identity.EmailVerified)
+            return Unauthorized("Your Google email must be verified to sign in.");
+
+        return await ResolveGoogleIdentityAndIssueAsync(identity);
+    }
+
+    [HttpGet("external/google/config")]
+    public ActionResult<GoogleConfigResponse> GoogleConfig([FromServices] IConfiguration config)
+        => Ok(new GoogleConfigResponse(config["Google:ClientId"] ?? ""));
+
+    // Resolve a validated Google identity to a local account (existing link -> email auto-link ->
+    // create) and issue the normal JWT. Shared by the id-token and code-exchange endpoints.
+    private async Task<ActionResult<AuthResponse>> ResolveGoogleIdentityAndIssueAsync(GoogleIdentity identity)
+    {
+        const string provider = "google";
+
+        var link = await db.ExternalLogins
+            .FirstOrDefaultAsync(e => e.Provider == provider && e.ProviderUserId == identity.Sub);
+
+        User? user;
+        if (link is not null)
+        {
+            user = await db.Users.FindAsync(link.UserId);
+        }
+        else
+        {
+            await using var tx = await db.Database.BeginTransactionAsync();
+            try
+            {
+                user = await db.Users.FirstOrDefaultAsync(u => u.Email == identity.Email);
+                if (user is null)
+                {
+                    var baseName = UsernameGenerator.Sanitize(identity.Name, identity.Email);
+                    var username = await GenerateUniqueUsernameAsync(baseName);
+                    user = new User { Username = username, Email = identity.Email, PasswordHash = "" };
+                    db.Users.Add(user);
+                    await db.SaveChangesAsync();
+                }
+                db.ExternalLogins.Add(new ExternalLogin
+                {
+                    UserId = user.Id,
+                    Provider = provider,
+                    ProviderUserId = identity.Sub,
+                    Email = identity.Email
+                });
+                await db.SaveChangesAsync();
+                await tx.CommitAsync();
+            }
+            catch (DbUpdateException)
+            {
+                await tx.RollbackAsync();
+                return Conflict("Account could not be created; please try signing in again.");
+            }
+        }
+
+        if (user is null) return Unauthorized("Account could not be resolved.");
+
+        var ip = HttpContext?.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        db.AuditLogs.Add(new AuditLog
+        {
+            ServerId = 0,
+            ActorId = user.Id,
+            ActorUsername = user.Username,
+            Action = "google_login",
+            Detail = ip
+        });
+
+        await AutoJoinDefaultServerAsync(user.Id);
+        var token = tokens.CreateToken(user);
+        await RecordSessionAsync(user.Id, token);
+        await db.SaveChangesAsync();
+        return Ok(new AuthResponse(token, user.Username, user.Id, user.AvatarUrl));
+    }
+
+    private async Task<string> GenerateUniqueUsernameAsync(string baseName)
+    {
+        if (!await db.Users.AnyAsync(u => u.Username == baseName))
+            return baseName;
+        for (int i = 1; i < 10000; i++)
+        {
+            var suffix = i.ToString();
+            var candidate = baseName.Length + suffix.Length > 32
+                ? baseName[..(32 - suffix.Length)] + suffix
+                : baseName + suffix;
+            if (!await db.Users.AnyAsync(u => u.Username == candidate))
+                return candidate;
+        }
+        return baseName[..Math.Min(baseName.Length, 24)] + Guid.NewGuid().ToString("N")[..8];
+    }
+
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest req)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
-        if (user is not null)
+        if (user is not null && !string.IsNullOrEmpty(user.PasswordHash))
         {
             // Expire previous tokens for this user
             var old = await db.PasswordResetTokens.Where(t => t.UserId == user.Id && !t.IsUsed).ToListAsync();
