@@ -800,6 +800,10 @@ app.Use(async (ctx, next) =>
 app.UseCors();
 app.UseRateLimiter();
 
+// Serve wwwroot (dashboard.js + self-hosted Chart.js) so the dashboard's JS loads
+// under the strict CSP (script-src 'self') instead of inline scripts / a CDN.
+app.UseStaticFiles();
+
 var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
 Directory.CreateDirectory(uploadsPath);
 app.UseStaticFiles(new StaticFileOptions
