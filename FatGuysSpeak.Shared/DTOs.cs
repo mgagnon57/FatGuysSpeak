@@ -156,3 +156,8 @@ public record SetMentionRoleRequest(ServerRole MinRole);
 
 // Automod
 public record AutomodActionDto(string Type, string Detail, DateTime OccurredAt);
+
+// Admin message log
+public record AdminMessageDto(
+    int Id, string Content, int AuthorId, string Author, string Channel,
+    string Server, string Source, DateTime CreatedAt, bool IsDeleted);

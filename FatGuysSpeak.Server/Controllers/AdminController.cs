@@ -144,19 +144,12 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
             query = query.Where(m => m.Source == src);
 
         var messages = await query
-            .OrderByDescending(m => m.CreatedAt)
+            .OrderByDescending(m => m.Id)
             .Take(Math.Min(limit, 500))
-            .Select(m => new
-            {
-                m.Id,
-                m.Content,
-                Author   = m.Author.Username,
-                Channel  = m.Channel.Name,
-                Server   = m.Channel.Server.Name,
-                Source   = m.Source.ToString(),
-                m.CreatedAt,
-                m.IsDeleted,
-            })
+            .Select(m => new FatGuysSpeak.Shared.AdminMessageDto(
+                m.Id, m.Content, m.AuthorId, m.Author.Username,
+                m.Channel.Name, m.Channel.Server.Name, m.Source.ToString(),
+                m.CreatedAt, m.IsDeleted))
             .ToListAsync();
 
         return Ok(messages);
@@ -180,7 +173,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         if (msg is null) return NotFound();
 
         msg.IsDeleted = true;
-        msg.Content = "[deleted by admin]";
         db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
         {
             ServerId = msg.Channel.ServerId,
