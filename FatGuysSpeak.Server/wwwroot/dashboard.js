@@ -573,11 +573,11 @@ async function loadMessages() {
     try {
       const res = await fetch('/api/admin/messages?' + buildMsgParams(null));
       if (!res.ok) throw new Error(res.status);
-      let msgs = await res.json();
-      if (!showDel) msgs = msgs.filter(m => !m.isDeleted);
+      const rawMsgs = await res.json();
+      const msgs = showDel ? rawMsgs : rawMsgs.filter(m => !m.isDeleted);
       allLoadedMsgs = msgs;
-      oldestMsgId = msgs.length ? msgs[msgs.length - 1].id : null;
-      document.getElementById('msgLoadMore').style.display = (msgs.length >= 100) ? '' : 'none';
+      oldestMsgId = rawMsgs.length ? rawMsgs[rawMsgs.length - 1].id : null;
+      document.getElementById('msgLoadMore').style.display = (rawMsgs.length >= 100) ? '' : 'none';
       renderMessages(allLoadedMsgs);
     } catch (e) {
       document.getElementById('msgTableBody').innerHTML =
@@ -592,11 +592,11 @@ async function loadMoreMsgs() {
   try {
     const res = await fetch('/api/admin/messages?' + buildMsgParams(oldestMsgId));
     if (!res.ok) throw new Error(res.status);
-    let msgs = await res.json();
-    if (!showDel) msgs = msgs.filter(m => !m.isDeleted);
+    const rawMsgs = await res.json();
+    const msgs = showDel ? rawMsgs : rawMsgs.filter(m => !m.isDeleted);
     allLoadedMsgs = allLoadedMsgs.concat(msgs);
-    oldestMsgId = msgs.length ? msgs[msgs.length - 1].id : oldestMsgId;
-    document.getElementById('msgLoadMore').style.display = (msgs.length >= 100) ? '' : 'none';
+    oldestMsgId = rawMsgs.length ? rawMsgs[rawMsgs.length - 1].id : oldestMsgId;
+    document.getElementById('msgLoadMore').style.display = (rawMsgs.length >= 100) ? '' : 'none';
     renderMessages(allLoadedMsgs);
   } catch (e) { alert('Load more failed: ' + e.message); }
 }
