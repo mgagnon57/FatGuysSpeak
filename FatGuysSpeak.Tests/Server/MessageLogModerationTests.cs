@@ -124,7 +124,7 @@ public class MessageLogModerationTests : IDisposable
     public async Task GetMessages_BeforeIdReturnsOlderPage()
     {
         var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
-        var a = await AddMsg(admin.Id, "first");
+        await AddMsg(admin.Id, "first");
         var b = await AddMsg(admin.Id, "second");
         var c = await AddMsg(admin.Id, "third");
 
@@ -138,6 +138,5 @@ public class MessageLogModerationTests : IDisposable
             ((OkObjectResult)await _c.GetMessages(limit: 1, beforeId: c.Id)).Value);
         Assert.Equal(b.Id, page2[0].Id);
         Assert.DoesNotContain(page2, x => x.Id == c.Id);
-        _ = a;
     }
 }

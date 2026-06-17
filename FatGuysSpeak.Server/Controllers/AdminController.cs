@@ -535,9 +535,15 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         if (!string.IsNullOrWhiteSpace(f.Keyword))
             q = q.Where(m => m.Content.ToLower().Contains(f.Keyword.ToLower()));
         if (f.From is DateTime from)
-            q = q.Where(m => m.CreatedAt >= from);
+        {
+            var fromUtc = DateTime.SpecifyKind(from, DateTimeKind.Utc);
+            q = q.Where(m => m.CreatedAt >= fromUtc);
+        }
         if (f.To is DateTime to)
-            q = q.Where(m => m.CreatedAt <= to);
+        {
+            var toUtc = DateTime.SpecifyKind(to, DateTimeKind.Utc);
+            q = q.Where(m => m.CreatedAt <= toUtc);
+        }
         return q;
     }
 
