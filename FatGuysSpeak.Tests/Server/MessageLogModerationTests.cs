@@ -40,6 +40,15 @@ public class MessageLogModerationTests : IDisposable
     }
 
     [Fact]
+    public async Task GetServers_ReturnsSeededServer()
+    {
+        var (server, _) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var ok = Assert.IsType<OkObjectResult>(await _c.GetServers());
+        var list = Assert.IsType<List<AdminServerDto>>(ok.Value);
+        Assert.Contains(list, s => s.Id == server.Id);
+    }
+
+    [Fact]
     public async Task GetMessages_IncludesAuthorId()
     {
         var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");

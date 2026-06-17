@@ -169,3 +169,6 @@ public record MessageFilterDto(
 
 public record BulkRestoreRequest(int[]? Ids = null, MessageFilterDto? Filter = null);
 public record BulkActionResult(int Affected, int[] ChannelIds);
+
+// Admin server list (filter dropdown)
+public record AdminServerDto(int Id, string Name);

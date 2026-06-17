@@ -582,7 +582,8 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         if (!IsLocal) return Forbid();
 
         var servers = await db.Servers
-            .Select(s => new { s.Id, s.Name, MemberCount = s.Members.Count })
+            .OrderBy(s => s.Id)
+            .Select(s => new FatGuysSpeak.Shared.AdminServerDto(s.Id, s.Name))
             .ToListAsync();
 
         return Ok(servers);
