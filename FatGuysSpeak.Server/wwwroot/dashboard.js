@@ -229,7 +229,7 @@ function roleBadge(role) {
 function renderUsers(users) {
   const tbody = document.getElementById('userTableBody');
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:#444;padding:20px 10px;">No users found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#444;padding:20px 10px;">No users found.</td></tr>';
     return;
   }
   const now = Date.now();
@@ -258,14 +258,14 @@ function renderUsers(users) {
       <td>${connBadge(u)}</td>
       <td>${channelCell(u)}</td>
       <td>${roleCell}</td>
-      <td>${muteCell}</td>
       <td style="color:#555">${new Date(u.createdAt).toLocaleDateString()}</td>
-      <td>
+      <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         ${u.voiceChannelId !== null
           ? `<button class="btn-sm danger" title="Disconnect this user from their current voice channel (they can rejoin)" data-click="kickVoice" data-uid="${u.id}">Kick Voice</button>`
           : `<button class="btn-sm" title="User is not in a voice channel" disabled>Kick Voice</button>`}
+        ${member ? muteCell : ''}
         ${member && role !== 'Admin'
-          ? ` <button class="btn-sm danger" title="Remove this user from the server — they can rejoin via invite link" data-click="kick" data-uid="${u.id}">Kick</button>
+          ? `<button class="btn-sm danger" title="Remove this user from the server — they can rejoin via invite link" data-click="kick" data-uid="${u.id}">Kick</button>
               <select class="btn-sm danger" data-change="tempban" data-uid="${u.id}" title="Block this user from rejoining the server for a chosen duration"><option value="">Temp Ban…</option><option value="3600">1 hour</option><option value="86400">24 hours</option><option value="604800">7 days</option><option value="2592000">30 days</option></select>`
           : ''}
       </td>
@@ -294,7 +294,7 @@ async function loadUsers() {
     filterUsers();
   } catch (e) {
     document.getElementById('userTableBody').innerHTML =
-      `<tr><td colspan="7" style="color:#ed4245;padding:20px 10px;">Failed to load users: ${e.message}</td></tr>`;
+      `<tr><td colspan="6" style="color:#ed4245;padding:20px 10px;">Failed to load users: ${e.message}</td></tr>`;
   }
 }
 

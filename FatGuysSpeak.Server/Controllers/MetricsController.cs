@@ -312,13 +312,12 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
                 <th title="Whether the user has an active SignalR connection to this server">Connection</th>
                 <th title="Text channel they're viewing and voice channel they're in (if any)">Channel</th>
                 <th title="Server role — hover a badge for a full list of permissions. Use ▲/▼ to promote or demote.">Role</th>
-                <th title="Active mute prevents the user from sending messages. Admins cannot be muted.">Mute</th>
                 <th>Member Since</th>
-                <th title="Kick Voice: disconnect from voice only. Kick: remove from server (rejoinable). Temp Ban: block entry for a chosen duration.">Actions</th>
+                <th title="Mute (timed), Kick Voice, Kick (rejoinable), or Temp Ban (timed entry block).">Actions</th>
               </tr>
             </thead>
             <tbody id="userTableBody">
-              <tr><td colspan="7" style="color:#444;padding:20px 10px;">Loading…</td></tr>
+              <tr><td colspan="6" style="color:#444;padding:20px 10px;">Loading…</td></tr>
             </tbody>
           </table>
         </div><!-- /tab-users -->
