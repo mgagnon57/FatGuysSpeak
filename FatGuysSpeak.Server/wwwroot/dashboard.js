@@ -163,7 +163,7 @@ function renderUsers(users) {
       ? isMuted
         ? `<span style="color:#f0a030;font-size:10px">until ${mutedUntil.toLocaleTimeString()}</span>
            <button class="btn-sm" style="margin-left:4px" title="Remove the active mute — user can send messages immediately" data-click="unmute" data-uid="${u.id}">Unmute</button>`
-        : `<button class="btn-sm" title="Temporarily prevent this user from sending messages" data-click="pickMute" data-uid="${u.id}" ${role==='Admin'?'disabled':''}>Mute…</button>`
+        : `<select class="btn-sm" data-change="mute" data-uid="${u.id}" ${role==='Admin'?'disabled':''} title="Temporarily prevent this user from sending messages"><option value="">Mute…</option><option value="300">5 minutes</option><option value="1800">30 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select>`
       : '<span style="color:#555">—</span>';
     return `<tr>
       <td><strong style="color:#d0d0d0">${escapeHtml(u.username)}</strong></td>
@@ -222,12 +222,12 @@ async function loadServerMembers() {
   filterUsers();
 }
 
-async function pickMute(serverId, userId, btn) {
-  const options = ['5 minutes','30 minutes','1 hour','24 hours'];
-  const choice = prompt('Mute duration:\n1: 5 minutes\n2: 30 minutes\n3: 1 hour\n4: 24 hours\n\nEnter 1–4:');
-  const secs = [300, 1800, 3600, 86400][parseInt(choice) - 1];
+async function muteFromSelect(sel) {
+  const secs = parseInt(sel.value);
+  const userId = +sel.dataset.uid;
+  sel.selectedIndex = 0; // reset back to the "Mute…" placeholder
   if (!secs) return;
-  await muteUser(serverId, userId, secs, btn);
+  await muteUser(currentServerId, userId, secs, sel);
 }
 
 async function muteUser(serverId, userId, seconds, btn) {
@@ -768,7 +768,6 @@ document.addEventListener('click', (e) => {
     case 'promote':       promoteUser(+d.uid, el); break;
     case 'demote':        demoteUser(+d.uid, el); break;
     case 'unmute':        muteUser(currentServerId, +d.uid, 0, el); break;
-    case 'pickMute':      pickMute(currentServerId, +d.uid, el); break;
     case 'kickVoice':     kickVoice(+d.uid, el); break;
     case 'kick':          kickFromServer(currentServerId, +d.uid, el); break;
     case 'delMsg':        adminDeleteMsg(+d.mid, el); break;
@@ -788,6 +787,7 @@ document.addEventListener('change', (e) => {
     case 'loadMessages':    loadMessages(); break;
     case 'loadAudit':       loadAudit(); break;
     case 'saveChannelPerm': saveChannelPerm(+d.sid, +d.cid); break;
+    case 'mute':            muteFromSelect(el); break;
     case 'tempban':         tempBanFromSelect(el); break;
   }
 });
