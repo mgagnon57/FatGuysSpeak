@@ -214,4 +214,31 @@ public class MessageLogModerationTests : IDisposable
         await _c.BulkDelete(new BulkDeleteRequest(Ids: new[] { a.Id, b.Id }));
         Assert.Equal(1, await _db.Db.AuditLogs.CountAsync(x => x.Action == "MessagesBulkDeleted"));
     }
+
+    [Fact]
+    public async Task BulkDelete_Hard_RemovesDependentPinsAndReactions()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var m = await AddMsg(admin.Id, "pinned and reacted");
+        _db.Db.PinnedMessages.Add(new PinnedMessage
+        {
+            MessageId = m.Id,
+            ChannelId = m.ChannelId,
+            PinnedById = admin.Id
+        });
+        _db.Db.MessageReactions.Add(new MessageReaction
+        {
+            MessageId = m.Id,
+            UserId = admin.Id,
+            Username = admin.Username,
+            Emoji = "👍"
+        });
+        await _db.Db.SaveChangesAsync();
+
+        await _c.BulkDelete(new BulkDeleteRequest(Ids: new[] { m.Id }, Mode: "hard"));
+
+        Assert.False(await _db.Db.Messages.AsNoTracking().AnyAsync(x => x.Id == m.Id));
+        Assert.False(await _db.Db.PinnedMessages.AsNoTracking().AnyAsync(p => p.MessageId == m.Id));
+        Assert.False(await _db.Db.MessageReactions.AsNoTracking().AnyAsync(r => r.MessageId == m.Id));
+    }
 }

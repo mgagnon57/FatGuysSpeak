@@ -571,7 +571,18 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         var channelIds = matched.Select(m => m.ChannelId).Distinct().ToArray();
         var msgRefs = matched.Select(m => (m.Id, m.ChannelId)).ToList();
 
-        if (hard) db.Messages.RemoveRange(matched);
+        if (hard)
+        {
+            // Delete via ExecuteDeleteAsync to avoid SaveChanges concurrency issues and to
+            // remove dependent rows first — PinnedMessage and MessageReaction have required
+            // FKs to Message with no cascade, so deleting messages first would violate them on Postgres.
+            var matchedIds = matched.Select(m => m.Id).ToArray();
+            await db.PinnedMessages.Where(p => matchedIds.Contains(p.MessageId)).ExecuteDeleteAsync();
+            await db.MessageReactions.Where(r => matchedIds.Contains(r.MessageId)).ExecuteDeleteAsync();
+            await db.Messages.Where(m => matchedIds.Contains(m.Id)).ExecuteDeleteAsync();
+            // Detach tracked entities so SaveChangesAsync (for the audit log) won't re-attempt the delete.
+            foreach (var m in matched) db.Entry(m).State = Microsoft.EntityFrameworkCore.EntityState.Detached;
+        }
         else foreach (var m in matched) m.IsDeleted = true;
 
         db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
