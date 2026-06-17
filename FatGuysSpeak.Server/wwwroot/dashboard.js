@@ -228,8 +228,9 @@ function sortUsers(list) {
       case 'online':
       default:           r = (a.isOnline === b.isOnline) ? 0 : (a.isOnline ? 1 : -1); break;
     }
-    if (r === 0) r = a.username.localeCompare(b.username); // stable tiebreak
-    return userSort.dir === 'desc' ? -r : r;
+    r = userSort.dir === 'desc' ? -r : r;
+    if (r === 0) r = a.username.localeCompare(b.username); // tiebreak always ascending
+    return r;
   };
   return [...list].sort(cmp);
 }
@@ -289,8 +290,8 @@ function renderUsers(users) {
           : `<button class="btn-sm" title="User is not in a voice channel" disabled>Kick Voice</button>`}
         ${member ? muteCell : ''}
         ${member && role !== 'Admin'
-          ? `<span class="destructive-actions"><button class="btn-sm danger" title="Remove this user from the server — they can rejoin via invite link" data-click="kick" data-uid="${u.id}">Kick</button>
-              <select class="btn-sm danger" data-change="tempban" data-uid="${u.id}" title="Block this user from rejoining the server for a chosen duration"><option value="">Temp Ban…</option><option value="3600">1 hour</option><option value="86400">24 hours</option><option value="604800">7 days</option><option value="2592000">30 days</option></select></span>`
+          ? `<button class="btn-sm danger" title="Remove this user from the server — they can rejoin via invite link" data-click="kick" data-uid="${u.id}">Kick</button>
+              <select class="btn-sm danger" data-change="tempban" data-uid="${u.id}" title="Block this user from rejoining the server for a chosen duration"><option value="">Temp Ban…</option><option value="3600">1 hour</option><option value="86400">24 hours</option><option value="604800">7 days</option><option value="2592000">30 days</option></select>`
           : ''}
       </td>
     </tr>`;

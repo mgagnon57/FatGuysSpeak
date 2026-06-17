@@ -194,10 +194,6 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           .actions-cell { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
           .sort-ind { color: #8ab4d4; font-size: 9px; }
           thead th[data-sortkey]:hover { color: #aaa; }
-          /* destructive actions + role arrows stay hidden until the row is hovered */
-          .destructive-actions, .role-arrows { opacity: 0; transition: opacity .12s; }
-          .user-table tr:hover .destructive-actions,
-          .user-table tr:hover .role-arrows { opacity: 1; }
         </style>
         </head>
         <body>
@@ -337,7 +333,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
                 <th title="Text channel they're viewing and voice channel they're in (if any)">Channel</th>
                 <th data-click="sort" data-sortkey="role" style="cursor:pointer" title="Sort by role. Hover a badge for permissions; ▲/▼ to promote/demote.">Role <span class="sort-ind"></span></th>
                 <th data-click="sort" data-sortkey="created" style="cursor:pointer" title="Sort by join date">Member Since <span class="sort-ind"></span></th>
-                <th title="Mute (timed), Kick Voice, Kick (rejoinable), or Temp Ban (timed entry block).">Actions</th>
+                <th style="text-align:center" title="Mute (timed), Kick Voice, Kick (rejoinable), or Temp Ban (timed entry block).">Actions</th>
               </tr>
             </thead>
             <tbody id="userTableBody">
