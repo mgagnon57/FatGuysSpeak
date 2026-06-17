@@ -547,6 +547,49 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         return q;
     }
 
+    private const int BulkDeleteMax = 5000;
+
+    [HttpPost("messages/delete")]
+    public async Task<IActionResult> BulkDelete(FatGuysSpeak.Shared.BulkDeleteRequest req)
+    {
+        if (!IsLocal) return Forbid();
+
+        var hasIds = req.Ids is { Length: > 0 };
+        var hasFilter = req.Filter is not null;
+        if (hasIds == hasFilter) return BadRequest("Provide exactly one of ids or filter.");
+
+        var q = db.Messages.Include(m => m.Channel).AsQueryable();
+        q = hasIds ? q.Where(m => req.Ids!.Contains(m.Id)) : ApplyMessageFilters(q, req.Filter!);
+
+        var count = await q.CountAsync();
+        if (count == 0) return Ok(new FatGuysSpeak.Shared.BulkActionResult(0, Array.Empty<int>()));
+        if (count > BulkDeleteMax)
+            return BadRequest($"Too many messages match ({count}). Narrow the filter; max {BulkDeleteMax} per operation.");
+
+        var matched = await q.ToListAsync();
+        var hard = string.Equals(req.Mode, "hard", StringComparison.OrdinalIgnoreCase);
+        var channelIds = matched.Select(m => m.ChannelId).Distinct().ToArray();
+        var msgRefs = matched.Select(m => (m.Id, m.ChannelId)).ToList();
+
+        if (hard) db.Messages.RemoveRange(matched);
+        else foreach (var m in matched) m.IsDeleted = true;
+
+        db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
+        {
+            ServerId = matched[0].Channel.ServerId,
+            ActorId = 0, ActorUsername = "admin",
+            Action = hard ? "MessagesBulkPurged" : "MessagesBulkDeleted",
+            TargetId = 0, TargetUsername = "",
+            Detail = $"{(hard ? "Hard" : "Soft")}-deleted {matched.Count} message(s) via {(hasIds ? "selection" : "filter")}."
+        });
+        await db.SaveChangesAsync();
+
+        foreach (var (id, channelId) in msgRefs)
+            await hub.Clients.Group($"channel-{channelId}").SendAsync("MessageDeleted", id, channelId);
+
+        return Ok(new FatGuysSpeak.Shared.BulkActionResult(matched.Count, channelIds));
+    }
+
     [HttpPost("messages/restore")]
     public async Task<IActionResult> BulkRestore(FatGuysSpeak.Shared.BulkRestoreRequest req)
     {

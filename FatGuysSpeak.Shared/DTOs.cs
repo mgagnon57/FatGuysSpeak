@@ -168,6 +168,7 @@ public record MessageFilterDto(
     DateTime? From = null, DateTime? To = null);
 
 public record BulkRestoreRequest(int[]? Ids = null, MessageFilterDto? Filter = null);
+public record BulkDeleteRequest(int[]? Ids = null, MessageFilterDto? Filter = null, string Mode = "soft");
 public record BulkActionResult(int Affected, int[] ChannelIds);
 
 // Admin server list (filter dropdown)

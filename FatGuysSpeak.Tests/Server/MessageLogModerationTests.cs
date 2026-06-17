@@ -148,4 +148,70 @@ public class MessageLogModerationTests : IDisposable
         Assert.Equal(b.Id, page2[0].Id);
         Assert.DoesNotContain(page2, x => x.Id == c.Id);
     }
+
+    [Fact]
+    public async Task BulkDelete_ByIds_SoftDeletes()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var a = await AddMsg(admin.Id, "one");
+        var b = await AddMsg(admin.Id, "two");
+
+        var ok = Assert.IsType<OkObjectResult>(
+            await _c.BulkDelete(new BulkDeleteRequest(Ids: new[] { a.Id, b.Id })));
+        var result = Assert.IsType<BulkActionResult>(ok.Value);
+        Assert.Equal(2, result.Affected);
+
+        Assert.True(await _db.Db.Messages.AsNoTracking().AllAsync(m => m.IsDeleted));
+        // content preserved on soft delete
+        Assert.Equal("one", (await _db.Db.Messages.AsNoTracking().FirstAsync(m => m.Id == a.Id)).Content);
+    }
+
+    [Fact]
+    public async Task BulkDelete_ByFilter_OnlyMatchingAuthor()
+    {
+        var (server, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var other = new User { Username = "spammer", Email = "s@t.com", PasswordHash = "x" };
+        _db.Db.Users.Add(other);
+        await _db.Db.SaveChangesAsync();
+        await AddMsg(admin.Id, "legit");
+        await AddMsg(other.Id, "spam1");
+        await AddMsg(other.Id, "spam2");
+
+        var ok = Assert.IsType<OkObjectResult>(
+            await _c.BulkDelete(new BulkDeleteRequest(Filter: new MessageFilterDto(Author: "spammer"))));
+        Assert.Equal(2, Assert.IsType<BulkActionResult>(ok.Value).Affected);
+
+        Assert.False((await _db.Db.Messages.AsNoTracking().FirstAsync(m => m.Content == "legit")).IsDeleted);
+    }
+
+    [Fact]
+    public async Task BulkDelete_Hard_RemovesRows()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var a = await AddMsg(admin.Id, "gone");
+
+        var ok = Assert.IsType<OkObjectResult>(
+            await _c.BulkDelete(new BulkDeleteRequest(Ids: new[] { a.Id }, Mode: "hard")));
+        Assert.Equal(1, Assert.IsType<BulkActionResult>(ok.Value).Affected);
+        Assert.False(await _db.Db.Messages.AsNoTracking().AnyAsync(m => m.Id == a.Id));
+    }
+
+    [Fact]
+    public async Task BulkDelete_RejectsBothIdsAndFilter()
+    {
+        var res = await _c.BulkDelete(new BulkDeleteRequest(
+            Ids: new[] { 1 }, Filter: new MessageFilterDto(Author: "x")));
+        Assert.IsType<BadRequestObjectResult>(res);
+    }
+
+    [Fact]
+    public async Task BulkDelete_WritesSingleAuditEntry()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var a = await AddMsg(admin.Id, "one");
+        var b = await AddMsg(admin.Id, "two");
+
+        await _c.BulkDelete(new BulkDeleteRequest(Ids: new[] { a.Id, b.Id }));
+        Assert.Equal(1, await _db.Db.AuditLogs.CountAsync(x => x.Action == "MessagesBulkDeleted"));
+    }
 }
