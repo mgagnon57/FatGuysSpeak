@@ -203,10 +203,35 @@ function channelCell(u) {
   return parts.length ? parts.join(' · ') : '<span style="color:#555">—</span>';
 }
 
-function connBadge(u) {
-  return u.isOnline
-    ? '<span class="badge badge-online">Connected</span>'
-    : '<span class="badge badge-offline">Offline</span>';
+const AVATAR_COLORS = ['#d42d00','#e89000','#36b864','#8ab4d4','#a060d0','#d04080'];
+function avatarHtml(u) {
+  if (u.avatarUrl) return `<img class="u-av" src="${escapeHtml(u.avatarUrl)}" alt="" loading="lazy" />`;
+  const initial = ((u.username || '?').trim().charAt(0) || '?').toUpperCase();
+  const col = AVATAR_COLORS[(u.id || 0) % AVATAR_COLORS.length];
+  return `<span class="u-av u-av-fallback" style="background:${col}">${escapeHtml(initial)}</span>`;
+}
+function userCell(u) {
+  const dot = `<span class="presence-dot" style="background:${u.isOnline ? '#44bb44' : '#555'}" title="${u.isOnline ? 'Online' : 'Offline'}"></span>`;
+  return `<div class="u-cell">${avatarHtml(u)}${dot}<span class="user-link" data-click="profile" data-uid="${u.id}">${escapeHtml(u.username)}</span></div>`;
+}
+// Default ordering: online users first, then alphabetical. Column sort overrides this (set below).
+let userSort = { key: 'online', dir: 'desc' };
+function sortUsers(list) {
+  const roleRank = { Admin: 3, Moderator: 2, Member: 1 };
+  const roleOf = (u) => serverMembers.find(m => m.userId === u.id)?.role ?? null;
+  const cmp = (a, b) => {
+    let r = 0;
+    switch (userSort.key) {
+      case 'username':   r = a.username.localeCompare(b.username); break;
+      case 'role':       r = (roleRank[roleOf(a)] || 0) - (roleRank[roleOf(b)] || 0); break;
+      case 'created':    r = new Date(a.createdAt) - new Date(b.createdAt); break;
+      case 'online':
+      default:           r = (a.isOnline === b.isOnline) ? 0 : (a.isOnline ? 1 : -1); break;
+    }
+    if (r === 0) r = a.username.localeCompare(b.username); // stable tiebreak
+    return userSort.dir === 'desc' ? -r : r;
+  };
+  return [...list].sort(cmp);
 }
 
 const ROLE_STR = { 0: 'Member', 1: 'Moderator', 2: 'Admin' };
@@ -229,7 +254,7 @@ function roleBadge(role) {
 function renderUsers(users) {
   const tbody = document.getElementById('userTableBody');
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="color:#444;padding:20px 10px;">No users found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#444;padding:20px 10px;">No users found.</td></tr>';
     return;
   }
   const now = Date.now();
@@ -240,7 +265,7 @@ function renderUsers(users) {
     const nextDown = role === 'Admin'  ? 'Moderator' : 'Member';
     const roleCell = role
       ? `<div style="display:flex;align-items:center;gap:4px">${roleBadge(role)}
-         <span style="margin-left:auto;display:inline-flex;gap:4px">
+         <span class="role-arrows" style="margin-left:auto;display:inline-flex;gap:4px">
            <button class="btn-sm" title="Promote to ${nextUp}" data-click="promote" data-uid="${u.id}" ${role==='Admin'?'disabled':''} aria-label="Promote to ${nextUp}">▲</button>
            <button class="btn-sm danger" title="Demote to ${nextDown}" data-click="demote" data-uid="${u.id}" ${role==='Member'?'disabled':''} aria-label="Demote to ${nextDown}">▼</button>
          </span></div>`
@@ -254,19 +279,18 @@ function renderUsers(users) {
         : `<select class="btn-sm" data-change="mute" data-uid="${u.id}" ${role==='Admin'?'disabled':''} title="Temporarily prevent this user from sending messages"><option value="">Mute…</option><option value="300">5 minutes</option><option value="1800">30 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select>`
       : '<span style="color:#555">—</span>';
     return `<tr>
-      <td><span class="user-link" data-click="profile" data-uid="${u.id}">${escapeHtml(u.username)}</span></td>
-      <td>${connBadge(u)}</td>
+      <td>${userCell(u)}</td>
       <td>${channelCell(u)}</td>
       <td>${roleCell}</td>
       <td style="color:#555">${new Date(u.createdAt).toLocaleDateString()}</td>
-      <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <td class="actions-cell">
         ${u.voiceChannelId !== null
           ? `<button class="btn-sm danger" title="Disconnect this user from their current voice channel (they can rejoin)" data-click="kickVoice" data-uid="${u.id}">Kick Voice</button>`
           : `<button class="btn-sm" title="User is not in a voice channel" disabled>Kick Voice</button>`}
         ${member ? muteCell : ''}
         ${member && role !== 'Admin'
-          ? `<button class="btn-sm danger" title="Remove this user from the server — they can rejoin via invite link" data-click="kick" data-uid="${u.id}">Kick</button>
-              <select class="btn-sm danger" data-change="tempban" data-uid="${u.id}" title="Block this user from rejoining the server for a chosen duration"><option value="">Temp Ban…</option><option value="3600">1 hour</option><option value="86400">24 hours</option><option value="604800">7 days</option><option value="2592000">30 days</option></select>`
+          ? `<span class="destructive-actions"><button class="btn-sm danger" title="Remove this user from the server — they can rejoin via invite link" data-click="kick" data-uid="${u.id}">Kick</button>
+              <select class="btn-sm danger" data-change="tempban" data-uid="${u.id}" title="Block this user from rejoining the server for a chosen duration"><option value="">Temp Ban…</option><option value="3600">1 hour</option><option value="86400">24 hours</option><option value="604800">7 days</option><option value="2592000">30 days</option></select></span>`
           : ''}
       </td>
     </tr>`;
@@ -274,8 +298,26 @@ function renderUsers(users) {
 }
 
 function filterUsers() {
-  const q = document.getElementById('userSearch').value.toLowerCase();
-  renderUsers(q ? allUsers.filter(u => u.username.toLowerCase().includes(q)) : allUsers);
+  const q = (document.getElementById('userSearch')?.value || '').toLowerCase();
+  const onlineOnly = document.getElementById('onlineOnly')?.checked;
+  const roleF = document.getElementById('roleFilter')?.value || '';
+  const roleOf = (u) => serverMembers.find(m => m.userId === u.id)?.role ?? null;
+
+  let list = allUsers;
+  if (q)          list = list.filter(u => u.username.toLowerCase().includes(q));
+  if (onlineOnly) list = list.filter(u => u.isOnline);
+  if (roleF)      list = list.filter(u => roleOf(u) === roleF);
+
+  renderUsers(sortUsers(list));
+
+  const online = allUsers.filter(u => u.isOnline).length;
+  const cnt = document.getElementById('userCount');
+  if (cnt) cnt.textContent = `${online} online · ${allUsers.length} total`;
+
+  document.querySelectorAll('#userTable thead th[data-sortkey]').forEach(th => {
+    const ind = th.querySelector('.sort-ind');
+    if (ind) ind.textContent = th.dataset.sortkey === userSort.key ? (userSort.dir === 'asc' ? '▲' : '▼') : '';
+  });
 }
 
 async function loadUsers() {
@@ -294,7 +336,7 @@ async function loadUsers() {
     filterUsers();
   } catch (e) {
     document.getElementById('userTableBody').innerHTML =
-      `<tr><td colspan="6" style="color:#ed4245;padding:20px 10px;">Failed to load users: ${e.message}</td></tr>`;
+      `<tr><td colspan="5" style="color:#ed4245;padding:20px 10px;">Failed to load users: ${e.message}</td></tr>`;
   }
 }
 
@@ -853,6 +895,13 @@ document.addEventListener('click', (e) => {
   const d = el.dataset;
   switch (d.click) {
     case 'tab':           showTab(d.tab, el); break;
+    case 'sort': {
+      const k = d.sortkey;
+      if (userSort.key === k) userSort.dir = userSort.dir === 'asc' ? 'desc' : 'asc';
+      else userSort = { key: k, dir: (k === 'created') ? 'desc' : 'asc' };
+      filterUsers();
+      break;
+    }
     case 'profile':       openProfile(+d.uid); break;
     case 'closeProfile':  closeProfile(); break;
     case 'promote':       promoteUser(+d.uid, el); break;
@@ -877,6 +926,7 @@ document.addEventListener('change', (e) => {
     case 'loadMessages':    loadMessages(); break;
     case 'loadAudit':       loadAudit(); break;
     case 'saveChannelPerm': saveChannelPerm(+d.sid, +d.cid); break;
+    case 'filterUsers':     filterUsers(); break;
     case 'mute':            muteFromSelect(el); break;
     case 'tempban':         tempBanFromSelect(el); break;
   }

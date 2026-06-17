@@ -185,6 +185,19 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           .pf-row { display: flex; justify-content: space-between; gap: 16px; padding: 4px 0; font-size: 12px; }
           .pf-label { color: #666; text-transform: uppercase; letter-spacing: .5px; font-size: 10px; }
           .pf-val { color: #d0d0d0; text-align: right; word-break: break-word; }
+
+          /* ── Users table: identity, presence, sort, hover-reveal ── */
+          .u-cell { display: flex; align-items: center; gap: 8px; }
+          .u-av { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+          .u-av-fallback { display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: #fff; }
+          .presence-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+          .actions-cell { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+          .sort-ind { color: #8ab4d4; font-size: 9px; }
+          thead th[data-sortkey]:hover { color: #aaa; }
+          /* destructive actions + role arrows stay hidden until the row is hovered */
+          .destructive-actions, .role-arrows { opacity: 0; transition: opacity .12s; }
+          .user-table tr:hover .destructive-actions,
+          .user-table tr:hover .role-arrows { opacity: 1; }
         </style>
         </head>
         <body>
@@ -302,22 +315,33 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
         <!-- ── Users ─────────────────────────────────────── -->
         <div id="tab-users" class="tab-panel">
           <div class="panel-header">
-            <h2>Connected Clients</h2>
-            <input class="search-box" id="userSearch" placeholder="Filter by username…" data-input="filterUsers" title="Type to filter the list by username" />
+            <h2>Users <span id="userCount" style="color:#555;font-size:11px;font-weight:400;margin-left:6px"></span></h2>
+            <div style="display:flex;gap:8px;align-items:center">
+              <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:4px;cursor:pointer" title="Show only users currently connected">
+                <input type="checkbox" id="onlineOnly" data-change="filterUsers" style="accent-color:#8ab4d4" /> Online only
+              </label>
+              <select id="roleFilter" data-change="filterUsers" title="Filter by server role"
+                style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit">
+                <option value="">All roles</option>
+                <option value="Admin">Admin</option>
+                <option value="Moderator">Moderator</option>
+                <option value="Member">Member</option>
+              </select>
+              <input class="search-box" id="userSearch" placeholder="Filter by username…" data-input="filterUsers" title="Type to filter the list by username" />
+            </div>
           </div>
           <table class="user-table" id="userTable">
             <thead>
               <tr>
-                <th>Username</th>
-                <th title="Whether the user has an active SignalR connection to this server">Connection</th>
+                <th data-click="sort" data-sortkey="username" style="cursor:pointer" title="Sort by username (online users first by default)">Username <span class="sort-ind"></span></th>
                 <th title="Text channel they're viewing and voice channel they're in (if any)">Channel</th>
-                <th title="Server role — hover a badge for a full list of permissions. Use ▲/▼ to promote or demote.">Role</th>
-                <th>Member Since</th>
+                <th data-click="sort" data-sortkey="role" style="cursor:pointer" title="Sort by role. Hover a badge for permissions; ▲/▼ to promote/demote.">Role <span class="sort-ind"></span></th>
+                <th data-click="sort" data-sortkey="created" style="cursor:pointer" title="Sort by join date">Member Since <span class="sort-ind"></span></th>
                 <th title="Mute (timed), Kick Voice, Kick (rejoinable), or Temp Ban (timed entry block).">Actions</th>
               </tr>
             </thead>
             <tbody id="userTableBody">
-              <tr><td colspan="6" style="color:#444;padding:20px 10px;">Loading…</td></tr>
+              <tr><td colspan="5" style="color:#444;padding:20px 10px;">Loading…</td></tr>
             </tbody>
           </table>
         </div><!-- /tab-users -->

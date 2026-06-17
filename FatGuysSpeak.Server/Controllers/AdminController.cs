@@ -34,7 +34,7 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
 
         var rows = await db.Users
             .OrderBy(u => u.Username)
-            .Select(u => new { u.Id, u.Username, u.Email, Status = u.Status.ToString(), u.CreatedAt })
+            .Select(u => new { u.Id, u.Username, u.Email, Status = u.Status.ToString(), u.CreatedAt, u.AvatarUrl })
             .ToListAsync();
 
         var users = rows.Select(u => new
@@ -44,6 +44,7 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
             u.Email,
             u.Status,
             u.CreatedAt,
+            u.AvatarUrl,
             IsOnline       = online.ContainsKey(u.Id),
             VoiceChannelId = voice.TryGetValue(u.Id, out var vc) ? (int?)vc : null,
             TextChannel    = ChanName(text, u.Id),
