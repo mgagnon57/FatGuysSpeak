@@ -161,6 +161,30 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
             font-weight: normal;
           }
           .role-tip:hover::after { opacity: 1; }
+
+          .user-link { color: #8ab4d4; cursor: pointer; }
+          .user-link:hover { text-decoration: underline; }
+          .modal-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,.6);
+            display: flex; align-items: center; justify-content: center; z-index: 9998;
+          }
+          .modal-card {
+            background: #1f1f1f; border: 1px solid #333; border-radius: 10px;
+            width: 460px; max-width: 92vw; max-height: 86vh; overflow-y: auto;
+            box-shadow: 0 12px 40px rgba(0,0,0,.6); padding: 0 0 8px;
+          }
+          .pf-head {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 18px; border-bottom: 1px solid #2a2a2a;
+          }
+          .pf-head h2 { font-size: 16px; color: #8ab4d4; }
+          .pf-close { background: none; border: none; color: #777; font-size: 16px; cursor: pointer; }
+          .pf-close:hover { color: #ed4245; }
+          .pf-section { padding: 12px 18px; border-bottom: 1px solid #242424; }
+          .pf-section:last-child { border-bottom: none; }
+          .pf-row { display: flex; justify-content: space-between; gap: 16px; padding: 4px 0; font-size: 12px; }
+          .pf-label { color: #666; text-transform: uppercase; letter-spacing: .5px; font-size: 10px; }
+          .pf-val { color: #d0d0d0; text-align: right; word-break: break-word; }
         </style>
         </head>
         <body>

@@ -1,6 +1,97 @@
 function escapeHtml(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+
+// ── User profile modal ────────────────────────────────────
+function fmtDuration(secs) {
+  secs = Math.max(0, Math.floor(secs || 0));
+  const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600), m = Math.floor((secs % 3600) / 60);
+  if (d) return `${d}d ${h}h ${m}m`;
+  if (h) return `${h}h ${m}m`;
+  if (m) return `${m}m`;
+  return `${secs}s`;
+}
+function fmtWhen(iso) {
+  if (!iso) return 'never';
+  const t = new Date(iso);
+  return t.toLocaleDateString() + ' ' + t.toLocaleTimeString();
+}
+function fmtAgo(iso) {
+  if (!iso) return 'never';
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + ' min ago';
+  if (s < 86400) return Math.floor(s / 3600) + ' hr ago';
+  return Math.floor(s / 86400) + ' days ago';
+}
+function closeProfile() {
+  document.getElementById('profileModal')?.remove();
+}
+async function openProfile(userId) {
+  closeProfile();
+  let p = null;
+  try {
+    const q = currentServerId ? ('?serverId=' + currentServerId) : '';
+    const res = await fetch('/api/admin/users/' + userId + '/profile' + q);
+    if (res.ok) p = await res.json();
+  } catch {}
+  renderProfileModal(p);
+}
+function pfRow(label, value) {
+  return `<div class="pf-row"><span class="pf-label">${label}</span><span class="pf-val">${value}</span></div>`;
+}
+function renderProfileModal(p) {
+  const wrap = document.createElement('div');
+  wrap.id = 'profileModal';
+  wrap.className = 'modal-backdrop';
+  wrap.setAttribute('data-click', 'closeProfile');
+
+  let body;
+  if (!p) {
+    body = `<div class="pf-section">Couldn't load this profile.</div>`;
+  } else {
+    const muted = p.mutedUntil && new Date(p.mutedUntil) > new Date();
+    const banned = p.tempBanExpiresAt && new Date(p.tempBanExpiresAt) > new Date();
+    body = `
+      <div class="pf-section">
+        ${pfRow('Email', escapeHtml(p.email || '—'))}
+        ${pfRow('Status', escapeHtml(p.status) + (p.inVoice ? ' · 🎙 in voice' : ''))}
+        ${p.bio ? pfRow('Bio', escapeHtml(p.bio)) : ''}
+      </div>
+      <div class="pf-section">
+        ${pfRow('Role', escapeHtml(p.role))}
+        ${pfRow('Member since', fmtWhen(p.createdAt))}
+        ${pfRow('Moderation', muted ? ('Muted until ' + fmtWhen(p.mutedUntil)) : (banned ? ('Temp-banned until ' + fmtWhen(p.tempBanExpiresAt)) : 'None'))}
+      </div>
+      <div class="pf-section">
+        ${pfRow('Last login', p.lastLoginAt ? (fmtWhen(p.lastLoginAt) + (p.lastLoginIp ? ' · ' + escapeHtml(p.lastLoginIp) : '')) : 'never')}
+        ${pfRow('Last device', p.lastLoginUserAgent ? escapeHtml(p.lastLoginUserAgent) : '—')}
+        ${pfRow('Last seen', fmtAgo(p.lastSeenAt))}
+        ${pfRow('Active sessions', p.activeSessionCount)}
+      </div>
+      <div class="pf-section">
+        ${pfRow('Messages sent', p.messageCount)}
+        ${pfRow('Most-used channel', p.topChannel ? '#' + escapeHtml(p.topChannel) : '—')}
+        ${pfRow('Total time on server', fmtDuration(p.totalOnlineSeconds))}
+      </div>`;
+  }
+
+  const title = p ? escapeHtml(p.username) : 'Profile';
+  wrap.innerHTML = `
+    <div class="modal-card">
+      <div class="pf-head">
+        <h2>${title}</h2>
+        <button class="pf-close" data-click="closeProfile" title="Close" aria-label="Close">✕</button>
+      </div>
+      ${body}
+    </div>`;
+  document.body.appendChild(wrap);
+  // Clicks inside the card shouldn't reach the backdrop (which closes), except the × button.
+  wrap.querySelector('.modal-card').addEventListener('click', (e) => {
+    if (!e.target.closest('[data-click="closeProfile"]')) e.stopPropagation();
+  });
+}
+
 // ── Tab switching ──────────────────────────────────
 function showTab(name, btn) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -166,7 +257,7 @@ function renderUsers(users) {
         : `<select class="btn-sm" data-change="mute" data-uid="${u.id}" ${role==='Admin'?'disabled':''} title="Temporarily prevent this user from sending messages"><option value="">Mute…</option><option value="300">5 minutes</option><option value="1800">30 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select>`
       : '<span style="color:#555">—</span>';
     return `<tr>
-      <td><strong style="color:#d0d0d0">${escapeHtml(u.username)}</strong></td>
+      <td><span class="user-link" data-click="profile" data-uid="${u.id}">${escapeHtml(u.username)}</span></td>
       <td>${statusBadge(u)}</td>
       <td>${roleCell}</td>
       <td>${muteCell}</td>
@@ -765,6 +856,8 @@ document.addEventListener('click', (e) => {
   const d = el.dataset;
   switch (d.click) {
     case 'tab':           showTab(d.tab, el); break;
+    case 'profile':       openProfile(+d.uid); break;
+    case 'closeProfile':  closeProfile(); break;
     case 'promote':       promoteUser(+d.uid, el); break;
     case 'demote':        demoteUser(+d.uid, el); break;
     case 'unmute':        muteUser(currentServerId, +d.uid, 0, el); break;
@@ -800,6 +893,7 @@ document.addEventListener('input', (e) => {
 });
 
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closeProfile(); return; }
   if (e.key !== 'Enter') return;
   const el = e.target.closest('[data-enter]');
   if (!el) return;
