@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FatGuysSpeak.Server.Hubs;
 
 [Authorize]
-public class ChatHub(AppDbContext db) : Hub
+public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTracker onlineTime) : Hub
 {
     // userId -> voice channelId
     private static readonly ConcurrentDictionary<int, int> VoiceChannelMap = new();
@@ -239,6 +239,7 @@ public class ChatHub(AppDbContext db) : Hub
     public override async Task OnConnectedAsync()
     {
         OnlineUsers[UserId] = Username;
+        onlineTime.Connect(UserId);
 
         var user = await db.Users.FindAsync(UserId);
         if (user is not null)
@@ -276,6 +277,7 @@ public class ChatHub(AppDbContext db) : Hub
             await Clients.Group($"channel-{textChannelId}").SendAsync("UserLeftChannel", textChannelId, new UserDto(UserId, Username, UserStatus.Offline));
         }
 
+        var addSeconds = onlineTime.Disconnect(UserId);
         var user = await db.Users.FindAsync(UserId);
         if (user is not null)
         {
@@ -283,6 +285,14 @@ public class ChatHub(AppDbContext db) : Hub
             user.LastSeenAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
         }
+        // Persist online time via an atomic DB increment (not a read-modify-write on the
+        // tracked entity) so two connections for the same user disconnecting concurrently
+        // can't overwrite each other's accumulated seconds. Quoted identifiers work on both
+        // SQLite and PostgreSQL.
+        if (addSeconds > 0)
+            await db.Database.ExecuteSqlRawAsync(
+                "UPDATE \"Users\" SET \"TotalOnlineSeconds\" = \"TotalOnlineSeconds\" + {0} WHERE \"Id\" = {1}",
+                addSeconds, UserId);
 
         var serverIds = await db.ServerMembers
             .Where(sm => sm.UserId == UserId)

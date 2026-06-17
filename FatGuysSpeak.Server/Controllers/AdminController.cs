@@ -44,6 +44,46 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         return Ok(users);
     }
 
+    [HttpGet("users/{id}/profile")]
+    public async Task<IActionResult> GetUserProfile(int id, [FromServices] OnlineTimeTracker onlineTime, [FromQuery] int? serverId = null)
+    {
+        if (!IsLocal) return Forbid();
+
+        var user = await db.Users.FindAsync(id);
+        if (user is null) return NotFound();
+
+        var voice = ChatHub.VoiceChannelSnapshot;
+
+        var sid = serverId ?? await db.Servers.OrderBy(s => s.Id).Select(s => (int?)s.Id).FirstOrDefaultAsync();
+        var member = sid is null ? null
+            : await db.ServerMembers.FirstOrDefaultAsync(m => m.ServerId == sid && m.UserId == id);
+        var tempBan = sid is null ? null
+            : await db.TempBans.Where(tb => tb.ServerId == sid && tb.UserId == id && tb.ExpiresAt > DateTime.UtcNow)
+                .OrderByDescending(tb => tb.ExpiresAt).FirstOrDefaultAsync();
+
+        var lastSession = await db.UserSessions.Where(s => s.UserId == id)
+            .OrderByDescending(s => s.CreatedAt).FirstOrDefaultAsync();
+        var activeSessions = await db.UserSessions.CountAsync(s => s.UserId == id && s.RevokedAt == null);
+
+        var messageCount = await db.Messages.CountAsync(m => m.AuthorId == id);
+        var topChannelId = await db.Messages.Where(m => m.AuthorId == id)
+            .GroupBy(m => m.ChannelId)
+            .OrderByDescending(g => g.Count())
+            .Select(g => (int?)g.Key)
+            .FirstOrDefaultAsync();
+        string? topChannel = topChannelId is null ? null
+            : await db.Channels.Where(c => c.Id == topChannelId).Select(c => c.Name).FirstOrDefaultAsync();
+
+        var dto = new FatGuysSpeak.Shared.UserProfileAdminDto(
+            user.Id, user.Username, user.Email, user.AvatarUrl, user.Bio,
+            user.Status.ToString(), voice.ContainsKey(id),
+            user.CreatedAt, member?.Role.ToString() ?? "—", member?.MutedUntil, tempBan?.ExpiresAt,
+            lastSession?.CreatedAt, lastSession?.IpAddress, lastSession?.UserAgent,
+            user.LastSeenAt, activeSessions,
+            messageCount, topChannel, user.TotalOnlineSeconds + onlineTime.LiveSeconds(id));
+        return Ok(dto);
+    }
+
     [HttpPost("users/{userId}/kick-voice")]
     public async Task<IActionResult> KickFromVoice(int userId)
     {

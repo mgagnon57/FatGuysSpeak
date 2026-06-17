@@ -38,6 +38,7 @@ builder.Services.AddScoped<FatGuysSpeak.Server.Services.IGoogleTokenValidator, F
 builder.Services.AddHttpClient("google", c => c.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddScoped<FatGuysSpeak.Server.Services.IGoogleCodeExchanger, FatGuysSpeak.Server.Services.GoogleCodeExchanger>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.ServerMetricsService>();
+builder.Services.AddSingleton<FatGuysSpeak.Server.Services.OnlineTimeTracker>();
 builder.Services.AddHttpClient("anthropic", c =>
 {
     c.BaseAddress = new Uri("https://api.anthropic.com/v1/");
@@ -312,6 +313,9 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='LastSeenAt'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"LastSeenAt\" TIMESTAMP");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='TotalOnlineSeconds'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"TotalOnlineSeconds\" BIGINT NOT NULL DEFAULT 0");
     }
     else
     {
@@ -395,6 +399,9 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='LastSeenAt'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN LastSeenAt TEXT");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='TotalOnlineSeconds'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN TotalOnlineSeconds INTEGER NOT NULL DEFAULT 0");
     }
 
     // MessageReactions table (added for reactions feature)
@@ -799,6 +806,10 @@ app.Use(async (ctx, next) =>
 });
 app.UseCors();
 app.UseRateLimiter();
+
+// Serve wwwroot (dashboard.js + self-hosted Chart.js) so the dashboard's JS loads
+// under the strict CSP (script-src 'self') instead of inline scripts / a CDN.
+app.UseStaticFiles();
 
 var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
 Directory.CreateDirectory(uploadsPath);

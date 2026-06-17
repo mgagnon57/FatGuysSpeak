@@ -84,7 +84,7 @@ public class ChatHubTypingTests : IDisposable
         ctx.Setup(c => c.ConnectionId).Returns(connectionId);
         ctx.Setup(c => c.User).Returns(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
 
-        var hub = new ChatHub(_testDb.Db);
+        var hub = new ChatHub(_testDb.Db, new FatGuysSpeak.Server.Services.OnlineTimeTracker());
         hub.Context = ctx.Object;
         hub.Clients = _mockClients.Object;
         hub.Groups = _mockGroups.Object;
