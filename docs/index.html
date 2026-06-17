@@ -957,7 +957,12 @@
     CLIENT INSTALLER <span class="tick-sep">·</span>
     MENTION GATING <span class="tick-sep">·</span>
     WORD FILTER SEVERITY <span class="tick-sep">·</span>
-    PASSWORD RESET <span class="tick-sep">·</span>&nbsp;
+    PASSWORD RESET <span class="tick-sep">·</span>
+    GOOGLE SIGN-IN <span class="tick-sep">·</span>
+    PINNED MESSAGES <span class="tick-sep">·</span>
+    CHANNEL CATEGORIES <span class="tick-sep">·</span>
+    MESSAGE EDITING <span class="tick-sep">·</span>
+    READ RECEIPTS <span class="tick-sep">·</span>&nbsp;
     PUSH-TO-TALK <span class="tick-sep">·</span>
     SCREEN SHARE <span class="tick-sep">·</span>
     WHISPER AI <span class="tick-sep">·</span>
@@ -976,7 +981,12 @@
     CLIENT INSTALLER <span class="tick-sep">·</span>
     MENTION GATING <span class="tick-sep">·</span>
     WORD FILTER SEVERITY <span class="tick-sep">·</span>
-    PASSWORD RESET <span class="tick-sep">·</span>&nbsp;
+    PASSWORD RESET <span class="tick-sep">·</span>
+    GOOGLE SIGN-IN <span class="tick-sep">·</span>
+    PINNED MESSAGES <span class="tick-sep">·</span>
+    CHANNEL CATEGORIES <span class="tick-sep">·</span>
+    MESSAGE EDITING <span class="tick-sep">·</span>
+    READ RECEIPTS <span class="tick-sep">·</span>&nbsp;
   </div>
 </div>
 
@@ -991,7 +1001,7 @@
     <div class="stat-lbl">Trackers / Ads</div>
   </div>
   <div class="stat-cell">
-    <div class="stat-num">25<span class="accent">+</span></div>
+    <div class="stat-num">30<span class="accent">+</span></div>
     <div class="stat-lbl">Core Features</div>
   </div>
   <div class="stat-cell">
@@ -1022,6 +1032,9 @@
         <li>DMs &amp; Group DMs (up to 10)</li>
         <li>Block users in DMs</li>
         <li>Slowmode per channel</li>
+        <li>Edit &amp; delete messages</li>
+        <li>Pinned messages</li>
+        <li>Typing indicators &amp; read receipts</li>
       </ul>
     </div>
     <div class="pillar reveal">
@@ -1051,6 +1064,7 @@
         <li>Temp bans with auto-expiry</li>
         <li>@everyone / @role mention gating</li>
         <li>Per-channel permissions</li>
+        <li>Channel categories</li>
         <li>Audit log with retention policy</li>
         <li>Webhook delivery</li>
       </ul>
@@ -1136,6 +1150,36 @@
       <h4>Hardened by Design</h4>
       <p>Defense in depth across the stack: SSRF-safe link previews and webhooks that validate the real destination on every hop, per-IP rate limiting that stops brute-force and lockout abuse, uploads checked by actual file signature instead of just the extension, a strict Content-Security-Policy, and constant-time credential checks. Channel read permissions are enforced everywhere — voice, search, and replies can't leak a restricted channel.</p>
       <span class="feat-tag">Security</span>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">🔑</span>
+      <h4>Sign in with Google</h4>
+      <p>Optional one-click Google sign-in next to username/password. The desktop client runs Google's secure loopback OAuth flow and your server exchanges the code and links the account by verified email — the client secret never leaves your server. Stays off until you add your own Google credentials.</p>
+      <span class="feat-tag">Security</span>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">📌</span>
+      <h4>Pinned Messages</h4>
+      <p>Pin the messages that matter in any channel or DM and pull them up in a dedicated list. Keep rules, links, and inside jokes one click away instead of lost in scrollback.</p>
+      <span class="feat-tag">Messaging</span>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">🗃</span>
+      <h4>Channel Categories</h4>
+      <p>Group channels under collapsible categories and order them how your crew thinks. The layout is yours to arrange, not a fixed list.</p>
+      <span class="feat-tag">Organization</span>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">🔔</span>
+      <h4>Notification Controls</h4>
+      <p>Per-channel and per-server notification levels — everything, mentions only, or nothing. Mute the noisy channels and keep the pings that actually matter.</p>
+      <span class="feat-tag">Personalization</span>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">🪪</span>
+      <h4>User Profiles</h4>
+      <p>Custom avatars, a personal bio, and an online / away / busy status on every profile. Click any member to see who they are and when they were last around.</p>
+      <span class="feat-tag">Community</span>
     </div>
   </div>
 </section>
