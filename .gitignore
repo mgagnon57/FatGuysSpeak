@@ -37,6 +37,8 @@ server-out.txt
 server-err.txt
 test-out.txt
 
+## Local dev SQLite database (runtime data — not source)
+FatGuysSpeak.Server/fatguys.db
 ## SQLite write-ahead-log sidecars
 *.db-shm
 *.db-wal
