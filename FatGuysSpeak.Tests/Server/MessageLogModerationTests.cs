@@ -216,6 +216,22 @@ public class MessageLogModerationTests : IDisposable
     }
 
     [Fact]
+    public async Task BulkDelete_Hard_OrphansThreadReplies()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var root = await AddMsg(admin.Id, "thread root");
+        var reply = new Message { AuthorId = admin.Id, ChannelId = root.ChannelId, Content = "reply", ThreadId = root.Id };
+        _db.Db.Messages.Add(reply);
+        await _db.Db.SaveChangesAsync();
+
+        await _c.BulkDelete(new BulkDeleteRequest(Ids: new[] { root.Id }, Mode: "hard"));
+
+        Assert.False(await _db.Db.Messages.AsNoTracking().AnyAsync(m => m.Id == root.Id)); // root gone
+        var reloaded = await _db.Db.Messages.AsNoTracking().FirstAsync(m => m.Id == reply.Id);
+        Assert.Null(reloaded.ThreadId); // reply orphaned, not deleted
+    }
+
+    [Fact]
     public async Task BulkDelete_Hard_RemovesDependentPinsAndReactions()
     {
         var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");

@@ -573,10 +573,13 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
 
         if (hard)
         {
-            // Delete via ExecuteDeleteAsync to avoid SaveChanges concurrency issues and to
-            // remove dependent rows first — PinnedMessage and MessageReaction have required
-            // FKs to Message with no cascade, so deleting messages first would violate them on Postgres.
             var matchedIds = matched.Select(m => m.Id).ToArray();
+            // Orphan thread replies first: Message.ThreadId is a self-FK with RESTRICT on Postgres,
+            // so deleting a thread-root would violate it. (ReplyToId has no DB FK, so it's fine.)
+            await db.Messages.Where(m => m.ThreadId.HasValue && matchedIds.Contains(m.ThreadId.Value))
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.ThreadId, (int?)null));
+            // PinnedMessages and MessageReactions have ON DELETE CASCADE, but delete them explicitly
+            // so the operation stays correct even if a DB was created without the cascade.
             await db.PinnedMessages.Where(p => matchedIds.Contains(p.MessageId)).ExecuteDeleteAsync();
             await db.MessageReactions.Where(r => matchedIds.Contains(r.MessageId)).ExecuteDeleteAsync();
             await db.Messages.Where(m => matchedIds.Contains(m.Id)).ExecuteDeleteAsync();

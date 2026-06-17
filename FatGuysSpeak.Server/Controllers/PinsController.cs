@@ -24,7 +24,7 @@ public class PinsController(AppDbContext db, IHubContext<ChatHub> hub) : Control
         if (!await IsMemberOfChannelAsync(channelId)) return Forbid();
 
         var pins = await db.PinnedMessages
-            .Where(p => p.ChannelId == channelId)
+            .Where(p => p.ChannelId == channelId && !p.Message.IsDeleted)
             .Include(p => p.Message).ThenInclude(m => m.Author)
             .Include(p => p.Message).ThenInclude(m => m.ReplyTo).ThenInclude(r => r!.Author)
             .OrderByDescending(p => p.PinnedAt)

@@ -181,6 +181,34 @@ public class PinsControllerTests : IDisposable
         Assert.Empty(list);
     }
 
+    [Fact]
+    public async Task GetChannelPins_ExcludesSoftDeletedMessages()
+    {
+        var (_, channel, mod, _) = await SeedChannelAsync();
+
+        // Add two messages and pin both.
+        var live = new Message { ChannelId = channel.Id, AuthorId = mod.Id, Content = "live message", Source = MessageSource.Text };
+        var dead = new Message { ChannelId = channel.Id, AuthorId = mod.Id, Content = "deleted message", Source = MessageSource.Text };
+        _testDb.Db.Messages.AddRange(live, dead);
+        await _testDb.Db.SaveChangesAsync();
+
+        _testDb.Db.PinnedMessages.Add(new PinnedMessage { MessageId = live.Id, ChannelId = channel.Id, PinnedById = mod.Id });
+        _testDb.Db.PinnedMessages.Add(new PinnedMessage { MessageId = dead.Id, ChannelId = channel.Id, PinnedById = mod.Id });
+        await _testDb.Db.SaveChangesAsync();
+
+        // Soft-delete one message (content is preserved per the soft-delete design).
+        dead.IsDeleted = true;
+        await _testDb.Db.SaveChangesAsync();
+
+        var result = await MakeController(mod.Id, mod.Username).GetChannelPins(channel.Id);
+        var ok   = Assert.IsType<OkObjectResult>(result.Result);
+        var list = Assert.IsType<List<MessageDto>>(ok.Value);
+
+        Assert.Single(list);
+        Assert.Equal(live.Id, list[0].Id);
+        Assert.DoesNotContain(list, m => m.Id == dead.Id);
+    }
+
     // ── DM pins ───────────────────────────────────────────────────────────────
 
     private async Task<(User alice, User bob, DirectConversationDto convo, DirectMessageDto msg)> SeedDmAsync()
