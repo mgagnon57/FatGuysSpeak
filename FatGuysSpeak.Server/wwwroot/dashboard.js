@@ -178,7 +178,7 @@ function renderUsers(users) {
           : `<button class="btn-sm" title="User is not in a voice channel" disabled>Kick Voice</button>`}
         ${member && role !== 'Admin'
           ? ` <button class="btn-sm danger" title="Remove this user from the server — they can rejoin via invite link" data-click="kick" data-uid="${u.id}">Kick</button>
-              <button class="btn-sm danger" title="Block this user from rejoining the server for a chosen duration" data-click="tempban" data-uid="${u.id}">Temp Ban…</button>`
+              <select class="btn-sm danger" data-change="tempban" data-uid="${u.id}" title="Block this user from rejoining the server for a chosen duration"><option value="">Temp Ban…</option><option value="3600">1 hour</option><option value="86400">24 hours</option><option value="604800">7 days</option><option value="2592000">30 days</option></select>`
           : ''}
       </td>
     </tr>`;
@@ -246,12 +246,15 @@ async function muteUser(serverId, userId, seconds, btn) {
   }
 }
 
-async function pickTempBan(serverId, userId, btn) {
-  const choice = prompt('Temp ban duration:\n1: 1 hour\n2: 24 hours\n3: 7 days\n4: 30 days\n\nEnter 1–4:');
-  const secs = [3600, 86400, 604800, 2592000][parseInt(choice) - 1];
+async function tempBanFromSelect(sel) {
+  const secs = parseInt(sel.value);
+  const label = sel.options[sel.selectedIndex].text;
+  const serverId = currentServerId;
+  const userId = +sel.dataset.uid;
+  sel.selectedIndex = 0; // reset back to the "Temp Ban…" placeholder
   if (!secs) return;
-  if (!confirm(`Temp ban this user for ${['1 hour','24 hours','7 days','30 days'][parseInt(choice)-1]}?`)) return;
-  await tempBanUser(serverId, userId, secs, btn);
+  if (!confirm(`Temp ban this user for ${label}?`)) return;
+  await tempBanUser(serverId, userId, secs, sel);
 }
 
 async function tempBanUser(serverId, userId, seconds, btn) {
@@ -768,7 +771,6 @@ document.addEventListener('click', (e) => {
     case 'pickMute':      pickMute(currentServerId, +d.uid, el); break;
     case 'kickVoice':     kickVoice(+d.uid, el); break;
     case 'kick':          kickFromServer(currentServerId, +d.uid, el); break;
-    case 'tempban':       pickTempBan(currentServerId, +d.uid, el); break;
     case 'delMsg':        adminDeleteMsg(+d.mid, el); break;
     case 'rmWf':          removeWordFilter(currentServerId, +d.fid, el); break;
     case 'createChannel': createChannel(); break;
@@ -786,6 +788,7 @@ document.addEventListener('change', (e) => {
     case 'loadMessages':    loadMessages(); break;
     case 'loadAudit':       loadAudit(); break;
     case 'saveChannelPerm': saveChannelPerm(+d.sid, +d.cid); break;
+    case 'tempban':         tempBanFromSelect(el); break;
   }
 });
 
