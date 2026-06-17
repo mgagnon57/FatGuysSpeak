@@ -552,6 +552,7 @@ function buildMsgParams(beforeId) {
   const source  = document.getElementById('msgSource').value;
   const server  = document.getElementById('msgServer').value;
   const range   = document.getElementById('msgRange').value;
+  const showDel = document.getElementById('msgShowDeleted').checked;
   const params = new URLSearchParams({ limit: 100 });
   if (author)  params.set('author',  author);
   if (channel) params.set('channel', channel);
@@ -562,6 +563,7 @@ function buildMsgParams(beforeId) {
     const from = new Date(Date.now() - (+range) * 86400000).toISOString();
     params.set('from', from);
   }
+  params.set('showDeleted', showDel);   // server-side filter (keeps pages full)
   if (beforeId) params.set('beforeId', beforeId);
   return params;
 }
@@ -569,15 +571,13 @@ function buildMsgParams(beforeId) {
 async function loadMessages() {
   clearTimeout(msgDebounce);
   msgDebounce = setTimeout(async () => {
-    const showDel = document.getElementById('msgShowDeleted').checked;
     try {
       const res = await fetch('/api/admin/messages?' + buildMsgParams(null));
       if (!res.ok) throw new Error(res.status);
-      const rawMsgs = await res.json();
-      const msgs = showDel ? rawMsgs : rawMsgs.filter(m => !m.isDeleted);
+      const msgs = await res.json();
       allLoadedMsgs = msgs;
-      oldestMsgId = rawMsgs.length ? rawMsgs[rawMsgs.length - 1].id : null;
-      document.getElementById('msgLoadMore').style.display = (rawMsgs.length >= 100) ? '' : 'none';
+      oldestMsgId = msgs.length ? msgs[msgs.length - 1].id : null;
+      document.getElementById('msgLoadMore').style.display = (msgs.length >= 100) ? '' : 'none';
       renderMessages(allLoadedMsgs);
       reconcileSelection();
     } catch (e) {
@@ -589,15 +589,13 @@ async function loadMessages() {
 
 async function loadMoreMsgs() {
   if (!oldestMsgId) return;
-  const showDel = document.getElementById('msgShowDeleted').checked;
   try {
     const res = await fetch('/api/admin/messages?' + buildMsgParams(oldestMsgId));
     if (!res.ok) throw new Error(res.status);
-    const rawMsgs = await res.json();
-    const msgs = showDel ? rawMsgs : rawMsgs.filter(m => !m.isDeleted);
+    const msgs = await res.json();
     allLoadedMsgs = allLoadedMsgs.concat(msgs);
-    oldestMsgId = rawMsgs.length ? rawMsgs[rawMsgs.length - 1].id : oldestMsgId;
-    document.getElementById('msgLoadMore').style.display = (rawMsgs.length >= 100) ? '' : 'none';
+    oldestMsgId = msgs.length ? msgs[msgs.length - 1].id : oldestMsgId;
+    document.getElementById('msgLoadMore').style.display = (msgs.length >= 100) ? '' : 'none';
     renderMessages(allLoadedMsgs);
     reconcileSelection();
   } catch (e) { alert('Load more failed: ' + e.message); }

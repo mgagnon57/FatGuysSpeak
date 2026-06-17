@@ -76,6 +76,35 @@ public class MessageLogModerationTests : IDisposable
     }
 
     [Fact]
+    public async Task GetMessages_ShowDeletedFalse_ExcludesDeleted()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var keep = await AddMsg(admin.Id, "keep");
+        var del = await AddMsg(admin.Id, "deleted");
+        del.IsDeleted = true;
+        await _db.Db.SaveChangesAsync();
+
+        var ok = Assert.IsType<OkObjectResult>(await _c.GetMessages(showDeleted: false));
+        var list = Assert.IsType<List<AdminMessageDto>>(ok.Value);
+        Assert.Single(list);
+        Assert.Equal(keep.Id, list[0].Id);
+    }
+
+    [Fact]
+    public async Task GetMessages_ShowDeletedTrue_IncludesDeleted()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        await AddMsg(admin.Id, "keep");
+        var del = await AddMsg(admin.Id, "deleted");
+        del.IsDeleted = true;
+        await _db.Db.SaveChangesAsync();
+
+        var ok = Assert.IsType<OkObjectResult>(await _c.GetMessages(showDeleted: true));
+        var list = Assert.IsType<List<AdminMessageDto>>(ok.Value);
+        Assert.Equal(2, list.Count);
+    }
+
+    [Fact]
     public async Task Restore_ByIds_UnflagsAndKeepsContent()
     {
         var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");

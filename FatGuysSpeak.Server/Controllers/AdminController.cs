@@ -132,7 +132,8 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         [FromQuery] string? keyword = null,
         [FromQuery] DateTime? from = null,
         [FromQuery] DateTime? to = null,
-        [FromQuery] int? beforeId = null)
+        [FromQuery] int? beforeId = null,
+        [FromQuery] bool? showDeleted = null)
     {
         if (!IsLocal) return Forbid();
 
@@ -144,6 +145,7 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         query = ApplyMessageFilters(query,
             new FatGuysSpeak.Shared.MessageFilterDto(author, channel, serverId, source, keyword, from, to));
         if (beforeId is int bid) query = query.Where(m => m.Id < bid);
+        if (showDeleted == false) query = query.Where(m => !m.IsDeleted);
 
         var messages = await query
             .OrderByDescending(m => m.Id)
