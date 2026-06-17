@@ -26,20 +26,29 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
 
         var online = ChatHub.OnlineUserSnapshot;
         var voice  = ChatHub.VoiceChannelSnapshot;
+        var text   = ChatHub.TextChannelSnapshot;
+        var channelNames = await db.Channels.ToDictionaryAsync(c => c.Id, c => c.Name);
 
-        var users = await db.Users
+        string? ChanName(IReadOnlyDictionary<int, int> map, int uid) =>
+            map.TryGetValue(uid, out var cid) && channelNames.TryGetValue(cid, out var n) ? n : null;
+
+        var rows = await db.Users
             .OrderBy(u => u.Username)
-            .Select(u => new
-            {
-                u.Id,
-                u.Username,
-                u.Email,
-                Status    = u.Status.ToString(),
-                u.CreatedAt,
-                IsOnline  = online.ContainsKey(u.Id),
-                VoiceChannelId = voice.ContainsKey(u.Id) ? (int?)voice[u.Id] : null,
-            })
+            .Select(u => new { u.Id, u.Username, u.Email, Status = u.Status.ToString(), u.CreatedAt })
             .ToListAsync();
+
+        var users = rows.Select(u => new
+        {
+            u.Id,
+            u.Username,
+            u.Email,
+            u.Status,
+            u.CreatedAt,
+            IsOnline       = online.ContainsKey(u.Id),
+            VoiceChannelId = voice.TryGetValue(u.Id, out var vc) ? (int?)vc : null,
+            TextChannel    = ChanName(text, u.Id),
+            VoiceChannel   = ChanName(voice, u.Id),
+        }).ToList();
 
         return Ok(users);
     }

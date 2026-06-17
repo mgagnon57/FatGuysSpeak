@@ -196,13 +196,11 @@ let serverMembers = [];
 let currentServerId = null;
 let serverName = '';
 
-function statusBadge(u) {
-  if (u.voiceChannelId !== null) return '<span class="badge badge-voice">🎙 In Voice</span>';
-  if (!u.isOnline) return '<span class="badge badge-offline">Offline</span>';
-  const s = u.status.toLowerCase();
-  if (s === 'away') return '<span class="badge badge-away">Away</span>';
-  if (s === 'donotdisturb') return '<span class="badge badge-dnd">DnD</span>';
-  return '<span class="badge badge-online">Online</span>';
+function channelCell(u) {
+  const parts = [];
+  if (u.textChannel)  parts.push('#' + escapeHtml(u.textChannel));
+  if (u.voiceChannel) parts.push('🎙 ' + escapeHtml(u.voiceChannel));
+  return parts.length ? parts.join(' · ') : '<span style="color:#555">—</span>';
 }
 
 function connBadge(u) {
@@ -256,11 +254,11 @@ function renderUsers(users) {
         : `<select class="btn-sm" data-change="mute" data-uid="${u.id}" ${role==='Admin'?'disabled':''} title="Temporarily prevent this user from sending messages"><option value="">Mute…</option><option value="300">5 minutes</option><option value="1800">30 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select>`
       : '<span style="color:#555">—</span>';
     return `<tr>
+      <td>${connBadge(u)}</td>
       <td><span class="user-link" data-click="profile" data-uid="${u.id}">${escapeHtml(u.username)}</span></td>
-      <td>${statusBadge(u)}</td>
+      <td>${channelCell(u)}</td>
       <td>${roleCell}</td>
       <td>${muteCell}</td>
-      <td>${connBadge(u)}</td>
       <td style="color:#555">${new Date(u.createdAt).toLocaleDateString()}</td>
       <td>
         ${u.voiceChannelId !== null
