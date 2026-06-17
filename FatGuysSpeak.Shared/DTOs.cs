@@ -161,3 +161,11 @@ public record AutomodActionDto(string Type, string Detail, DateTime OccurredAt);
 public record AdminMessageDto(
     int Id, string Content, int AuthorId, string Author, string Channel,
     string Server, string Source, DateTime CreatedAt, bool IsDeleted);
+
+public record MessageFilterDto(
+    string? Author = null, string? Channel = null, int? ServerId = null,
+    string? Source = null, string? Keyword = null,
+    DateTime? From = null, DateTime? To = null);
+
+public record BulkRestoreRequest(int[]? Ids = null, MessageFilterDto? Filter = null);
+public record BulkActionResult(int Affected, int[] ChannelIds);

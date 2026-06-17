@@ -518,6 +518,56 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
 
     public record AdminCreateChannelRequest(string Name);
 
+    private static IQueryable<FatGuysSpeak.Server.Models.Message> ApplyMessageFilters(
+        IQueryable<FatGuysSpeak.Server.Models.Message> q, FatGuysSpeak.Shared.MessageFilterDto f)
+    {
+        if (!string.IsNullOrWhiteSpace(f.Author))
+            q = q.Where(m => m.Author.Username.ToLower().Contains(f.Author.ToLower()));
+        if (!string.IsNullOrWhiteSpace(f.Channel))
+            q = q.Where(m => m.Channel.Name.ToLower().Contains(f.Channel.ToLower()));
+        if (f.ServerId is int sid)
+            q = q.Where(m => m.Channel.ServerId == sid);
+        if (!string.IsNullOrWhiteSpace(f.Source) &&
+            Enum.TryParse<FatGuysSpeak.Shared.MessageSource>(f.Source, true, out var src))
+            q = q.Where(m => m.Source == src);
+        if (!string.IsNullOrWhiteSpace(f.Keyword))
+            q = q.Where(m => m.Content.ToLower().Contains(f.Keyword.ToLower()));
+        if (f.From is DateTime from)
+            q = q.Where(m => m.CreatedAt >= from);
+        if (f.To is DateTime to)
+            q = q.Where(m => m.CreatedAt <= to);
+        return q;
+    }
+
+    [HttpPost("messages/restore")]
+    public async Task<IActionResult> BulkRestore(FatGuysSpeak.Shared.BulkRestoreRequest req)
+    {
+        if (!IsLocal) return Forbid();
+
+        var hasIds = req.Ids is { Length: > 0 };
+        var hasFilter = req.Filter is not null;
+        if (hasIds == hasFilter) return BadRequest("Provide exactly one of ids or filter.");
+
+        var q = db.Messages.Include(m => m.Channel).Where(m => m.IsDeleted);
+        q = hasIds ? q.Where(m => req.Ids!.Contains(m.Id)) : ApplyMessageFilters(q, req.Filter!);
+
+        var matched = await q.ToListAsync();
+        foreach (var m in matched) m.IsDeleted = false;
+
+        if (matched.Count > 0)
+            db.AuditLogs.Add(new FatGuysSpeak.Server.Models.AuditLog
+            {
+                ServerId = matched[0].Channel.ServerId,
+                ActorId = 0, ActorUsername = "admin",
+                Action = "MessagesRestored", TargetId = 0, TargetUsername = "",
+                Detail = $"Restored {matched.Count} message(s)."
+            });
+        await db.SaveChangesAsync();
+
+        var channelIds = matched.Select(m => m.ChannelId).Distinct().ToArray();
+        return Ok(new FatGuysSpeak.Shared.BulkActionResult(matched.Count, channelIds));
+    }
+
     [HttpGet("servers")]
     public async Task<IActionResult> GetServers()
     {

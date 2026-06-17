@@ -65,4 +65,29 @@ public class MessageLogModerationTests : IDisposable
         Assert.True(reloaded.IsDeleted);
         Assert.Equal("keep this text", reloaded.Content); // content NOT overwritten
     }
+
+    [Fact]
+    public async Task Restore_ByIds_UnflagsAndKeepsContent()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var m = await AddMsg(admin.Id, "original text");
+        await _c.DeleteMessage(m.Id); // soft-delete (content preserved)
+
+        var res = await _c.BulkRestore(new BulkRestoreRequest(Ids: new[] { m.Id }));
+        var ok = Assert.IsType<OkObjectResult>(res);
+        var result = Assert.IsType<BulkActionResult>(ok.Value);
+        Assert.Equal(1, result.Affected);
+
+        var reloaded = await _db.Db.Messages.AsNoTracking().FirstAsync(x => x.Id == m.Id);
+        Assert.False(reloaded.IsDeleted);
+        Assert.Equal("original text", reloaded.Content);
+    }
+
+    [Fact]
+    public async Task Restore_RejectsBothIdsAndFilter()
+    {
+        var res = await _c.BulkRestore(new BulkRestoreRequest(
+            Ids: new[] { 1 }, Filter: new MessageFilterDto(Author: "x")));
+        Assert.IsType<BadRequestObjectResult>(res);
+    }
 }
