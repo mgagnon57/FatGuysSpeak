@@ -32,6 +32,20 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
     internal static IReadOnlyDictionary<int, int>    VoiceChannelSnapshot  => VoiceChannelMap;
     internal static IReadOnlyDictionary<int, int>    TextChannelSnapshot   => UserTextChannelMap;
 
+    // Server-authoritative voice removal for admin actions (which have no caller connection
+    // context): clears the user's voice state and tells that voice channel they left.
+    // Returns the channel they were in, or null if they weren't in voice.
+    internal static async Task<int?> RemoveUserFromVoiceAsync(IHubContext<ChatHub> hub, int userId)
+    {
+        if (!VoiceChannelMap.TryRemove(userId, out var channelId))
+            return null;
+        ActiveCameras.TryRemove(userId, out _);
+        var name = OnlineUsers.TryGetValue(userId, out var n) ? n : "";
+        await hub.Clients.Group($"voice-{channelId}").SendAsync("UserLeftVoice",
+            new VoiceStateDto(userId, name, null, false, false));
+        return channelId;
+    }
+
     private int UserId => int.Parse(Context.User!.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string Username => Context.User!.FindFirstValue(ClaimTypes.Name)!;
 

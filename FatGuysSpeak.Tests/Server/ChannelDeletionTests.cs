@@ -110,6 +110,36 @@ public class ChannelDeletionTests : IDisposable
     }
 
     [Fact]
+    public async Task DeleteChannel_DefaultChannel_IsBlocked()
+    {
+        await SeedAsync();
+        var def = await CreateChannelAsync("home");
+        def.IsDefault = true;
+        await _db.Db.SaveChangesAsync();
+
+        var result = await _servers.DeleteChannel(_server.Id, def.Id);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.True(await _db.Db.Channels.AnyAsync(c => c.Id == def.Id)); // still there
+    }
+
+    [Fact]
+    public async Task CreateServer_SeedsUndeletableDefaultLobby()
+    {
+        await SeedAsync();
+        var result = await _servers.CreateServer(new CreateServerRequest("New Server", null));
+        var dto = (ServerDto)((OkObjectResult)result.Result!).Value!;
+
+        var lobby = await _db.Db.Channels.FirstOrDefaultAsync(c => c.ServerId == dto.Id && c.IsDefault);
+        Assert.NotNull(lobby);
+        Assert.Equal("lobby", lobby!.Name);
+
+        var del = await _servers.DeleteChannel(dto.Id, lobby.Id);
+        Assert.IsType<BadRequestObjectResult>(del);
+        Assert.True(await _db.Db.Channels.AnyAsync(c => c.Id == lobby.Id));
+    }
+
+    [Fact]
     public async Task DeleteChannel_NonAdmin_Forbidden()
     {
         await SeedAsync();

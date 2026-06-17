@@ -23,7 +23,7 @@ public record SetRoleRequest(ServerRole Role);
 public record SetChannelPermissionRequest(ServerRole MinRoleToRead, ServerRole MinRoleToWrite);
 public record CreateServerRequest(string Name, string? Description);
 
-public record ChannelDto(int Id, string Name, ChannelType Type, int ServerId, int Position, int? CategoryId = null, int SlowmodeSeconds = 0, NotifLevel? UserNotifLevel = null, string? Topic = null, bool IsNsfw = false);
+public record ChannelDto(int Id, string Name, ChannelType Type, int ServerId, int Position, int? CategoryId = null, int SlowmodeSeconds = 0, NotifLevel? UserNotifLevel = null, string? Topic = null, bool IsNsfw = false, bool IsDefault = false);
 public record SetNotifLevelRequest(NotifLevel Level);
 public record CreateChannelRequest(string Name, ChannelType Type);
 public record SetSlowmodeRequest(int Seconds);

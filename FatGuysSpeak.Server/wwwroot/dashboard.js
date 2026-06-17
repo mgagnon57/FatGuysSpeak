@@ -732,9 +732,11 @@ function renderChannels(channels, serverId) {
           data-click="renameChannel" data-sid="${c.serverId}" data-cid="${c.id}"
           title="Rename this channel">Rename</button>
         <span id="ch-status-${c.id}" style="font-size:10px;color:#555"></span>
-        <button class="btn-sm" style="background:#3a1a1a;color:#ed4245;border-color:#5a2a2a;padding:3px 8px;font-size:11px"
+        ${c.isDefault
+          ? `<span class="badge" style="background:#2d5f9e22;color:#8ab4d4" title="The default channel can't be deleted — rename it instead">Default</span>`
+          : `<button class="btn-sm" style="background:#3a1a1a;color:#ed4245;border-color:#5a2a2a;padding:3px 8px;font-size:11px"
           data-click="deleteChannel" data-sid="${c.serverId}" data-cid="${c.id}" data-cname="${escapeHtml(c.name)}"
-          title="Permanently delete this channel and all its messages">Delete</button>
+          title="Permanently delete this channel and all its messages">Delete</button>`}
       </td>
     </tr>`).join('');
 }

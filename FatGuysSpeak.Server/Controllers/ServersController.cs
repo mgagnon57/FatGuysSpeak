@@ -96,7 +96,7 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
         await db.SaveChangesAsync();
 
         db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = UserId, Role = ServerRole.Admin });
-        db.Channels.Add(new Channel { Name = "general", Type = ChannelType.Text, ServerId = server.Id, Position = 0 });
+        db.Channels.Add(new Channel { Name = "lobby", Type = ChannelType.Text, ServerId = server.Id, Position = 0, IsDefault = true });
         db.Channels.Add(new Channel { Name = "General", Type = ChannelType.Voice, ServerId = server.Id, Position = 1 });
         await db.SaveChangesAsync();
 
@@ -160,7 +160,7 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
 
         return channels.Select(c => new ChannelDto(
             c.Id, c.Name, c.Type, c.ServerId, c.Position, c.CategoryId, c.SlowmodeSeconds,
-            notifMap.TryGetValue(c.Id, out var lvl) ? lvl : (NotifLevel?)null, c.Topic, c.IsNsfw))
+            notifMap.TryGetValue(c.Id, out var lvl) ? lvl : (NotifLevel?)null, c.Topic, c.IsNsfw, c.IsDefault))
             .ToList();
     }
 
@@ -198,6 +198,9 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
 
         var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
         if (channel is null) return NotFound();
+        if (channel.IsDefault) return BadRequest("The default channel can't be deleted. Rename it instead.");
+
+        var defaultChannel = await db.Channels.FirstOrDefaultAsync(c => c.ServerId == serverId && c.IsDefault);
 
         // Note: the channel's messages are intentionally left in place (kept as a server-side
         // log). They will never resurface because channel ids are never reused — see
@@ -211,6 +214,16 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
         await db.SaveChangesAsync();
 
         await hub.Clients.Group($"server-{serverId}").SendAsync("ChannelDeleted", channelId);
+
+        // Bump anyone who was in the deleted channel (text or voice) into the default channel.
+        if (defaultChannel is not null)
+        {
+            var affected = ChatHub.TextChannelSnapshot.Where(kv => kv.Value == channelId).Select(kv => kv.Key)
+                .Union(ChatHub.VoiceChannelSnapshot.Where(kv => kv.Value == channelId).Select(kv => kv.Key))
+                .Distinct();
+            foreach (var uid in affected)
+                await hub.Clients.User(uid.ToString()).SendAsync("ForceJoinChannel", defaultChannel.Id);
+        }
         return NoContent();
     }
 

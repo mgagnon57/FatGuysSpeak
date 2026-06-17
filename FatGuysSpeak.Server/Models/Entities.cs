@@ -99,6 +99,9 @@ public class Channel
     public int SlowmodeSeconds { get; set; }
     public string? Topic { get; set; }
     public bool IsNsfw { get; set; }
+    // The server's default channel: cannot be deleted (can be renamed), and is where
+    // users are bumped when a channel is deleted or they're removed from one.
+    public bool IsDefault { get; set; }
 
     public List<Message> Messages { get; set; } = [];
 }

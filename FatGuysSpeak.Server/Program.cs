@@ -646,6 +646,8 @@ using (var scope = app.Services.CreateScope())
         if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Channels\" ADD COLUMN \"Topic\" TEXT");
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Channels' AND column_name='IsNsfw'";
         if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Channels\" ADD COLUMN \"IsNsfw\" BOOLEAN NOT NULL DEFAULT FALSE");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Channels' AND column_name='IsDefault'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Channels\" ADD COLUMN \"IsDefault\" BOOLEAN NOT NULL DEFAULT FALSE");
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Servers' AND column_name='VanityCode'";
         if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Servers\" ADD COLUMN \"VanityCode\" TEXT");
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Servers' AND column_name='MinRoleToMentionEveryone'";
@@ -670,6 +672,8 @@ using (var scope = app.Services.CreateScope())
         if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE Channels ADD COLUMN Topic TEXT");
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Channels') WHERE name='IsNsfw'";
         if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE Channels ADD COLUMN IsNsfw INTEGER NOT NULL DEFAULT 0");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Channels') WHERE name='IsDefault'";
+        if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE Channels ADD COLUMN IsDefault INTEGER NOT NULL DEFAULT 0");
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Servers') WHERE name='VanityCode'";
         if ((long)checkCmd.ExecuteScalar()! == 0) ctx.Database.ExecuteSqlRaw("ALTER TABLE Servers ADD COLUMN VanityCode TEXT");
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Servers') WHERE name='MinRoleToMentionEveryone'";
@@ -737,7 +741,7 @@ using (var scope = app.Services.CreateScope())
         ctx.Servers.Add(server);
         ctx.SaveChanges();
         ctx.Channels.AddRange(
-            new FatGuysSpeak.Server.Models.Channel { Name = "lobby",          Type = FatGuysSpeak.Shared.ChannelType.Text, ServerId = server.Id, Position = 0 },
+            new FatGuysSpeak.Server.Models.Channel { Name = "lobby",          Type = FatGuysSpeak.Shared.ChannelType.Text, ServerId = server.Id, Position = 0, IsDefault = true },
             new FatGuysSpeak.Server.Models.Channel { Name = "angry-fat-guys", Type = FatGuysSpeak.Shared.ChannelType.Text, ServerId = server.Id, Position = 1 }
         );
         ctx.SaveChanges();
@@ -759,6 +763,18 @@ using (var scope = app.Services.CreateScope())
             ctx.SaveChanges();
         }
     }
+
+    // Backfill: every server needs exactly one default channel. If none is flagged
+    // (e.g. an existing database), mark the lowest-position channel as the default.
+    foreach (var srv in ctx.Servers.ToList())
+    {
+        if (!ctx.Channels.Any(c => c.ServerId == srv.Id && c.IsDefault))
+        {
+            var primary = ctx.Channels.Where(c => c.ServerId == srv.Id).OrderBy(c => c.Position).FirstOrDefault();
+            if (primary is not null) primary.IsDefault = true;
+        }
+    }
+    ctx.SaveChanges();
 
     var blacklist = scope.ServiceProvider.GetRequiredService<SessionBlacklistService>();
     await blacklist.RehydrateAsync(ctx);

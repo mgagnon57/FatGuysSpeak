@@ -98,7 +98,27 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     public async Task<IActionResult> KickFromVoice(int userId)
     {
         if (!IsLocal) return Forbid();
+
+        // Authoritatively remove them from voice server-side (don't just ask the client to —
+        // that's what left them "notified but not actually removed").
+        var channelId = await FatGuysSpeak.Server.Hubs.ChatHub.RemoveUserFromVoiceAsync(hub, userId);
+
+        // Tell the client to tear down its local voice session.
         await hub.Clients.User(userId.ToString()).SendAsync("KickFromVoice");
+
+        // Bump them into the server's default (Lobby) channel rather than leaving them stranded.
+        if (channelId is not null)
+        {
+            var serverId = await db.Channels.Where(c => c.Id == channelId)
+                .Select(c => (int?)c.ServerId).FirstOrDefaultAsync();
+            if (serverId is not null)
+            {
+                var lobbyId = await db.Channels.Where(c => c.ServerId == serverId && c.IsDefault)
+                    .Select(c => (int?)c.Id).FirstOrDefaultAsync();
+                if (lobbyId is not null)
+                    await hub.Clients.User(userId.ToString()).SendAsync("ForceJoinChannel", lobbyId);
+            }
+        }
         return NoContent();
     }
 
@@ -440,11 +460,10 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
 
         var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
         if (channel is null) return NotFound();
+        if (channel.IsDefault) return BadRequest("The default channel can't be deleted. Rename it instead.");
 
-        var lobby = await db.Channels
-            .Where(c => c.ServerId == serverId && c.Id != channelId)
-            .OrderBy(c => c.Position)
-            .FirstOrDefaultAsync();
+        // Bump occupants of the deleted channel into the server's default (Lobby) channel.
+        var lobby = await db.Channels.FirstOrDefaultAsync(c => c.ServerId == serverId && c.IsDefault);
 
         // Messages are kept as a server-side log; they never resurface because channel ids
         // are never reused (see ServersController.NextChannelIdAsync).
@@ -529,7 +548,7 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
 
         var channels = await query
             .OrderBy(c => c.ServerId).ThenBy(c => c.Position)
-            .Select(c => new { c.Id, c.Name, c.Type, c.ServerId, ServerName = c.Server.Name, c.Position })
+            .Select(c => new { c.Id, c.Name, c.Type, c.ServerId, ServerName = c.Server.Name, c.Position, c.IsDefault })
             .ToListAsync();
 
         var channelIds = channels.Select(c => c.Id).ToList();
@@ -542,7 +561,7 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
             perms.TryGetValue(c.Id, out var perm);
             return new
             {
-                c.Id, c.Name, c.Type, c.ServerId, c.ServerName,
+                c.Id, c.Name, c.Type, c.ServerId, c.ServerName, c.IsDefault,
                 MinRoleToRead  = (perm?.MinRoleToRead  ?? FatGuysSpeak.Shared.ServerRole.Member).ToString(),
                 MinRoleToWrite = (perm?.MinRoleToWrite ?? FatGuysSpeak.Shared.ServerRole.Member).ToString(),
             };
