@@ -349,12 +349,24 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
             <div style="display:flex;gap:8px;align-items:center">
               <input class="search-box" id="msgAuthor"  placeholder="Author…"  data-input="loadMessages" style="width:120px" title="Filter by the username who sent the message" />
               <input class="search-box" id="msgChannel" placeholder="Channel…" data-input="loadMessages" style="width:120px" title="Filter by channel name (without #)" />
+              <input class="search-box" id="msgKeyword" placeholder="Search text…" data-input="loadMessages" style="width:140px" title="Search within message content" />
               <select id="msgSource" data-change="loadMessages" title="Filter by message type: text chat, Whisper voice transcription, or stream event"
                 style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
                 <option value="">All sources</option>
                 <option value="Text">Text</option>
                 <option value="Voice">Voice</option>
                 <option value="Stream">Stream</option>
+              </select>
+              <select id="msgServer" data-change="loadMessages" title="Filter by server"
+                style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
+                <option value="">All servers</option>
+              </select>
+              <select id="msgRange" data-change="loadMessages" title="Limit to a recent time window"
+                style="background:#252525;border:1px solid #333;border-radius:4px;color:#d0d0d0;font-size:11px;padding:5px 8px;font-family:inherit;">
+                <option value="">Any time</option>
+                <option value="1">Last 24h</option>
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
               </select>
               <label style="font-size:11px;color:#666;display:flex;align-items:center;gap:5px;cursor:pointer" title="Also show messages that were soft-deleted by an admin — content is retained in the database">
                 <input type="checkbox" id="msgShowDeleted" data-change="loadMessages" style="accent-color:#8ab4d4" />
@@ -379,6 +391,9 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
               <tr><td colspan="7" style="color:#444;padding:20px 10px;">Loading…</td></tr>
             </tbody>
           </table>
+          <div style="text-align:center;padding:10px">
+            <button class="btn-sm" id="msgLoadMore" data-click="loadMoreMsgs" style="display:none">Load more</button>
+          </div>
         </div><!-- /tab-messages -->
 
         <!-- ── Channels ──────────────────────────────────── -->

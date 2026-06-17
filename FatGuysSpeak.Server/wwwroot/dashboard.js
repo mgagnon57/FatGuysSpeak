@@ -542,31 +542,74 @@ async function refreshRateLimits() {
 
 // ── Message Log ───────────────────────────────────
 let msgDebounce = null;
+let oldestMsgId = null;     // cursor for "load more"
+let allLoadedMsgs = [];     // accumulated across pages
+
+function buildMsgParams(beforeId) {
+  const author  = document.getElementById('msgAuthor').value.trim();
+  const channel = document.getElementById('msgChannel').value.trim();
+  const keyword = document.getElementById('msgKeyword').value.trim();
+  const source  = document.getElementById('msgSource').value;
+  const server  = document.getElementById('msgServer').value;
+  const range   = document.getElementById('msgRange').value;
+  const params = new URLSearchParams({ limit: 100 });
+  if (author)  params.set('author',  author);
+  if (channel) params.set('channel', channel);
+  if (keyword) params.set('keyword', keyword);
+  if (source)  params.set('source',  source);
+  if (server)  params.set('serverId', server);
+  if (range) {
+    const from = new Date(Date.now() - (+range) * 86400000).toISOString();
+    params.set('from', from);
+  }
+  if (beforeId) params.set('beforeId', beforeId);
+  return params;
+}
 
 async function loadMessages() {
   clearTimeout(msgDebounce);
   msgDebounce = setTimeout(async () => {
-    const author  = document.getElementById('msgAuthor').value.trim();
-    const channel = document.getElementById('msgChannel').value.trim();
-    const source  = document.getElementById('msgSource').value;
     const showDel = document.getElementById('msgShowDeleted').checked;
-
-    const params = new URLSearchParams({ limit: 200 });
-    if (author)  params.set('author',  author);
-    if (channel) params.set('channel', channel);
-    if (source)  params.set('source',  source);
-
     try {
-      const res = await fetch('/api/admin/messages?' + params);
+      const res = await fetch('/api/admin/messages?' + buildMsgParams(null));
       if (!res.ok) throw new Error(res.status);
       let msgs = await res.json();
       if (!showDel) msgs = msgs.filter(m => !m.isDeleted);
-      renderMessages(msgs);
+      allLoadedMsgs = msgs;
+      oldestMsgId = msgs.length ? msgs[msgs.length - 1].id : null;
+      document.getElementById('msgLoadMore').style.display = (msgs.length >= 100) ? '' : 'none';
+      renderMessages(allLoadedMsgs);
     } catch (e) {
       document.getElementById('msgTableBody').innerHTML =
         `<tr><td colspan="7" style="color:#ed4245;padding:20px 10px;">Failed: ${e.message}</td></tr>`;
     }
   }, 250);
+}
+
+async function loadMoreMsgs() {
+  if (!oldestMsgId) return;
+  const showDel = document.getElementById('msgShowDeleted').checked;
+  try {
+    const res = await fetch('/api/admin/messages?' + buildMsgParams(oldestMsgId));
+    if (!res.ok) throw new Error(res.status);
+    let msgs = await res.json();
+    if (!showDel) msgs = msgs.filter(m => !m.isDeleted);
+    allLoadedMsgs = allLoadedMsgs.concat(msgs);
+    oldestMsgId = msgs.length ? msgs[msgs.length - 1].id : oldestMsgId;
+    document.getElementById('msgLoadMore').style.display = (msgs.length >= 100) ? '' : 'none';
+    renderMessages(allLoadedMsgs);
+  } catch (e) { alert('Load more failed: ' + e.message); }
+}
+
+async function loadServerOptions() {
+  try {
+    const res = await fetch('/api/admin/servers');
+    if (!res.ok) return;
+    const servers = await res.json();
+    const sel = document.getElementById('msgServer');
+    sel.innerHTML = '<option value="">All servers</option>' +
+      servers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  } catch { /* dropdown stays "All servers" */ }
 }
 
 function sourceBadge(s) {
@@ -932,6 +975,7 @@ async function removeWordFilter(serverId, filterId, btn) {
 // ── Boot ──────────────────────────────────────────
 (async () => {
   await initServer();
+  loadServerOptions();
   refreshMetrics();
   refreshRateLimits();
 })();
@@ -965,6 +1009,7 @@ document.addEventListener('click', (e) => {
     case 'unmute':        muteUser(currentServerId, +d.uid, 0, el); break;
     case 'kickVoice':     kickVoice(+d.uid, el); break;
     case 'kick':          kickFromServer(currentServerId, +d.uid, el); break;
+    case 'loadMoreMsgs':  loadMoreMsgs(); break;
     case 'delMsg':        adminDeleteMsg(+d.mid, el); break;
     case 'restoreMsg':    adminRestoreMsg(+d.mid, el); break;
     case 'expandMsg':     expandMsg(+d.mid, el); break;
