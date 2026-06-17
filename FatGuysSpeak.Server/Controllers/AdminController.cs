@@ -127,7 +127,12 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         [FromQuery] int limit = 100,
         [FromQuery] string? author = null,
         [FromQuery] string? channel = null,
-        [FromQuery] string? source = null)
+        [FromQuery] string? source = null,
+        [FromQuery] int? serverId = null,
+        [FromQuery] string? keyword = null,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null,
+        [FromQuery] int? beforeId = null)
     {
         if (!IsLocal) return Forbid();
 
@@ -136,12 +141,9 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
             .Include(m => m.Channel).ThenInclude(c => c.Server)
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(author))
-            query = query.Where(m => m.Author.Username.ToLower().Contains(author.ToLower()));
-        if (!string.IsNullOrWhiteSpace(channel))
-            query = query.Where(m => m.Channel.Name.ToLower().Contains(channel.ToLower()));
-        if (!string.IsNullOrWhiteSpace(source) && Enum.TryParse<FatGuysSpeak.Shared.MessageSource>(source, true, out var src))
-            query = query.Where(m => m.Source == src);
+        query = ApplyMessageFilters(query,
+            new FatGuysSpeak.Shared.MessageFilterDto(author, channel, serverId, source, keyword, from, to));
+        if (beforeId is int bid) query = query.Where(m => m.Id < bid);
 
         var messages = await query
             .OrderByDescending(m => m.Id)

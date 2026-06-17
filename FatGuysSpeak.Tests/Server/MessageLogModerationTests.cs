@@ -90,4 +90,54 @@ public class MessageLogModerationTests : IDisposable
             Ids: new[] { 1 }, Filter: new MessageFilterDto(Author: "x")));
         Assert.IsType<BadRequestObjectResult>(res);
     }
+
+    [Fact]
+    public async Task GetMessages_KeywordFiltersContent()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        await AddMsg(admin.Id, "hello world");
+        await AddMsg(admin.Id, "goodbye");
+
+        var ok = Assert.IsType<OkObjectResult>(await _c.GetMessages(keyword: "WORLD"));
+        var list = Assert.IsType<List<AdminMessageDto>>(ok.Value);
+        Assert.Single(list);
+        Assert.Equal("hello world", list[0].Content);
+    }
+
+    [Fact]
+    public async Task GetMessages_DateRangeIsInclusive()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var t1 = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var t2 = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        await AddMsg(admin.Id, "january", when: t1);
+        await AddMsg(admin.Id, "june", when: t2);
+
+        var ok = Assert.IsType<OkObjectResult>(await _c.GetMessages(
+            from: new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc), to: t2));
+        var list = Assert.IsType<List<AdminMessageDto>>(ok.Value);
+        Assert.Single(list);
+        Assert.Equal("june", list[0].Content);
+    }
+
+    [Fact]
+    public async Task GetMessages_BeforeIdReturnsOlderPage()
+    {
+        var (_, admin) = await TestHelpers.SeedServerAsync(_db.Db, "owner");
+        var a = await AddMsg(admin.Id, "first");
+        var b = await AddMsg(admin.Id, "second");
+        var c = await AddMsg(admin.Id, "third");
+
+        // Newest-first page of size 1 -> "third".
+        var page1 = Assert.IsType<List<AdminMessageDto>>(
+            ((OkObjectResult)await _c.GetMessages(limit: 1)).Value);
+        Assert.Equal(c.Id, page1[0].Id);
+
+        // Next page (older than "third") -> "second".
+        var page2 = Assert.IsType<List<AdminMessageDto>>(
+            ((OkObjectResult)await _c.GetMessages(limit: 1, beforeId: c.Id)).Value);
+        Assert.Equal(b.Id, page2[0].Id);
+        Assert.DoesNotContain(page2, x => x.Id == c.Id);
+        _ = a;
+    }
 }
