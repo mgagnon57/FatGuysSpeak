@@ -375,9 +375,22 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
               <button class="btn-sm" id="msgExportCsv" data-click="exportMsgCsv" title="Download the currently shown rows as a CSV file">Export CSV</button>
             </div>
           </div>
+          <div id="msgBulkBar" style="display:none;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #2a2a2a;margin-bottom:6px">
+            <span id="msgSelCount" style="color:#8ab4d4;font-size:12px">0 selected</span>
+            <button class="btn-sm danger" data-click="bulkDelSelected">Delete selected</button>
+            <button class="btn-sm" data-click="bulkClearSel">Clear</button>
+            <label style="font-size:11px;color:#888;display:flex;align-items:center;gap:5px;cursor:pointer" title="Permanently remove from the database (irreversible) instead of hiding">
+              <input type="checkbox" id="msgHardDelete" style="accent-color:#ed4245" /> Permanent
+            </label>
+          </div>
+          <div style="padding:0 0 8px 0;display:flex;gap:8px">
+            <button class="btn-sm danger" data-click="bulkDelFilter" title="Delete ALL messages matching the current filters (not just the loaded page)">Delete all matching filter</button>
+            <button class="btn-sm" data-click="bulkRestoreFilter" title="Restore ALL soft-deleted messages matching the current filters">Restore all matching filter</button>
+          </div>
           <table class="user-table">
             <thead>
               <tr>
+                <th style="width:28px"><input type="checkbox" id="msgSelectAll" data-change="toggleSelectAll" title="Select all loaded rows" style="accent-color:#8ab4d4" /></th>
                 <th style="width:130px">Time</th>
                 <th style="width:100px">Author</th>
                 <th style="width:90px">Channel</th>
@@ -388,7 +401,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
               </tr>
             </thead>
             <tbody id="msgTableBody">
-              <tr><td colspan="7" style="color:#444;padding:20px 10px;">Loading…</td></tr>
+              <tr><td colspan="8" style="color:#444;padding:20px 10px;">Loading…</td></tr>
             </tbody>
           </table>
           <div style="text-align:center;padding:10px">

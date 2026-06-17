@@ -581,7 +581,7 @@ async function loadMessages() {
       renderMessages(allLoadedMsgs);
     } catch (e) {
       document.getElementById('msgTableBody').innerHTML =
-        `<tr><td colspan="7" style="color:#ed4245;padding:20px 10px;">Failed: ${e.message}</td></tr>`;
+        `<tr><td colspan="8" style="color:#ed4245;padding:20px 10px;">Failed: ${e.message}</td></tr>`;
     }
   }, 250);
 }
@@ -619,11 +619,12 @@ function sourceBadge(s) {
 }
 
 let lastRenderedMsgs = [];
+const selectedMsgIds = new Set();
 function renderMessages(msgs) {
   lastRenderedMsgs = msgs;
   const tbody = document.getElementById('msgTableBody');
   if (!msgs.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:#444;padding:20px 10px;">No messages found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="color:#444;padding:20px 10px;">No messages found.</td></tr>';
     return;
   }
   tbody.innerHTML = msgs.map(m => {
@@ -641,6 +642,7 @@ function renderMessages(msgs) {
       ? `<button class="btn-sm" title="Restore this message — un-hide it (content was preserved)" data-click="restoreMsg" data-mid="${m.id}">Restore</button>`
       : `<button class="btn-sm danger" title="Soft-delete this message — hidden from clients but kept in the database" data-click="delMsg" data-mid="${m.id}">Delete</button>`;
     return `<tr data-mid="${m.id}" style="${deleted ? 'opacity:.55' : ''}">
+      <td><input type="checkbox" class="msg-sel" data-change="toggleMsgSel" data-mid="${m.id}" ${selectedMsgIds.has(m.id) ? 'checked' : ''} style="accent-color:#8ab4d4" /></td>
       <td style="color:#555;font-size:11px;white-space:nowrap">${timeStr}</td>
       <td><span class="user-link" data-click="profile" data-uid="${m.authorId}" style="color:#8ab4d4;font-weight:500;cursor:pointer">${escapeHtml(m.author)}</span></td>
       <td style="color:#666">#${escapeHtml(m.channel)}</td>
@@ -707,6 +709,89 @@ function exportMsgCsv() {
   a.download = `messages-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 100);
+}
+
+function updateBulkBar() {
+  const n = selectedMsgIds.size;
+  document.getElementById('msgBulkBar').style.display = n ? 'flex' : 'none';
+  document.getElementById('msgSelCount').textContent = `${n} selected`;
+}
+
+function toggleMsgSel(el) {
+  const id = +el.dataset.mid;
+  if (el.checked) selectedMsgIds.add(id); else selectedMsgIds.delete(id);
+  updateBulkBar();
+}
+
+function toggleSelectAll(el) {
+  selectedMsgIds.clear();
+  if (el.checked) allLoadedMsgs.forEach(m => selectedMsgIds.add(m.id));
+  document.querySelectorAll('.msg-sel').forEach(cb => { cb.checked = el.checked; });
+  updateBulkBar();
+}
+
+function bulkClearSel() {
+  selectedMsgIds.clear();
+  document.getElementById('msgSelectAll').checked = false;
+  document.querySelectorAll('.msg-sel').forEach(cb => { cb.checked = false; });
+  updateBulkBar();
+}
+
+async function postBulkDelete(body, label) {
+  const hard = document.getElementById('msgHardDelete').checked;
+  body.mode = hard ? 'hard' : 'soft';
+  const warn = `${label}\n\nThis will ${hard ? 'PERMANENTLY delete' : 'soft-delete'} the matching messages.`;
+  if (!confirm(warn)) return;
+  if (hard && !confirm('Permanent delete is IRREVERSIBLE. Click OK only if you are sure.')) return;
+  try {
+    const res = await fetch('/api/admin/messages/delete', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    if (!res.ok) { alert('Delete failed: ' + (await res.text())); return; }
+    const r = await res.json();
+    alert(`Deleted ${r.affected} message(s).`);
+    bulkClearSel();
+    loadMessages();
+  } catch (e) { alert('Delete failed: ' + e.message); }
+}
+
+function bulkDelSelected() {
+  if (!selectedMsgIds.size) return;
+  postBulkDelete({ ids: [...selectedMsgIds] }, `Delete ${selectedMsgIds.size} selected message(s)?`);
+}
+
+function currentFilterObj() {
+  const f = {
+    author:   document.getElementById('msgAuthor').value.trim() || null,
+    channel:  document.getElementById('msgChannel').value.trim() || null,
+    keyword:  document.getElementById('msgKeyword').value.trim() || null,
+    source:   document.getElementById('msgSource').value || null,
+    serverId: document.getElementById('msgServer').value ? +document.getElementById('msgServer').value : null,
+  };
+  const range = document.getElementById('msgRange').value;
+  if (range) f.from = new Date(Date.now() - (+range) * 86400000).toISOString();
+  return f;
+}
+
+function bulkDelFilter() {
+  const f = currentFilterObj();
+  const hasAny = Object.values(f).some(v => v !== null && v !== undefined);
+  if (!hasAny && !confirm('No filters set — this will delete EVERY message. Continue?')) return;
+  postBulkDelete({ filter: f }, 'Delete ALL messages matching the current filter?');
+}
+
+async function bulkRestoreFilter() {
+  const f = currentFilterObj();
+  if (!confirm('Restore ALL soft-deleted messages matching the current filter?')) return;
+  try {
+    const res = await fetch('/api/admin/messages/restore', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filter: f })
+    });
+    if (!res.ok) { alert('Restore failed: ' + (await res.text())); return; }
+    const r = await res.json();
+    alert(`Restored ${r.affected} message(s).`);
+    loadMessages();
+  } catch (e) { alert('Restore failed: ' + e.message); }
 }
 
 // ── Server initialisation ─────────────────────────
@@ -1012,6 +1097,10 @@ document.addEventListener('click', (e) => {
     case 'loadMoreMsgs':  loadMoreMsgs(); break;
     case 'delMsg':        adminDeleteMsg(+d.mid, el); break;
     case 'restoreMsg':    adminRestoreMsg(+d.mid, el); break;
+    case 'bulkDelSelected':   bulkDelSelected(); break;
+    case 'bulkClearSel':      bulkClearSel(); break;
+    case 'bulkDelFilter':     bulkDelFilter(); break;
+    case 'bulkRestoreFilter': bulkRestoreFilter(); break;
     case 'expandMsg':     expandMsg(+d.mid, el); break;
     case 'exportMsgCsv':  exportMsgCsv(); break;
     case 'rmWf':          removeWordFilter(currentServerId, +d.fid, el); break;
@@ -1028,6 +1117,8 @@ document.addEventListener('change', (e) => {
   const d = el.dataset;
   switch (d.change) {
     case 'loadMessages':    loadMessages(); break;
+    case 'toggleMsgSel':    toggleMsgSel(el); break;
+    case 'toggleSelectAll': toggleSelectAll(el); break;
     case 'loadAudit':       loadAudit(); break;
     case 'saveChannelPerm': saveChannelPerm(+d.sid, +d.cid); break;
     case 'filterUsers':     filterUsers(); break;
