@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
-using System.Reflection;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,7 +10,7 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast) : ObservableObject
+public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService) : ObservableObject
 {
     private bool _initialized;
     private static readonly ConcurrentDictionary<string, LinkPreviewDto?> PreviewCache = new();
@@ -72,10 +71,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private bool _isControlling;
     [ObservableProperty] private string? _controlledName;
 
-    // Update notification state
-    [ObservableProperty] private bool _updateAvailable;
-    [ObservableProperty] private string? _latestVersion;
-    [ObservableProperty] private string _updateUrl = "https://github.com/mgagnon57/FatGuysSpeak/releases/latest";
+    // Version sync state
+    [ObservableProperty] private bool _versionSyncing;
+    [ObservableProperty] private string? _versionSyncText;
+    [ObservableProperty] private bool _versionMismatch;
+    [ObservableProperty] private string? _versionMismatchText;
 
     public bool CanOfferControl => IsStreaming && DeviceInfo.Platform == DevicePlatform.WinUI;
     public bool CanRequestControl => ActiveStreamerId > 0 && !IsStreaming && DeviceInfo.Platform == DevicePlatform.WinUI;
@@ -590,32 +590,41 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         _blockedUserIds.Clear();
         foreach (var b in blocks ?? [])
             _blockedUserIds.Add(b.UserId);
-        _ = CheckForUpdatesAsync();
+        _ = SyncClientToServerAsync();
     }
 
-    public async Task CheckForUpdatesAsync()
+    public async Task SyncClientToServerAsync()
     {
-        var status = await api.GetUpdateStatusAsync();
-        if (status?.Latest is null) return;
-        var mine = VersionInfo.Parse(
-            Assembly.GetExecutingAssembly()
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion).Version;
-        if (SemVer.IsOutdated(mine, status.Latest))
+        var serverVersion = await api.GetServerVersionAsync();
+        if (string.IsNullOrEmpty(serverVersion)) return;
+
+        var mine = updateService.InstalledVersion;
+        if (mine is null) return;  // dev / not Velopack-installed -> can't self-update
+
+        if (FatGuysSpeak.Shared.SemVer.Compare(mine, serverVersion) == 0) return;  // already matched
+
+        var downgrade = FatGuysSpeak.Shared.SemVer.Compare(mine, serverVersion) > 0;
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            MainThread.BeginInvokeOnMainThread(() =>
+            VersionSyncText = downgrade ? $"Downgrading to v{serverVersion}…" : $"Updating to v{serverVersion}…";
+            VersionSyncing = true;
+        });
+
+        var result = await updateService.SyncToServerVersionAsync(serverVersion);
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            VersionSyncing = false;
+            if (result == Services.UpdateSyncResult.Unavailable)
             {
-                LatestVersion = status.Latest;
-                UpdateUrl = status.ReleaseUrl ?? UpdateUrl;
-                UpdateAvailable = true;
-            });
-        }
+                VersionMismatchText = $"Your client (v{mine}) doesn't match the server (v{serverVersion}) "
+                    + "and auto-update isn't available — continue, or update manually.";
+                VersionMismatch = true;
+            }
+        });
     }
 
     [RelayCommand]
-    private async Task OpenUpdate() => await Launcher.OpenAsync(UpdateUrl);
-
-    [RelayCommand]
-    private void DismissUpdate() => UpdateAvailable = false;
+    private void DismissMismatch() => VersionMismatch = false;
 
     [RelayCommand]
     public async Task SelectServerAsync(ServerViewItem item)

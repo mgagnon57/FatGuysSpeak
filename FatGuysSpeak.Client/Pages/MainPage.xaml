@@ -71,16 +71,17 @@
                    TextColor="#d0a060" FontSize="11" VerticalOptions="Center" />
         </Grid>
 
-        <!-- ═══ UPDATE BANNER ═══ -->
-        <Grid Grid.Row="2" IsVisible="{Binding UpdateAvailable}" ColumnDefinitions="*,Auto,Auto"
-              BackgroundColor="#3a2a00" Padding="12,6">
-            <Label Grid.Column="0" VerticalOptions="Center" TextColor="#e8c060"
-                   Text="{Binding LatestVersion, StringFormat='⬆ Update available — v{0}'}" />
-            <Button Grid.Column="1" Text="Download" Command="{Binding OpenUpdateCommand}"
-                    BackgroundColor="#6a5000" TextColor="#f0d090" Padding="10,2" Margin="6,0" />
-            <Button Grid.Column="2" Text="✕" Command="{Binding DismissUpdateCommand}"
-                    BackgroundColor="Transparent" TextColor="#e8c060" Padding="6,2" />
-        </Grid>
+        <!-- ═══ VERSION SYNC BANNERS ═══ -->
+        <VerticalStackLayout Grid.Row="2">
+            <Grid IsVisible="{Binding VersionSyncing}" BackgroundColor="#143060" Padding="12,6">
+                <Label TextColor="#cfe0ff" VerticalOptions="Center" Text="{Binding VersionSyncText}" />
+            </Grid>
+            <Grid IsVisible="{Binding VersionMismatch}" ColumnDefinitions="*,Auto" BackgroundColor="#3a2a00" Padding="12,6">
+                <Label Grid.Column="0" VerticalOptions="Center" TextColor="#e8c060" Text="{Binding VersionMismatchText}" />
+                <Button Grid.Column="1" Text="✕" Command="{Binding DismissMismatchCommand}"
+                        BackgroundColor="Transparent" TextColor="#e8c060" Padding="6,2" />
+            </Grid>
+        </VerticalStackLayout>
 
         <!-- ═══ MAIN CONTENT ═══ -->
         <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,*,Auto">

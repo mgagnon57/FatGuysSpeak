@@ -91,9 +91,13 @@ public class ApiService
         return await resp.Content.ReadFromJsonAsync<AuthResponse>();
     }
 
-    public async Task<UpdateStatusDto?> GetUpdateStatusAsync()
+    public async Task<string?> GetServerVersionAsync()
     {
-        try { return await _http.GetFromJsonAsync<UpdateStatusDto>("api/update-status"); }
+        try
+        {
+            var v = await _http.GetFromJsonAsync<VersionInfo>("api/version");
+            return v?.Version;
+        }
         catch { return null; }
     }
 
