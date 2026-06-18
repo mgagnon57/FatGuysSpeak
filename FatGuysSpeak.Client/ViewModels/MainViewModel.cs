@@ -639,7 +639,22 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                     VersionSyncStage = $"Restarting to apply v{serverVersion} in {sec}…");
                 await Task.Delay(1000);
             }
-            updateService.ApplyAndRestart();                      // swaps files + relaunches; process exits
+            try
+            {
+                updateService.ApplyAndRestart();                  // swaps files + relaunches; process exits
+            }
+            catch
+            {
+                // Apply failed after a successful download (e.g. update.exe blocked) -> don't
+                // strand the user behind a frozen overlay; surface a recoverable banner.
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    VersionSyncInProgress = false;
+                    VersionMismatchText = $"Update to v{serverVersion} downloaded but couldn't be applied. "
+                        + "Please restart the app to finish updating.";
+                    VersionMismatch = true;
+                });
+            }
             return;
         }
 
