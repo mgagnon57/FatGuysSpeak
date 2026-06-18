@@ -601,19 +601,17 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (VersionSyncInProgress) return;   // a sync is already underway; don't re-enter
 
         var serverVersion = await api.GetServerVersionAsync();
-        if (string.IsNullOrEmpty(serverVersion)) return;          // can't evaluate -> connect as-is
-
         var mine = updateService.InstalledVersion;
-        if (mine is null) return;                                 // dev / not Velopack-installed
 
-        if (FatGuysSpeak.Shared.VersionCompat.SameMajor(mine, serverVersion))
-            return;                                               // compatible -> connect, no UI
+        var action = FatGuysSpeak.Shared.VersionSyncPlan.Decide(mine, serverVersion);
+        // CannotEvaluate (no server version / dev build) or ConnectAsIs (same major) -> connect, no UI.
+        if (action is FatGuysSpeak.Shared.VersionSyncAction.CannotEvaluate
+                   or FatGuysSpeak.Shared.VersionSyncAction.ConnectAsIs) return;
 
         if (_versionSyncCheckedFor == serverVersion) return;      // already handled this server this session
         _versionSyncCheckedFor = serverVersion;
 
-        var downgrade = FatGuysSpeak.Shared.SemVer.Compare(mine, serverVersion) > 0;
-        var verb = downgrade ? "Downgrading" : "Updating";
+        var verb = action == FatGuysSpeak.Shared.VersionSyncAction.Downgrade ? "Downgrading" : "Updating";
         MainThread.BeginInvokeOnMainThread(() =>
         {
             VersionMismatch = false;
