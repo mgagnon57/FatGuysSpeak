@@ -52,13 +52,18 @@ dotnet build (Join-Path $root 'FatGuysSpeak.Server') -c Release --framework net9
 dotnet build (Join-Path $root 'FatGuysSpeak.Client') -c Release --framework net9.0-windows10.0.19041.0; if ($LASTEXITCODE) { throw 'client build failed' }
 dotnet build (Join-Path $root 'FatGuysSpeak.Installer') -c Release --framework net9.0-windows10.0.19041.0; if ($LASTEXITCODE) { throw 'installer build failed' }
 
-# 7. Collect versioned artifacts into release-output/ (gitignored)
+# 7. Collect versioned artifacts into release-output/ (gitignored). Fail loudly if an
+#    expected artifact is missing (the Release build emits into a RID subfolder that
+#    differs per project: installer -> win-x64, client -> win10-x64), so search for it.
 $out = Join-Path $root 'release-output'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
-$setup = Join-Path $root 'FatGuysSpeak.Installer\bin\Release\net9.0-windows10.0.19041.0\FatGuysSpeak-Server-Setup.exe'
-if (Test-Path $setup) { Copy-Item $setup (Join-Path $out "FatGuysSpeak-Server-Setup-$Version.exe") -Force }
+$setup = Get-ChildItem -Path (Join-Path $root 'FatGuysSpeak.Installer\bin\Release') -Recurse -Filter 'FatGuysSpeak-Server-Setup.exe' -ErrorAction SilentlyContinue |
+    Select-Object -First 1 -ExpandProperty FullName
+if (-not $setup) { throw 'Installer exe not found under FatGuysSpeak.Installer\bin\Release after build.' }
+Copy-Item $setup (Join-Path $out "FatGuysSpeak-Server-Setup-$Version.exe") -Force
 $clientDir = Join-Path $root 'FatGuysSpeak.Client\bin\Release\net9.0-windows10.0.19041.0\win10-x64'
-if (Test-Path $clientDir) { Compress-Archive -Path (Join-Path $clientDir '*') -DestinationPath (Join-Path $out "FatGuysSpeak-Client-$Version.zip") -Force }
+if (-not (Test-Path $clientDir)) { throw "Client build output not found at $clientDir." }
+Compress-Archive -Path (Join-Path $clientDir '*') -DestinationPath (Join-Path $out "FatGuysSpeak-Client-$Version.zip") -Force
 
 # 8. Commit + tag (NO push)
 git -C $root add Directory.Build.props CHANGELOG.md website/index.html docs/index.html
