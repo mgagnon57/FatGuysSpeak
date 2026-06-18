@@ -190,6 +190,15 @@ builder.Services.AddHttpClient("giphy", c =>
     c.BaseAddress = new Uri("https://api.giphy.com/v1/gifs/");
     c.Timeout = TimeSpan.FromSeconds(10);
 });
+builder.Services.AddHttpClient("github", c =>
+{
+    c.BaseAddress = new Uri("https://api.github.com/");
+    c.Timeout = TimeSpan.FromSeconds(10);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("FatGuysSpeak");
+    c.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+});
+builder.Services.AddSingleton<FatGuysSpeak.Server.Services.UpdateStatus>();
+builder.Services.AddHostedService<FatGuysSpeak.Server.Services.UpdateCheckService>();
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.TempBanCleanupService>();
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.AuditLogCleanupService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.SessionBlacklistService>();
