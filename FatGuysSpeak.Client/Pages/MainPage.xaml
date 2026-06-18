@@ -71,11 +71,8 @@
                    TextColor="#d0a060" FontSize="11" VerticalOptions="Center" />
         </Grid>
 
-        <!-- ═══ VERSION SYNC BANNERS ═══ -->
+        <!-- ═══ VERSION MISMATCH BANNER ═══ -->
         <VerticalStackLayout Grid.Row="2">
-            <Grid IsVisible="{Binding VersionSyncing}" BackgroundColor="#143060" Padding="12,6">
-                <Label TextColor="#cfe0ff" VerticalOptions="Center" Text="{Binding VersionSyncText}" />
-            </Grid>
             <Grid IsVisible="{Binding VersionMismatch}" ColumnDefinitions="*,Auto" BackgroundColor="#3a2a00" Padding="12,6">
                 <Label Grid.Column="0" VerticalOptions="Center" TextColor="#e8c060" Text="{Binding VersionMismatchText}" />
                 <Button Grid.Column="1" Text="✕" Command="{Binding DismissMismatchCommand}"
@@ -1490,6 +1487,23 @@
                     BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#cc4444"
                     FontSize="11" FontAttributes="Bold"
                     HeightRequest="32" CornerRadius="3" Padding="10,0" />
+        </Grid>
+
+        <!-- ═══ VERSION SYNC OVERLAY (blocking; covers the whole page) ═══ -->
+        <Grid Grid.RowSpan="5" IsVisible="{Binding VersionSyncInProgress}"
+              BackgroundColor="#cc000814">
+            <Border Stroke="#2a4a80" StrokeThickness="1" BackgroundColor="#0e1830"
+                    Padding="28,22" WidthRequest="360"
+                    HorizontalOptions="Center" VerticalOptions="Center"
+                    StrokeShape="RoundRectangle 10">
+                <VerticalStackLayout Spacing="14">
+                    <Label Text="{Binding VersionSyncTitle}" TextColor="#cfe0ff"
+                           FontAttributes="Bold" FontSize="15" HorizontalOptions="Center" />
+                    <ProgressBar Progress="{Binding VersionSyncProgress}" ProgressColor="#5a8de0" />
+                    <Label Text="{Binding VersionSyncStage}" TextColor="#90a8d0"
+                           FontSize="12" HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </Border>
         </Grid>
 
     </Grid>
