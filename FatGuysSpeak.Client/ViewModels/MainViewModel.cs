@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.Reflection;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -70,6 +71,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     // Remote control state — controller side
     [ObservableProperty] private bool _isControlling;
     [ObservableProperty] private string? _controlledName;
+
+    // Update notification state
+    [ObservableProperty] private bool _updateAvailable;
+    [ObservableProperty] private string? _latestVersion;
+    [ObservableProperty] private string _updateUrl = "https://github.com/mgagnon57/FatGuysSpeak/releases/latest";
 
     public bool CanOfferControl => IsStreaming && DeviceInfo.Platform == DevicePlatform.WinUI;
     public bool CanRequestControl => ActiveStreamerId > 0 && !IsStreaming && DeviceInfo.Platform == DevicePlatform.WinUI;
@@ -584,7 +590,32 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         _blockedUserIds.Clear();
         foreach (var b in blocks ?? [])
             _blockedUserIds.Add(b.UserId);
+        _ = CheckForUpdatesAsync();
     }
+
+    public async Task CheckForUpdatesAsync()
+    {
+        var status = await api.GetUpdateStatusAsync();
+        if (status?.Latest is null) return;
+        var mine = VersionInfo.Parse(
+            Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion).Version;
+        if (SemVer.IsOutdated(mine, status.Latest))
+        {
+            MainThread.BeginInvokeOnMainThread(() =>
+            {
+                LatestVersion = status.Latest;
+                UpdateUrl = status.ReleaseUrl ?? UpdateUrl;
+                UpdateAvailable = true;
+            });
+        }
+    }
+
+    [RelayCommand]
+    private async Task OpenUpdate() => await Launcher.OpenAsync(UpdateUrl);
+
+    [RelayCommand]
+    private void DismissUpdate() => UpdateAvailable = false;
 
     [RelayCommand]
     public async Task SelectServerAsync(ServerViewItem item)

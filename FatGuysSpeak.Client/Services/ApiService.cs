@@ -91,6 +91,12 @@ public class ApiService
         return await resp.Content.ReadFromJsonAsync<AuthResponse>();
     }
 
+    public async Task<UpdateStatusDto?> GetUpdateStatusAsync()
+    {
+        try { return await _http.GetFromJsonAsync<UpdateStatusDto>("api/update-status"); }
+        catch { return null; }
+    }
+
     public async Task<GoogleConfigResponse?> GetGoogleConfigAsync()
     {
         try { return await _http.GetFromJsonAsync<GoogleConfigResponse>("api/auth/external/google/config"); }

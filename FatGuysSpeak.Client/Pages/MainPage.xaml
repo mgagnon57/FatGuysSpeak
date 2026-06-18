@@ -35,7 +35,7 @@
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
 
         <!-- ═══ TOP BAR ═══ -->
         <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgPanel}" Padding="10,6"
@@ -71,8 +71,19 @@
                    TextColor="#d0a060" FontSize="11" VerticalOptions="Center" />
         </Grid>
 
+        <!-- ═══ UPDATE BANNER ═══ -->
+        <Grid Grid.Row="2" IsVisible="{Binding UpdateAvailable}" ColumnDefinitions="*,Auto,Auto"
+              BackgroundColor="#3a2a00" Padding="12,6">
+            <Label Grid.Column="0" VerticalOptions="Center" TextColor="#e8c060"
+                   Text="{Binding LatestVersion, StringFormat='⬆ Update available — v{0}'}" />
+            <Button Grid.Column="1" Text="Download" Command="{Binding OpenUpdateCommand}"
+                    BackgroundColor="#6a5000" TextColor="#f0d090" Padding="10,2" Margin="6,0" />
+            <Button Grid.Column="2" Text="✕" Command="{Binding DismissUpdateCommand}"
+                    BackgroundColor="Transparent" TextColor="#e8c060" Padding="6,2" />
+        </Grid>
+
         <!-- ═══ MAIN CONTENT ═══ -->
-        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto">
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,*,Auto">
 
             <!-- SERVER SIDEBAR -->
             <Grid Grid.Column="0" BackgroundColor="#111111" RowDefinitions="*,Auto"
@@ -1397,7 +1408,7 @@
         </Grid>
 
         <!-- ═══ BOTTOM CONTROLS BAR ═══ -->
-        <Grid Grid.Row="3" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="10,6"
+        <Grid Grid.Row="4" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="10,6"
               ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
 
             <Button Grid.Column="0"
