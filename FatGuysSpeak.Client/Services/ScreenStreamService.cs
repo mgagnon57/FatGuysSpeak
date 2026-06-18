@@ -105,6 +105,18 @@ public sealed class ScreenStreamService : IDisposable
         StopAudioCapture();
     }
 
+    /// <summary>Live capture bounds in screen pixels: (left, top, width, height).
+    /// Full-desktop share = the primary screen; window share = the window's current rect.</summary>
+    public (int Left, int Top, int Width, int Height) CurrentCaptureRect
+    {
+        get
+        {
+            if (_targetWindow != IntPtr.Zero && GetWindowRect(_targetWindow, out var r))
+                return (r.Left, r.Top, Math.Max(1, r.Right - r.Left), Math.Max(1, r.Bottom - r.Top));
+            return (0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+        }
+    }
+
     public void UpdateQuality(int fps, int jpegQuality, int maxWidth)
     {
         _jpegQuality = jpegQuality;
@@ -269,6 +281,7 @@ public sealed class ScreenStreamService : IDisposable
     public void StartCapture(IntPtr targetWindow = default, int fps = 20) { }
     public void StopCapture() { }
     public void UpdateQuality(int fps, int jpegQuality, int maxWidth) { }
+    public (int Left, int Top, int Width, int Height) CurrentCaptureRect => (0, 0, 1, 1);
     public void Dispose() { }
 }
 #endif
