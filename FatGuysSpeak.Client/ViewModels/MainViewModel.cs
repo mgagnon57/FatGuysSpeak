@@ -544,6 +544,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         _hubReconnectedHandler = _ => MainThread.BeginInvokeOnMainThread(async () =>
         {
             HubConnectionState = "Connected";
+            // Server always tears down control sessions on disconnect, so reset stale client state.
+            IsBeingControlled = false;
+            ControllerName = null;
+            IsControlling = false;
+            ControlledName = null;
             await OnReconnectedAsync();
         });
         hub.Reconnected  += _hubReconnectedHandler;

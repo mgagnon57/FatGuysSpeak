@@ -75,7 +75,12 @@ public partial class StreamViewPage : ContentPage
             accel.Invoked += (_, _) =>
             {
                 if (BindingContext is MainViewModel vm)
-                    vm.StopControlCommand.Execute(null);
+                {
+                    if (vm.IsControlling)
+                        vm.ReleaseControlCommand.Execute(null);
+                    else if (vm.IsBeingControlled)
+                        vm.StopControlCommand.Execute(null);
+                }
             };
             pageRoot.KeyboardAccelerators.Add(accel);
             _pageRoot = pageRoot;
