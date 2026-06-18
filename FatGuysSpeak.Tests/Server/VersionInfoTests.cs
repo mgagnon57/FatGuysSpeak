@@ -1,5 +1,4 @@
 using FatGuysSpeak.Shared;
-using Xunit;
 
 namespace FatGuysSpeak.Tests.Server;
 
