@@ -41,6 +41,14 @@ public class ChatHubService
     public event Action<int, string, int>? CameraStarted;   // (userId, username, channelId)
     public event Action<int, int>? CameraStopped;            // (userId, channelId)
     public event Action<int, byte[]>? CameraFrameReceived;  // (userId, frame)
+    public event Action<int, string>? ControlRequested;   // (controllerId, controllerName) — to streamer
+    public event Action<int, string>? ControlOffered;     // (streamerId, streamerName) — to viewer
+    public event Action<int, string>? ControlActive;      // (controllerId, controllerName) — to streamer
+    public event Action<int, string>? ControlGranted;     // (streamerId, streamerName) — to controller
+    public event Action<int>? ControlDeclined;            // (byUserId)
+    public event Action? ControlBusy;
+    public event Action<int>? ControlEnded;               // (otherUserId)
+    public event Action<RemoteInputDto>? RemoteInputReceived;
     public event Action<DirectMessageDto>? DirectMessageReceived;
     public event Action<int, int>? DirectMessageDeleted;    // (conversationId, messageId)
     public event Action<int, string, int>? DmUserTyping;    // (userId, username, conversationId)
@@ -127,6 +135,14 @@ public class ChatHubService
             (dto, rootId, count) => ThreadReplyReceived?.Invoke(dto, rootId, count));
         _connection.On<int, DateTime?>("UserMuted", (uid, until) => UserMuted?.Invoke(uid, until));
         _connection.On<int, DateTime>("UserTempBanned", (uid, exp) => UserTempBanned?.Invoke(uid, exp));
+        _connection.On<int, string>("ControlRequested", (id, n) => ControlRequested?.Invoke(id, n));
+        _connection.On<int, string>("ControlOffered",   (id, n) => ControlOffered?.Invoke(id, n));
+        _connection.On<int, string>("ControlActive",    (id, n) => ControlActive?.Invoke(id, n));
+        _connection.On<int, string>("ControlGranted",   (id, n) => ControlGranted?.Invoke(id, n));
+        _connection.On<int>("ControlDeclined",          id => ControlDeclined?.Invoke(id));
+        _connection.On("ControlBusy",                   () => ControlBusy?.Invoke());
+        _connection.On<int>("ControlEnded",             id => ControlEnded?.Invoke(id));
+        _connection.On<RemoteInputDto>("ReceiveRemoteInput", dto => RemoteInputReceived?.Invoke(dto));
 
         _connection.Reconnecting  += ex  => { Reconnecting?.Invoke(ex);  return Task.CompletedTask; };
         _connection.Reconnected   += cid => { Reconnected?.Invoke(cid);  return Task.CompletedTask; };
@@ -171,6 +187,15 @@ public class ChatHubService
     public Task SendStreamAudioAsync(byte[] data) => _connection?.SendAsync("SendStreamAudio", data) ?? Task.CompletedTask;
     public Task WatchStreamAsync(int channelId) => _connection!.InvokeAsync("WatchStream", channelId);
     public Task StopWatchingAsync(int channelId) => _connection!.InvokeAsync("StopWatching", channelId);
+
+    public Task RequestControl(int streamerId) => _connection!.InvokeAsync("RequestControl", streamerId);
+    public Task OfferControl(int viewerId) => _connection!.InvokeAsync("OfferControl", viewerId);
+    public Task GrantControl(int controllerId) => _connection!.InvokeAsync("GrantControl", controllerId);
+    public Task AcceptControl(int streamerId) => _connection!.InvokeAsync("AcceptControl", streamerId);
+    public Task DenyControl(int otherUserId) => _connection!.InvokeAsync("DenyControl", otherUserId);
+    public Task StopControl() => _connection!.InvokeAsync("StopControl");
+    public Task ReleaseControl() => _connection!.InvokeAsync("ReleaseControl");
+    public Task SendRemoteInput(RemoteInputDto dto) => _connection!.SendAsync("SendRemoteInput", dto);
 
     public Task StartCameraAsync(int channelId) => _connection!.InvokeAsync("StartCamera", channelId);
     public Task StopCameraAsync(int channelId) => _connection!.InvokeAsync("StopCamera", channelId);
