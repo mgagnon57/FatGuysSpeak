@@ -173,3 +173,13 @@ public record BulkActionResult(int Affected, int[] ChannelIds);
 
 // Admin server list (filter dropdown)
 public record AdminServerDto(int Id, string Name);
+
+// Remote control
+public enum RemoteInputKind { Move, Down, Up, Wheel, KeyDown, KeyUp }
+
+public record RemoteInputDto(
+    RemoteInputKind Kind,
+    double X = 0, double Y = 0,   // normalized 0..1 (Move/Down/Up/Wheel)
+    int Button = 0,               // 0=left, 1=right, 2=middle (Down/Up)
+    int Delta = 0,                // wheel notches * 120 (Wheel)
+    int KeyCode = 0);             // Win32 virtual-key code (KeyDown/KeyUp)
