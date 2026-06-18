@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <!-- Stamp the git short SHA + UTC build date into InformationalVersion on every
+       build. Falls back to "nogit" when git is unavailable (clean tarball / CI). -->
+  <Target Name="StampGitVersion" BeforeTargets="GetAssemblyVersion;CoreCompile">
+    <Exec Command="git rev-parse --short HEAD" ConsoleToMSBuild="true"
+          ContinueOnError="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitShaRaw" />
+      <Output TaskParameter="ExitCode" PropertyName="GitExit" />
+    </Exec>
+    <PropertyGroup>
+      <GitSha Condition="'$(GitExit)' == '0'">$(GitShaRaw.Trim())</GitSha>
+      <GitSha Condition="'$(GitSha)' == ''">nogit</GitSha>
+      <BuildDateUtc>$([System.DateTime]::UtcNow.ToString('yyyy-MM-dd'))</BuildDateUtc>
+      <InformationalVersion>$(Version)+g$(GitSha).$(BuildDateUtc)</InformationalVersion>
+    </PropertyGroup>
+  </Target>
+</Project>
