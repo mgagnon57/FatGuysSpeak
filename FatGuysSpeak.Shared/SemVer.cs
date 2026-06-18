@@ -33,6 +33,14 @@ public static class SemVer
         return l is not null && Compare(current, l) < 0;
     }
 
+    // Major component of a valid MAJOR.MINOR.PATCH, else null. "v3.0.0" -> 3; junk -> null.
+    public static int? Major(string? v)
+    {
+        var n = NormalizeTag(v);
+        if (n is null) return null;
+        return int.Parse(n.Split('.')[0]);
+    }
+
     private static (int, int, int) Parts(string? v)
     {
         if (string.IsNullOrWhiteSpace(v)) return (0, 0, 0);
