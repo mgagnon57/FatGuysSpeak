@@ -116,7 +116,7 @@ const throughput = new Chart(document.getElementById('chart'), {
     labels: xLabels,
     datasets: [{
       data: new Array(60).fill(0),
-      backgroundColor: (ctx) => ctx.parsed.y > 20 ? '#ed4245' : '#2d5f9e',
+      backgroundColor: (ctx) => ctx.parsed.y > 20 ? '#ed4245' : '#d42d00',
       borderRadius: 2,
       borderSkipped: false,
       maxBarThickness: 14,
@@ -129,10 +129,10 @@ const throughput = new Chart(document.getElementById('chart'), {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#1e1e2e',
-        titleColor: '#8ab4d4',
-        bodyColor: '#d0d0d0',
-        borderColor: '#333',
+        backgroundColor: '#1a1717',
+        titleColor: '#f04010',
+        bodyColor: '#e9e4d9',
+        borderColor: '#292525',
         borderWidth: 1,
         callbacks: {
           title: (items) => {
@@ -144,8 +144,8 @@ const throughput = new Chart(document.getElementById('chart'), {
       }
     },
     scales: {
-      x: { grid: { color: '#222' }, ticks: { color: '#444', font: { size: 10 }, maxRotation: 0 } },
-      y: { grid: { color: '#222' }, ticks: { color: '#444', font: { size: 10 }, stepSize: 1 }, beginAtZero: true }
+      x: { grid: { color: '#1a1717' }, ticks: { color: '#322e28', font: { size: 10 }, maxRotation: 0 } },
+      y: { grid: { color: '#1a1717' }, ticks: { color: '#322e28', font: { size: 10 }, stepSize: 1 }, beginAtZero: true }
     }
   }
 });
@@ -182,7 +182,7 @@ async function refreshMetrics() {
     throughput.update('none');
 
     document.getElementById('lastUpdated').textContent = 'updated ' + new Date().toLocaleTimeString();
-    document.getElementById('liveDot').style.background = '#44bb44';
+    document.getElementById('liveDot').style.background = '#36b864';
     document.getElementById('serverUrl').textContent = window.location.origin;
   } catch {
     document.getElementById('lastUpdated').textContent = 'connection lost — retrying…';
@@ -204,10 +204,10 @@ function channelCell(u) {
   const parts = [];
   if (t) parts.push('#' + escapeHtml(t));
   if (v) parts.push('🎙 ' + escapeHtml(v));
-  return parts.length ? parts.join(' · ') : '<span style="color:#555">—</span>';
+  return parts.length ? parts.join(' · ') : '<span style="color:#4a443d">—</span>';
 }
 
-const AVATAR_COLORS = ['#d42d00','#e89000','#36b864','#8ab4d4','#a060d0','#d04080'];
+const AVATAR_COLORS = ['#d42d00','#e89000','#36b864','#f04010','#a060d0','#d04080'];
 function avatarHtml(u) {
   if (u.avatarUrl) return `<img class="u-av" src="${escapeHtml(u.avatarUrl)}" alt="" loading="lazy" />`;
   const initial = ((u.username || '?').trim().charAt(0) || '?').toUpperCase();
@@ -215,7 +215,7 @@ function avatarHtml(u) {
   return `<span class="u-av u-av-fallback" style="background:${col}">${escapeHtml(initial)}</span>`;
 }
 function userCell(u) {
-  const dot = `<span class="presence-dot" style="background:${u.isOnline ? '#44bb44' : '#555'}" title="${u.isOnline ? 'Online' : 'Offline'}"></span>`;
+  const dot = `<span class="presence-dot" style="background:${u.isOnline ? '#36b864' : '#4a443d'}" title="${u.isOnline ? 'Online' : 'Offline'}"></span>`;
   return `<div class="u-cell">${avatarHtml(u)}${dot}<span class="user-link" data-click="profile" data-uid="${u.id}">${escapeHtml(u.username)}</span></div>`;
 }
 // Default ordering: online users first, then alphabetical. Column sort overrides this (set below).
@@ -250,8 +250,8 @@ const ROLE_TIPS = {
 };
 
 function roleBadge(role) {
-  const map = { Admin: '#8ab4d4', Moderator: '#44bb44', Member: '#555' };
-  const col = map[role] || '#555';
+  const map = { Admin: '#f04010', Moderator: '#36b864', Member: '#4a443d' };
+  const col = map[role] || '#4a443d';
   const tip = (ROLE_TIPS[role] || role || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   return `<span class="badge role-tip" style="background:${col}22;color:${col};cursor:help" data-tip="${tip}">${role ?? '—'}</span>`;
 }
@@ -259,7 +259,7 @@ function roleBadge(role) {
 function renderUsers(users) {
   const tbody = document.getElementById('userTableBody');
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:#444;padding:20px 10px;">No users found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#322e28;padding:20px 10px;">No users found.</td></tr>';
     return;
   }
   const now = Date.now();
@@ -274,20 +274,20 @@ function renderUsers(users) {
            <button class="btn-sm" title="Promote to ${nextUp}" data-click="promote" data-uid="${u.id}" ${role==='Admin'?'disabled':''} aria-label="Promote to ${nextUp}">▲</button>
            <button class="btn-sm danger" title="Demote to ${nextDown}" data-click="demote" data-uid="${u.id}" ${role==='Member'?'disabled':''} aria-label="Demote to ${nextDown}">▼</button>
          </span></div>`
-      : '<span style="color:#555">—</span>';
+      : '<span style="color:#4a443d">—</span>';
     const mutedUntil = member?.mutedUntil ? new Date(member.mutedUntil) : null;
     const isMuted = mutedUntil && mutedUntil.getTime() > now;
     const muteCell = member
       ? isMuted
-        ? `<span style="color:#f0a030;font-size:10px">until ${mutedUntil.toLocaleTimeString()}</span>
+        ? `<span style="color:#e89000;font-size:10px">until ${mutedUntil.toLocaleTimeString()}</span>
            <button class="btn-sm" style="margin-left:4px" title="Remove the active mute — user can send messages immediately" data-click="unmute" data-uid="${u.id}">Unmute</button>`
         : `<select class="btn-sm" data-change="mute" data-uid="${u.id}" ${role==='Admin'?'disabled':''} title="Temporarily prevent this user from sending messages"><option value="">Mute…</option><option value="300">5 minutes</option><option value="1800">30 minutes</option><option value="3600">1 hour</option><option value="86400">24 hours</option></select>`
-      : '<span style="color:#555">—</span>';
+      : '<span style="color:#4a443d">—</span>';
     return `<tr>
       <td>${userCell(u)}</td>
       <td>${channelCell(u)}</td>
       <td>${roleCell}</td>
-      <td style="color:#555">${new Date(u.createdAt).toLocaleDateString()}</td>
+      <td style="color:#4a443d">${new Date(u.createdAt).toLocaleDateString()}</td>
       <td class="actions-cell">
         ${u.voiceChannelId !== null
           ? `<button class="btn-sm danger" title="Disconnect this user from their current voice channel (they can rejoin)" data-click="kickVoice" data-uid="${u.id}">Kick Voice</button>`
@@ -477,7 +477,7 @@ const rlChart = new Chart(document.getElementById('rlChart'), {
     datasets: [{
       data: new Array(60).fill(0),
       backgroundColor: '#f0a03066',
-      borderColor: '#f0a030',
+      borderColor: '#e89000',
       borderWidth: 1,
       borderRadius: 2,
       borderSkipped: false,
@@ -491,10 +491,10 @@ const rlChart = new Chart(document.getElementById('rlChart'), {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#1e1e2e',
-        titleColor: '#f0a030',
-        bodyColor: '#d0d0d0',
-        borderColor: '#333',
+        backgroundColor: '#1a1717',
+        titleColor: '#e89000',
+        bodyColor: '#e9e4d9',
+        borderColor: '#292525',
         borderWidth: 1,
         callbacks: {
           title: (items) => {
@@ -506,8 +506,8 @@ const rlChart = new Chart(document.getElementById('rlChart'), {
       }
     },
     scales: {
-      x: { grid: { color: '#222' }, ticks: { color: '#444', font: { size: 9 }, maxRotation: 0 } },
-      y: { grid: { color: '#222' }, ticks: { color: '#444', font: { size: 9 }, stepSize: 1 }, beginAtZero: true }
+      x: { grid: { color: '#1a1717' }, ticks: { color: '#322e28', font: { size: 9 }, maxRotation: 0 } },
+      y: { grid: { color: '#1a1717' }, ticks: { color: '#322e28', font: { size: 9 }, stepSize: 1 }, beginAtZero: true }
     }
   }
 });
@@ -526,14 +526,14 @@ async function refreshRateLimits() {
 
     const tbody = document.getElementById('rlOffenders');
     if (!d.topOffenders.length) {
-      tbody.innerHTML = '<tr><td colspan="3" style="color:#444;padding:10px">No rate limit hits yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3" style="color:#322e28;padding:10px">No rate limit hits yet.</td></tr>';
     } else {
       tbody.innerHTML = d.topOffenders.map(o => {
         const last = new Date(o.lastSeen).toLocaleTimeString();
         return `<tr>
-          <td style="color:#d0d0d0">${escapeHtml(o.who)}</td>
-          <td style="text-align:right;color:#f0a030;font-weight:600">${o.hits}</td>
-          <td style="color:#555">${last}</td>
+          <td style="color:#e9e4d9">${escapeHtml(o.who)}</td>
+          <td style="text-align:right;color:#e89000;font-weight:600">${o.hits}</td>
+          <td style="color:#4a443d">${last}</td>
         </tr>`;
       }).join('');
     }
@@ -613,9 +613,9 @@ async function loadServerOptions() {
 }
 
 function sourceBadge(s) {
-  const map = { Text: '#2d5f9e', Voice: '#3a6a3a', Stream: '#5a2d8e' };
-  const col = map[s] || '#333';
-  return `<span class="badge" style="background:${col}20;color:${col === '#333' ? '#888' : col};border:1px solid ${col}40">${escapeHtml(s)}</span>`;
+  const map = { Text: '#d42d00', Voice: '#3a6a3a', Stream: '#5a2d8e' };
+  const col = map[s] || '#292525';
+  return `<span class="badge" style="background:${col}20;color:${col === '#292525' ? '#756e62' : col};border:1px solid ${col}40">${escapeHtml(s)}</span>`;
 }
 
 let lastRenderedMsgs = [];
@@ -624,14 +624,14 @@ function renderMessages(msgs) {
   lastRenderedMsgs = msgs;
   const tbody = document.getElementById('msgTableBody');
   if (!msgs.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="color:#444;padding:20px 10px;">No messages found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="color:#322e28;padding:20px 10px;">No messages found.</td></tr>';
     return;
   }
   tbody.innerHTML = msgs.map(m => {
     const ts = new Date(m.createdAt);
     const timeStr = ts.toLocaleDateString() + ' ' + ts.toLocaleTimeString();
     const deleted = m.isDeleted;
-    const contentStyle = deleted ? 'color:#555;font-style:italic' : 'color:#c0c0c0';
+    const contentStyle = deleted ? 'color:#4a443d;font-style:italic' : 'color:#c0c0c0';
     const full = m.content || '';
     const truncated = full.length > 120;
     const shown = truncated ? full.slice(0, 120) + '…' : full;
@@ -642,11 +642,11 @@ function renderMessages(msgs) {
       ? `<button class="btn-sm" title="Restore this message — un-hide it (content was preserved)" data-click="restoreMsg" data-mid="${m.id}">Restore</button>`
       : `<button class="btn-sm danger" title="Soft-delete this message — hidden from clients but kept in the database" data-click="delMsg" data-mid="${m.id}">Delete</button>`;
     return `<tr data-mid="${m.id}" style="${deleted ? 'opacity:.55' : ''}">
-      <td><input type="checkbox" class="msg-sel" data-change="toggleMsgSel" data-mid="${m.id}" ${selectedMsgIds.has(m.id) ? 'checked' : ''} style="accent-color:#8ab4d4" /></td>
-      <td style="color:#555;font-size:11px;white-space:nowrap">${timeStr}</td>
-      <td><span class="user-link" data-click="profile" data-uid="${m.authorId}" style="color:#8ab4d4;font-weight:500;cursor:pointer">${escapeHtml(m.author)}</span></td>
-      <td style="color:#666">#${escapeHtml(m.channel)}</td>
-      <td style="color:#555;font-size:11px">${escapeHtml(m.server)}</td>
+      <td><input type="checkbox" class="msg-sel" data-change="toggleMsgSel" data-mid="${m.id}" ${selectedMsgIds.has(m.id) ? 'checked' : ''} style="accent-color:#f04010" /></td>
+      <td style="color:#4a443d;font-size:11px;white-space:nowrap">${timeStr}</td>
+      <td><span class="user-link" data-click="profile" data-uid="${m.authorId}" style="color:#f04010;font-weight:500;cursor:pointer">${escapeHtml(m.author)}</span></td>
+      <td style="color:#5a544a">#${escapeHtml(m.channel)}</td>
+      <td style="color:#4a443d;font-size:11px">${escapeHtml(m.server)}</td>
       <td>${sourceBadge(m.source)}</td>
       <td style="${contentStyle}">${contentCell}</td>
       <td>${action}</td>
@@ -833,34 +833,34 @@ async function loadAudit() {
 
 function actionBadge(action) {
   const map = {
-    RoleChanged:              '#8ab4d4',
+    RoleChanged:              '#f04010',
     MemberKicked:             '#ed4245',
-    UserMuted:                '#f0a030',
-    UserUnmuted:              '#44bb44',
+    UserMuted:                '#e89000',
+    UserUnmuted:              '#36b864',
     UserTempBanned:           '#ed4245',
-    MessageDeleted:           '#f0a030',
-    ChannelCreated:           '#44bb44',
+    MessageDeleted:           '#e89000',
+    ChannelCreated:           '#36b864',
     ChannelDeleted:           '#ed4245',
-    ChannelPermissionsChanged:'#8ab4d4',
+    ChannelPermissionsChanged:'#f04010',
   };
-  const col = map[action] || '#888';
+  const col = map[action] || '#756e62';
   return `<span class="badge" style="background:${col}22;color:${col}">${action}</span>`;
 }
 
 function renderAudit(logs) {
   const tbody = document.getElementById('auditTableBody');
   if (!logs.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:#444;padding:20px 10px;">No audit entries found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#322e28;padding:20px 10px;">No audit entries found.</td></tr>';
     return;
   }
   tbody.innerHTML = logs.map(a => {
     const ts = new Date(a.createdAt);
     return `<tr>
-      <td style="color:#555;font-size:11px;white-space:nowrap">${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}</td>
-      <td style="color:#8ab4d4">${escapeHtml(a.actorUsername)}</td>
+      <td style="color:#4a443d;font-size:11px;white-space:nowrap">${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}</td>
+      <td style="color:#f04010">${escapeHtml(a.actorUsername)}</td>
       <td>${actionBadge(a.action)}</td>
-      <td style="color:#aaa">${escapeHtml(a.targetUsername ?? '—')}</td>
-      <td style="color:#777;font-size:11px">${(a.detail ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+      <td style="color:#9a9183">${escapeHtml(a.targetUsername ?? '—')}</td>
+      <td style="color:#6a6358;font-size:11px">${(a.detail ?? '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
     </tr>`;
   }).join('');
 }
@@ -885,19 +885,19 @@ const roles = ['Member','Moderator','Admin'];
 function renderChannels(channels, serverId) {
   const tbody = document.getElementById('channelTableBody');
   if (!channels.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="color:#444;padding:20px 10px;">No channels found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#322e28;padding:20px 10px;">No channels found.</td></tr>';
     return;
   }
   tbody.innerHTML = channels.map(c => `
     <tr id="ch-row-${c.id}">
-      <td style="color:#555">${escapeHtml(c.serverName)}</td>
-      <td style="color:#d0d0d0">#${escapeHtml(c.name)}</td>
-      <td style="color:#666">${c.type}</td>
+      <td style="color:#4a443d">${escapeHtml(c.serverName)}</td>
+      <td style="color:#e9e4d9">#${escapeHtml(c.name)}</td>
+      <td style="color:#5a544a">${c.type}</td>
       <td>
         <select data-change="saveChannelPerm" data-sid="${c.serverId}" data-cid="${c.id}"
           id="read-${c.id}"
           title="Minimum role required to see and read this channel"
-          style="background:#252525;border:1px solid #333;border-radius:3px;color:#d0d0d0;font-size:11px;padding:3px 6px">
+          style="background:#161414;border:1px solid #292525;border-radius:3px;color:#e9e4d9;font-size:11px;padding:3px 6px">
           ${roles.map(r => `<option value="${r}" ${c.minRoleToRead===r?'selected':''}>${r}</option>`).join('')}
         </select>
       </td>
@@ -905,20 +905,20 @@ function renderChannels(channels, serverId) {
         <select data-change="saveChannelPerm" data-sid="${c.serverId}" data-cid="${c.id}"
           id="write-${c.id}"
           title="Minimum role required to send messages in this channel (must be ≥ Min Read Role)"
-          style="background:#252525;border:1px solid #333;border-radius:3px;color:#d0d0d0;font-size:11px;padding:3px 6px">
+          style="background:#161414;border:1px solid #292525;border-radius:3px;color:#e9e4d9;font-size:11px;padding:3px 6px">
           ${roles.map(r => `<option value="${r}" ${c.minRoleToWrite===r?'selected':''}>${r}</option>`).join('')}
         </select>
       </td>
       <td style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <input id="ch-rename-${c.id}" value="${escapeHtml(c.name)}"
-          style="background:#1a1a1a;border:1px solid #3a3a3a;border-radius:4px;color:#d0d0d0;font-size:11px;padding:3px 7px;font-family:inherit;outline:none;width:110px"
+          style="background:#0c0b0b;border:1px solid #3a3a3a;border-radius:4px;color:#e9e4d9;font-size:11px;padding:3px 7px;font-family:inherit;outline:none;width:110px"
           data-enter="renameChannel" data-sid="${c.serverId}" data-cid="${c.id}" />
         <button class="btn-sm" style="padding:3px 8px;font-size:11px"
           data-click="renameChannel" data-sid="${c.serverId}" data-cid="${c.id}"
           title="Rename this channel">Rename</button>
-        <span id="ch-status-${c.id}" style="font-size:10px;color:#555"></span>
+        <span id="ch-status-${c.id}" style="font-size:10px;color:#4a443d"></span>
         ${c.isDefault
-          ? `<span class="badge" style="background:#2d5f9e22;color:#8ab4d4" title="The default channel can't be deleted — rename it instead">Default</span>`
+          ? `<span class="badge" style="background:#2d5f9e22;color:#f04010" title="The default channel can't be deleted — rename it instead">Default</span>`
           : `<button class="btn-sm" style="background:#3a1a1a;color:#ed4245;border-color:#5a2a2a;padding:3px 8px;font-size:11px"
           data-click="deleteChannel" data-sid="${c.serverId}" data-cid="${c.id}" data-cname="${escapeHtml(c.name)}"
           title="Permanently delete this channel and all its messages">Delete</button>`}
@@ -932,7 +932,7 @@ async function createChannel() {
   const name = nameEl.value.trim().toLowerCase().replace(/\s+/g, '-');
   if (!name) { statusEl.textContent = 'Enter a channel name.'; statusEl.style.color = '#ed4245'; return; }
   if (!currentServerId) { statusEl.textContent = 'No server selected.'; statusEl.style.color = '#ed4245'; return; }
-  statusEl.textContent = 'Creating…'; statusEl.style.color = '#555';
+  statusEl.textContent = 'Creating…'; statusEl.style.color = '#4a443d';
   try {
     const res = await fetch(`/api/admin/servers/${currentServerId}/channels`, {
       method: 'POST',
@@ -956,7 +956,7 @@ async function saveChannelPerm(serverId, channelId) {
   const minRoleToWrite = document.getElementById(`write-${channelId}`).value;
   const status = document.getElementById(`ch-status-${channelId}`);
   status.textContent = 'Saving…';
-  status.style.color = '#888';
+  status.style.color = '#756e62';
   try {
     const res = await fetch(`/api/admin/servers/${serverId}/channels/${channelId}/permissions`, {
       method: 'PUT',
@@ -965,7 +965,7 @@ async function saveChannelPerm(serverId, channelId) {
     });
     if (!res.ok) throw new Error(await res.text() || res.status);
     status.textContent = 'Saved ✓';
-    status.style.color = '#44bb44';
+    status.style.color = '#36b864';
     setTimeout(() => { status.textContent = ''; }, 2000);
   } catch (e) {
     status.textContent = 'Failed';
@@ -978,7 +978,7 @@ async function renameChannel(serverId, channelId) {
   const status = document.getElementById(`ch-status-${channelId}`);
   const name   = input.value.trim().toLowerCase().replace(/\s+/g, '-');
   if (!name) { status.textContent = 'Name required'; status.style.color = '#ed4245'; return; }
-  status.textContent = 'Saving…'; status.style.color = '#888';
+  status.textContent = 'Saving…'; status.style.color = '#756e62';
   try {
     const res = await fetch(`/api/admin/servers/${serverId}/channels/${channelId}/name`, {
       method: 'PATCH',
@@ -987,7 +987,7 @@ async function renameChannel(serverId, channelId) {
     });
     if (!res.ok) throw new Error(await res.text() || res.status);
     input.value = name;
-    status.textContent = 'Renamed ✓'; status.style.color = '#44bb44';
+    status.textContent = 'Renamed ✓'; status.style.color = '#36b864';
     setTimeout(() => { status.textContent = ''; }, 2000);
   } catch (e) {
     status.textContent = `Error: ${e.message}`; status.style.color = '#ed4245';
@@ -997,7 +997,7 @@ async function renameChannel(serverId, channelId) {
 async function deleteChannel(serverId, channelId, channelName) {
   if (!confirm(`Delete #${channelName}? This cannot be undone.`)) return;
   const status = document.getElementById(`ch-status-${channelId}`);
-  status.textContent = 'Deleting…'; status.style.color = '#888';
+  status.textContent = 'Deleting…'; status.style.color = '#756e62';
   try {
     const res = await fetch(`/api/admin/servers/${serverId}/channels/${channelId}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(await res.text() || res.status);
@@ -1011,7 +1011,7 @@ async function deleteChannel(serverId, channelId, channelName) {
 async function loadWordFilters() {
   const tbody = document.getElementById('wfTableBody');
   if (!currentServerId) {
-    tbody.innerHTML = '<tr><td colspan="3" style="color:#444;padding:20px 10px;">Loading…</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="3" style="color:#322e28;padding:20px 10px;">Loading…</td></tr>';
     return;
   }
   try {
@@ -1019,14 +1019,14 @@ async function loadWordFilters() {
     if (!res.ok) throw new Error(res.status);
     const filters = await res.json();
     if (!filters.length) {
-      tbody.innerHTML = '<tr><td colspan="3" style="color:#444;padding:20px 10px;">No patterns configured.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3" style="color:#322e28;padding:20px 10px;">No patterns configured.</td></tr>';
       return;
     }
     tbody.innerHTML = filters.map(f => {
       const ts = new Date(f.createdAt).toLocaleDateString();
       return `<tr>
-        <td style="color:#d0d0d0;font-family:monospace">${escapeHtml(f.pattern)}</td>
-        <td style="color:#555;font-size:11px">${ts}</td>
+        <td style="color:#e9e4d9;font-family:monospace">${escapeHtml(f.pattern)}</td>
+        <td style="color:#4a443d;font-size:11px">${ts}</td>
         <td><button class="btn-sm danger" title="Remove this pattern — messages containing it will no longer be filtered" data-click="rmWf" data-fid="${f.id}">Remove</button></td>
       </tr>`;
     }).join('');

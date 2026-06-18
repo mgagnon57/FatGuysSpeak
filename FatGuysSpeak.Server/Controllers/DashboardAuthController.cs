@@ -64,29 +64,29 @@ public class DashboardAuthController(IConfiguration config) : ControllerBase
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body {
-            background: #1a1a1a; color: #d0d0d0;
+            background: #0c0b0b; color: #e9e4d9;
             font-family: 'Segoe UI', system-ui, sans-serif;
             display: flex; align-items: center; justify-content: center; height: 100vh;
           }
           .card {
-            background: #252525; border: 1px solid #2e2e2e; border-radius: 10px;
+            background: #161414; border: 1px solid #292525; border-radius: 10px;
             padding: 36px 40px; width: 320px;
           }
-          h1 { font-size: 15px; color: #8ab4d4; font-weight: 600; margin-bottom: 24px; letter-spacing: .3px; }
+          h1 { font-size: 15px; color: #f04010; font-weight: 600; margin-bottom: 24px; letter-spacing: .3px; }
           .field { margin-bottom: 16px; }
-          label { display: block; font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+          label { display: block; font-size: 11px; color: #5a544a; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
           input {
-            width: 100%; background: #1a1a1a; border: 1px solid #3a3a3a; border-radius: 6px;
-            color: #d0d0d0; font-size: 13px; padding: 9px 12px; outline: none;
+            width: 100%; background: #0c0b0b; border: 1px solid #3a3a3a; border-radius: 6px;
+            color: #e9e4d9; font-size: 13px; padding: 9px 12px; outline: none;
             font-family: inherit; transition: border-color .15s;
           }
-          input:focus { border-color: #8ab4d4; }
+          input:focus { border-color: #f04010; }
           button {
-            width: 100%; background: #2d5f9e; border: none; border-radius: 6px;
+            width: 100%; background: #d42d00; border: none; border-radius: 6px;
             color: #fff; font-size: 13px; font-family: inherit; padding: 10px;
             cursor: pointer; margin-top: 8px; transition: background .15s;
           }
-          button:hover { background: #3a72b8; }
+          button:hover { background: #f04010; }
           .error {
             color: #e05555; font-size: 12px; margin-bottom: 14px; padding: 8px 12px;
             background: #2a1a1a; border: 1px solid #5a2222; border-radius: 6px;
