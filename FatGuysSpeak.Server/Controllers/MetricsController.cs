@@ -1,4 +1,6 @@
+using System.Reflection;
 using FatGuysSpeak.Server.Services;
+using FatGuysSpeak.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,7 +14,15 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
     public IActionResult GetMetrics() => Ok(metrics.GetSnapshot());
 
     [HttpGet("/dashboard")]
-    public ContentResult Dashboard() => Content(Html, "text/html");
+    public ContentResult Dashboard()
+    {
+        var v = VersionInfo.Parse(typeof(MetricsController).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
+        var label = $"FatGuysSpeak v{v.Version}"
+            + (v.Commit.Length > 0 ? $" · {v.Commit}" : "")
+            + (v.BuildDate.Length > 0 ? $" · {v.BuildDate}" : "");
+        return Content(Html.Replace("{{VERSION}}", System.Net.WebUtility.HtmlEncode(label)), "text/html");
+    }
 
     private const string Html = """
         <!DOCTYPE html>
@@ -506,6 +516,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
         <div class="status-bar">
           <span id="serverUrl" title="The address this server is currently listening on">http://localhost:5238</span>
           <span id="refreshNote" title="Overview and rate-limit charts update every 2–5 s automatically; open tabs refresh every 5 s">auto-refreshes every 2s</span>
+          <span id="appVersion" title="Running build" style="color:#555">{{VERSION}}</span>
         </div>
 
         <script src="/dashboard.js"></script>
