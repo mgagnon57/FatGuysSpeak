@@ -285,6 +285,7 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         OnlineUsers.TryRemove(UserId, out _);
+        await EndControlSessionsInvolvingAsync(UserId);
 
         if (UserTextChannelMap.TryRemove(UserId, out var textChannelId))
         {
@@ -379,6 +380,7 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
     public async Task StopStream()
     {
         if (!ActiveStreamers.TryRemove(UserId, out var info)) return;
+        await EndControlSessionsInvolvingAsync(UserId);
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"stream-{info.ChannelId}");
         await Clients.Group($"server-{info.ServerId}").SendAsync("StreamStopped", UserId, info.ChannelId);
         var channelName = (await db.Channels.FindAsync(info.ChannelId))?.Name ?? "";
@@ -426,6 +428,19 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         if (!RemoteControlSessions.TryRemove(streamerId, out var s)) return;
         await Clients.User(streamerId.ToString()).SendAsync("ControlEnded", s.ControllerId);
         await Clients.User(s.ControllerId.ToString()).SendAsync("ControlEnded", streamerId);
+    }
+
+    // Ends any control session in which `userId` is the streamer OR the controller.
+    private async Task EndControlSessionsInvolvingAsync(int userId)
+    {
+        if (RemoteControlSessions.ContainsKey(userId))           // user is a streamer
+        {
+            await CloseControlSessionAsync(userId);
+            return;
+        }
+        var asController = RemoteControlSessions.FirstOrDefault(kv => kv.Value.ControllerId == userId);
+        if (asController.Value.ControllerId != userId) return;   // not in any session
+        await CloseControlSessionAsync(asController.Key);
     }
 
     public async Task RequestControl(int streamerId)

@@ -169,4 +169,37 @@ public class ChatHubRemoteControlTests : IDisposable
         await Hub(streamer.Id, streamer.Username, "conn-s").DenyControl(viewer.Id);
         Assert.True(Sent($"user:{viewer.Id}", "ControlDeclined"));
     }
+
+    [Fact]
+    public async Task StopStream_EndsAnyActiveControlSession()
+    {
+        var (_, streamer, viewer) = await SeedStreamAsync("ss-end");
+        await Hub(streamer.Id, streamer.Username, "conn-s").GrantControl(viewer.Id);
+        _sent.Clear();
+        await Hub(streamer.Id, streamer.Username, "conn-s").StopStream();
+        Assert.True(Sent($"user:{viewer.Id}", "ControlEnded"));
+        _sent.Clear();
+        await Hub(viewer.Id, viewer.Username, "conn-v").SendRemoteInput(new RemoteInputDto(RemoteInputKind.Move));
+        Assert.False(_sent.Any(kv => kv.Value.Any(m => m.Method == "ReceiveRemoteInput")));
+    }
+
+    [Fact]
+    public async Task StreamerDisconnect_EndsControlSession()
+    {
+        var (_, streamer, viewer) = await SeedStreamAsync("disc-s");
+        await Hub(streamer.Id, streamer.Username, "conn-s").GrantControl(viewer.Id);
+        _sent.Clear();
+        await Hub(streamer.Id, streamer.Username, "conn-s").OnDisconnectedAsync(null);
+        Assert.True(Sent($"user:{viewer.Id}", "ControlEnded"));
+    }
+
+    [Fact]
+    public async Task ControllerDisconnect_EndsControlSession()
+    {
+        var (_, streamer, viewer) = await SeedStreamAsync("disc-c");
+        await Hub(streamer.Id, streamer.Username, "conn-s").GrantControl(viewer.Id);
+        _sent.Clear();
+        await Hub(viewer.Id, viewer.Username, "conn-v").OnDisconnectedAsync(null);
+        Assert.True(Sent($"user:{streamer.Id}", "ControlEnded"));
+    }
 }
