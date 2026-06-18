@@ -598,6 +598,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private async Task SyncClientToServerAsync()
     {
+        if (VersionSyncInProgress) return;   // a sync is already underway; don't re-enter
+
         var serverVersion = await api.GetServerVersionAsync();
         if (string.IsNullOrEmpty(serverVersion)) return;          // can't evaluate -> connect as-is
 
