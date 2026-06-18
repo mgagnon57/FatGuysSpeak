@@ -858,6 +858,13 @@ app.MapGet("/api/version", () =>
         .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
     return Results.Ok(FatGuysSpeak.Shared.VersionInfo.Parse(info));
 });
+app.MapGet("/api/update-status", (FatGuysSpeak.Server.Services.UpdateStatus s) =>
+{
+    var current = FatGuysSpeak.Shared.VersionInfo.Parse(typeof(Program).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion).Version;
+    return Results.Ok(new FatGuysSpeak.Shared.UpdateStatusDto(
+        current, s.LatestVersion, FatGuysSpeak.Shared.SemVer.IsOutdated(current, s.LatestVersion), s.ReleaseUrl));
+});
 app.MapHub<ChatHub>("/hubs/chat");
 
 #if WINDOWS
