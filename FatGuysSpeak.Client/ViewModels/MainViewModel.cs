@@ -13,6 +13,7 @@ namespace FatGuysSpeak.Client.ViewModels;
 public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService) : ObservableObject
 {
     private bool _initialized;
+    private bool _versionSyncAttempted;
     private static readonly ConcurrentDictionary<string, LinkPreviewDto?> PreviewCache = new();
     private static readonly Regex UrlRegex = new(@"https?://\S+", RegexOptions.Compiled);
 
@@ -593,17 +594,20 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         _ = SyncClientToServerAsync();
     }
 
-    public async Task SyncClientToServerAsync()
+    private async Task SyncClientToServerAsync()
     {
+        if (_versionSyncAttempted) return;
+        _versionSyncAttempted = true;
+
         var serverVersion = await api.GetServerVersionAsync();
         if (string.IsNullOrEmpty(serverVersion)) return;
 
         var mine = updateService.InstalledVersion;
         if (mine is null) return;  // dev / not Velopack-installed -> can't self-update
 
-        if (FatGuysSpeak.Shared.SemVer.Compare(mine, serverVersion) == 0) return;  // already matched
-
-        var downgrade = FatGuysSpeak.Shared.SemVer.Compare(mine, serverVersion) > 0;
+        var cmp = FatGuysSpeak.Shared.SemVer.Compare(mine, serverVersion);
+        if (cmp == 0) return;            // already matched
+        var downgrade = cmp > 0;
         MainThread.BeginInvokeOnMainThread(() =>
         {
             VersionSyncText = downgrade ? $"Downgrading to v{serverVersion}…" : $"Updating to v{serverVersion}…";
