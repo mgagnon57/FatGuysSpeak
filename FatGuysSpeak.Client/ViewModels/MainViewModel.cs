@@ -65,21 +65,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     // Remote control state — sharer side
     [ObservableProperty] private bool _isBeingControlled;
-    private string? _controllerName;
-    public string? ControllerName
-    {
-        get => _controllerName;
-        set { if (_controllerName == value) return; _controllerName = value; OnPropertyChanged(); }
-    }
+    [ObservableProperty] private string? _controllerName;
 
     // Remote control state — controller side
     [ObservableProperty] private bool _isControlling;
-    private string? _controlledName;
-    public string? ControlledName
-    {
-        get => _controlledName;
-        set { if (_controlledName == value) return; _controlledName = value; OnPropertyChanged(); }
-    }
+    [ObservableProperty] private string? _controlledName;
 
     public bool CanOfferControl => IsStreaming && DeviceInfo.Platform == DevicePlatform.WinUI;
     public bool CanRequestControl => ActiveStreamerId > 0 && !IsStreaming && DeviceInfo.Platform == DevicePlatform.WinUI;
