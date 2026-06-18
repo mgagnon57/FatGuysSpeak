@@ -5,7 +5,8 @@
              BackgroundColor="Black"
              Title="Screen Share">
     <Grid>
-        <Image Source="{Binding StreamFrame}"
+        <Image x:Name="StreamImage"
+               Source="{Binding StreamFrame}"
                Aspect="AspectFit"
                IsVisible="{Binding HasStreamFrame}" />
 
@@ -39,5 +40,55 @@
                 HorizontalOptions="End" VerticalOptions="Start"
                 Margin="0,6,8,0"
                 HeightRequest="30" CornerRadius="4" Padding="10,0" />
+
+        <!-- Request control button (viewer): shown when CanRequestControl -->
+        <Button Text="🖱 Request Control"
+                Command="{Binding RequestControlCommand}"
+                BackgroundColor="#CC2d5f9e"
+                TextColor="White" FontSize="11"
+                HorizontalOptions="End" VerticalOptions="End"
+                Margin="0,0,8,8"
+                HeightRequest="30" CornerRadius="4" Padding="10,0"
+                IsVisible="{Binding CanRequestControl}" />
+
+        <!-- Banner: I am being controlled (red, sharer side) -->
+        <Grid VerticalOptions="End" HorizontalOptions="Fill"
+              BackgroundColor="#CC8B0000"
+              IsVisible="{Binding IsBeingControlled}"
+              Padding="12,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0"
+                   Text="{Binding ControllerName, StringFormat='🖱 {0} is controlling your screen'}"
+                   TextColor="White" FontSize="12" FontAttributes="Bold"
+                   VerticalOptions="Center" />
+            <Button Grid.Column="1"
+                    Text="Stop control"
+                    Command="{Binding StopControlCommand}"
+                    BackgroundColor="#ed4245" TextColor="White" FontSize="11"
+                    HeightRequest="30" CornerRadius="4" Padding="10,0" />
+        </Grid>
+
+        <!-- Banner: I am controlling (blue, controller side) -->
+        <Grid VerticalOptions="End" HorizontalOptions="Fill"
+              BackgroundColor="#CC143060"
+              IsVisible="{Binding IsControlling}"
+              Padding="12,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0"
+                   Text="{Binding ControlledName, StringFormat='🖱 You are controlling {0}\'s screen'}"
+                   TextColor="White" FontSize="12" FontAttributes="Bold"
+                   VerticalOptions="Center" />
+            <Button Grid.Column="1"
+                    Text="Release"
+                    Command="{Binding ReleaseControlCommand}"
+                    BackgroundColor="#2d5f9e" TextColor="White" FontSize="11"
+                    HeightRequest="30" CornerRadius="4" Padding="10,0" />
+        </Grid>
     </Grid>
 </ContentPage>

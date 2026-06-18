@@ -10,7 +10,7 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, CameraService camera, SettingsViewModel settings, ToastNotificationService toast) : ObservableObject
+public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast) : ObservableObject
 {
     private bool _initialized;
     private static readonly ConcurrentDictionary<string, LinkPreviewDto?> PreviewCache = new();
@@ -62,6 +62,31 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public string UnreadPillText => _unreadBelowCount == 1 ? "↓  1 new message" : $"↓  {_unreadBelowCount} new messages";
     public event Action? ScrollToLatestRequested;
     [ObservableProperty] private bool _isFullScreen;
+
+    // Remote control state — sharer side
+    [ObservableProperty] private bool _isBeingControlled;
+    private string? _controllerName;
+    public string? ControllerName
+    {
+        get => _controllerName;
+        set { if (_controllerName == value) return; _controllerName = value; OnPropertyChanged(); }
+    }
+
+    // Remote control state — controller side
+    [ObservableProperty] private bool _isControlling;
+    private string? _controlledName;
+    public string? ControlledName
+    {
+        get => _controlledName;
+        set { if (_controlledName == value) return; _controlledName = value; OnPropertyChanged(); }
+    }
+
+    public bool CanOfferControl => IsStreaming && DeviceInfo.Platform == DevicePlatform.WinUI;
+    public bool CanRequestControl => ActiveStreamerId > 0 && !IsStreaming && DeviceInfo.Platform == DevicePlatform.WinUI;
+
+    /// <summary>Exposes hub for page code-behind to call SendRemoteInput.</summary>
+    public void SendRemoteInput(RemoteInputDto dto) => _ = hub.SendRemoteInput(dto);
+
     [ObservableProperty] private string? _activeStreamerName;
     [ObservableProperty] private int _activeStreamerId;
     [ObservableProperty] private ImageSource? _streamFrame;
@@ -385,7 +410,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         OnPropertyChanged(nameof(IsWaitingForStream));
         OnPropertyChanged(nameof(StreamHeaderText));
         OnPropertyChanged(nameof(StreamTabOpacity));
+        OnPropertyChanged(nameof(CanOfferControl));
+        OnPropertyChanged(nameof(CanRequestControl));
     }
+    partial void OnActiveStreamerIdChanged(int value) => OnPropertyChanged(nameof(CanRequestControl));
     partial void OnIsFullScreenChanged(bool value) => OnPropertyChanged(nameof(StreamViewerVisible));
     partial void OnActiveStreamerNameChanged(string? value)
     {
@@ -513,6 +541,14 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.ThreadReplyReceived += OnThreadReplyReceived;
         hub.UserMuted += OnUserMuted;
         hub.UserTempBanned += OnUserTempBanned;
+        hub.ControlRequested    += OnControlRequested;
+        hub.ControlOffered      += OnControlOffered;
+        hub.ControlActive       += OnControlActive;
+        hub.ControlGranted      += OnControlGranted;
+        hub.ControlDeclined     += OnControlDeclined;
+        hub.ControlBusy         += OnControlBusy;
+        hub.ControlEnded        += OnControlEnded;
+        hub.RemoteInputReceived += OnRemoteInputReceived;
         _hubReconnectingHandler = _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Reconnecting");
         hub.Reconnecting += _hubReconnectingHandler;
         _hubReconnectedHandler = _ => MainThread.BeginInvokeOnMainThread(async () =>
@@ -1689,6 +1725,14 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.ThreadReplyReceived    -= OnThreadReplyReceived;
         hub.UserMuted              -= OnUserMuted;
         hub.UserTempBanned         -= OnUserTempBanned;
+        hub.ControlRequested       -= OnControlRequested;
+        hub.ControlOffered         -= OnControlOffered;
+        hub.ControlActive          -= OnControlActive;
+        hub.ControlGranted         -= OnControlGranted;
+        hub.ControlDeclined        -= OnControlDeclined;
+        hub.ControlBusy            -= OnControlBusy;
+        hub.ControlEnded           -= OnControlEnded;
+        hub.RemoteInputReceived    -= OnRemoteInputReceived;
         if (_hubReconnectingHandler is not null)  hub.Reconnecting -= _hubReconnectingHandler;
         if (_hubReconnectedHandler is not null)   hub.Reconnected  -= _hubReconnectedHandler;
         if (_hubDisconnectedHandler is not null)  hub.Disconnected -= _hubDisconnectedHandler;
@@ -2799,4 +2843,99 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                 AddToStore(MessageViewItem.CreateSystem($"← {user.Username} left the channel", channelId, MessageSource.Text));
         });
     }
+
+    // ── Remote Control ────────────────────────────────────────────────────────
+
+    private void OnControlRequested(int controllerId, string controllerName)
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            bool allow = await Shell.Current.DisplayAlert(
+                "Remote control request",
+                $"{controllerName} wants to control your screen.\n\nThey will be able to control your WHOLE PC — not just the shared window — until you stop it.",
+                "Allow", "Deny");
+            if (allow)
+                await hub.GrantControl(controllerId);
+            else
+                await hub.DenyControl(controllerId);
+        });
+    }
+
+    private void OnControlOffered(int streamerId, string streamerName)
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            bool accept = await Shell.Current.DisplayAlert(
+                "Remote control offered",
+                $"{streamerName} is giving you control of their screen. Accept?",
+                "Accept", "Decline");
+            if (accept)
+                await hub.AcceptControl(streamerId);
+            else
+                await hub.DenyControl(streamerId);
+        });
+    }
+
+    private void OnControlActive(int controllerId, string controllerName)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            IsBeingControlled = true;
+            ControllerName = controllerName;
+        });
+    }
+
+    private void OnControlGranted(int streamerId, string streamerName)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            IsControlling = true;
+            ControlledName = streamerName;
+        });
+    }
+
+    private void OnControlDeclined(int _)
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+            await Shell.Current.DisplayAlert("Remote control", "Request was declined.", "OK"));
+    }
+
+    private void OnControlBusy()
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+            await Shell.Current.DisplayAlert("Remote control", "Someone already has control of that screen.", "OK"));
+    }
+
+    private void OnControlEnded(int _)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            IsBeingControlled = false;
+            ControllerName = null;
+            IsControlling = false;
+            ControlledName = null;
+        });
+    }
+
+    private void OnRemoteInputReceived(RemoteInputDto dto)
+    {
+        if (IsBeingControlled)
+            remoteInput.Inject(dto);
+    }
+
+    [RelayCommand]
+    public void RequestControl()
+    {
+        if (ActiveStreamerId <= 0) return;
+        _ = hub.RequestControl(ActiveStreamerId);
+    }
+
+    [RelayCommand]
+    public void StopControl() => _ = hub.StopControl();
+
+    [RelayCommand]
+    public void ReleaseControl() => _ = hub.ReleaseControl();
+
+    [RelayCommand]
+    public void OfferControl(int viewerId) => _ = hub.OfferControl(viewerId);
 }

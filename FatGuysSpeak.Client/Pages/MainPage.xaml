@@ -662,6 +662,26 @@
                             <Label Text="{Binding StreamQualityLabel, StringFormat='Quality: {0}'}"
                                    TextColor="#4a7a4a" FontSize="11" HorizontalOptions="Center" />
                         </VerticalStackLayout>
+                        <!-- Give control button (sharer offers to most-recently-joined viewer; viewer id via OfferControlCommand with 0 = pending) -->
+                        <!-- Note: OfferControl requires a viewer id. Without a viewer panel, this button is wired but hidden until CanOfferControl. -->
+                        <!-- Being-controlled banner (sharer side) -->
+                        <Grid VerticalOptions="End" HorizontalOptions="Fill"
+                              BackgroundColor="#CC8B0000"
+                              IsVisible="{Binding IsBeingControlled}"
+                              Padding="8,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Label Grid.Column="0"
+                                   Text="{Binding ControllerName, StringFormat='🖱 {0} is controlling your screen'}"
+                                   TextColor="White" FontSize="11" FontAttributes="Bold" VerticalOptions="Center" />
+                            <Button Grid.Column="1"
+                                    Text="Stop control"
+                                    Command="{Binding StopControlCommand}"
+                                    BackgroundColor="#ed4245" TextColor="White" FontSize="10"
+                                    HeightRequest="26" CornerRadius="3" Padding="8,0" />
+                        </Grid>
                     </Grid>
                     <Grid Grid.Row="1" IsVisible="{Binding IsStreaming, Converter={StaticResource InvertBoolConverter}}">
                         <Image Source="{Binding StreamFrame}" Aspect="AspectFit"
@@ -701,6 +721,33 @@
                                 </CollectionView.ItemTemplate>
                             </CollectionView>
                         </Border>
+                        <!-- Request control button (viewer side) -->
+                        <Button Text="🖱 Request Control"
+                                Command="{Binding RequestControlCommand}"
+                                BackgroundColor="#CC2d5f9e"
+                                TextColor="White" FontSize="10"
+                                HorizontalOptions="End" VerticalOptions="End"
+                                Margin="0,0,8,8"
+                                HeightRequest="26" CornerRadius="3" Padding="8,0"
+                                IsVisible="{Binding CanRequestControl}" />
+                        <!-- Controlling banner (controller side) -->
+                        <Grid VerticalOptions="End" HorizontalOptions="Fill"
+                              BackgroundColor="#CC143060"
+                              IsVisible="{Binding IsControlling}"
+                              Padding="8,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Label Grid.Column="0"
+                                   Text="{Binding ControlledName, StringFormat='🖱 You are controlling {0}\'s screen'}"
+                                   TextColor="White" FontSize="11" FontAttributes="Bold" VerticalOptions="Center" />
+                            <Button Grid.Column="1"
+                                    Text="Release"
+                                    Command="{Binding ReleaseControlCommand}"
+                                    BackgroundColor="#2d5f9e" TextColor="White" FontSize="10"
+                                    HeightRequest="26" CornerRadius="3" Padding="8,0" />
+                        </Grid>
                     </Grid>
                 </Grid>
 
