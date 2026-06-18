@@ -47,7 +47,7 @@
                         FontSize="16" WidthRequest="32" HeightRequest="30" Padding="0"
                         ToolTipProperties.Text="Toggle sidebar" />
                 <Label Text="🖥" FontSize="14" TextColor="{DynamicResource ThemeAccentLight}" VerticalOptions="Center" />
-                <Label Text="FatGuysSpeak" TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="13" VerticalOptions="Center" />
+                <Label Text="FatGuysSpeak" FontFamily="Bebas" CharacterSpacing="1" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="17" VerticalOptions="Center" />
                 <BoxView WidthRequest="1" HeightRequest="14" BackgroundColor="{DynamicResource ThemeBgElevated}" VerticalOptions="Center" Margin="4,0" />
                 <Ellipse WidthRequest="8" HeightRequest="8"
                          Fill="{Binding ConnectionDotColor}"
@@ -131,7 +131,7 @@
                            IsVisible="{Binding IsNotDmMode}" />
                     <Label Grid.Column="0" Text="💬" TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0"
                            IsVisible="{Binding IsDmMode}" />
-                    <Label Grid.Column="1" Text="{Binding SelectedServer.Name, FallbackValue='FatGuysSpeak'}" TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="12" VerticalOptions="Center"
+                    <Label Grid.Column="1" Text="{Binding SelectedServer.Name, FallbackValue='FatGuysSpeak'}" FontFamily="Bebas" CharacterSpacing="1" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="16" VerticalOptions="Center"
                            IsVisible="{Binding IsNotDmMode}" />
                     <Label Grid.Column="1" Text="Direct Messages" TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="12" VerticalOptions="Center"
                            IsVisible="{Binding IsDmMode}" />
@@ -881,7 +881,7 @@
                                         </Label>
                                         <Label Text="{Binding AuthorRoleIcon}" FontSize="11" VerticalOptions="Center"
                                                IsVisible="{Binding HasAuthorRoleIcon}" />
-                                        <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
+                                        <Label FontFamily="DMMono" Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
                                                TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="End" Margin="0,0,0,1" />
                                         <Label Text="(edited)" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10"
                                                VerticalOptions="End" Margin="0,0,0,1"
@@ -1082,7 +1082,7 @@
                                            VerticalOptions="Center" />
                                     <Label Text="{Binding AuthorRoleIcon}" FontSize="10" VerticalOptions="Center"
                                            IsVisible="{Binding HasAuthorRoleIcon}" />
-                                    <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
+                                    <Label FontFamily="DMMono" Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
                                            TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center" />
                                 </HorizontalStackLayout>
                                 <Label Text="{Binding Message.Content}" TextColor="{DynamicResource ThemeTextPrimary}"
@@ -1129,7 +1129,7 @@
                                                TextColor="{DynamicResource ThemeAccentLight}" FontAttributes="Bold" FontSize="12" />
                                         <Label Text="{Binding AuthorRoleIcon}" FontSize="10" VerticalOptions="Center"
                                                IsVisible="{Binding HasAuthorRoleIcon}" />
-                                        <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
+                                        <Label FontFamily="DMMono" Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
                                                TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="End" />
                                     </HorizontalStackLayout>
                                     <Label Grid.Row="1" Grid.Column="1"
@@ -1377,7 +1377,7 @@
                                                TextColor="{DynamicResource ThemeAccentLight}" FontAttributes="Bold" FontSize="12" />
                                         <Label Text="{Binding AuthorRoleIcon}" FontSize="10" VerticalOptions="Center"
                                                IsVisible="{Binding HasAuthorRoleIcon}" />
-                                        <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
+                                        <Label FontFamily="DMMono" Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
                                                TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="End" Margin="0,0,0,1" />
                                     </HorizontalStackLayout>
                                     <Label Text="{Binding Message.Content}" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"

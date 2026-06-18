@@ -9,7 +9,7 @@
     <ScrollView>
         <VerticalStackLayout Padding="40" Spacing="16" VerticalOptions="Center">
 
-            <Label Text="FatGuysSpeak" FontSize="32" FontAttributes="Bold"
+            <Label Text="FatGuysSpeak" FontFamily="Bebas" FontSize="44" CharacterSpacing="2"
                    TextColor="{DynamicResource ThemeAccentLight}" HorizontalOptions="Center" />
             <Label Text="Welcome back!" FontSize="18" TextColor="{DynamicResource ThemeTextPrimary}"
                    HorizontalOptions="Center" />
