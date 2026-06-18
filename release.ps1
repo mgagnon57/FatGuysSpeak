@@ -20,7 +20,9 @@ if ($null -eq $new) { throw "Version '$Version' is not SemVer (MAJOR.MINOR.PATCH
 $propsXml = Get-Content $propsPath -Raw
 if ($propsXml -notmatch '<Version>(\d+\.\d+\.\d+)</Version>') { throw 'Could not find <Version> in Directory.Build.props.' }
 $current = Parse-SemVer $Matches[1]
-if ($new -le $current) { throw "Version $Version must be greater than current $($Matches[1])." }
+# Allow >= so you can publish the current in-development source version (the version is
+# pre-set in Directory.Build.props between releases); only a downgrade is rejected.
+if ($new -lt $current) { throw "Version $Version must be >= current $($Matches[1]) (no downgrades)." }
 
 # 2. Require a clean working tree
 $dirty = (git -C $root status --porcelain)
