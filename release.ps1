@@ -67,6 +67,32 @@ $clientDir = Join-Path $root 'FatGuysSpeak.Client\bin\Release\net9.0-windows10.0
 if (-not (Test-Path $clientDir)) { throw "Client build output not found at $clientDir." }
 Compress-Archive -Path (Join-Path $clientDir '*') -DestinationPath (Join-Path $out "FatGuysSpeak-Client-$Version.zip") -Force
 
+# 7b. Velopack: publish the client and upload to the GitHub release (default + per-version channel)
+$repoUrl = 'https://github.com/mgagnon57/FatGuysSpeak'
+$verChannel = 'v' + ($Version -replace '\.', '-')        # 1.2.0 -> v1-2-0 (matches UpdateChannel.ForVersion)
+$clientPub = Join-Path $root 'release-output\client-pub'
+Remove-Item -Recurse -Force $clientPub -ErrorAction SilentlyContinue
+dotnet publish (Join-Path $root 'FatGuysSpeak.Client') -c Release -f net9.0-windows10.0.19041.0 -o $clientPub
+if ($LASTEXITCODE) { throw 'client publish failed' }
+
+$vpkOut = Join-Path $root 'release-output\vpk'
+foreach ($ch in @('win', $verChannel)) {
+    vpk pack --packId FatGuysSpeak.Client --packVersion $Version --packDir $clientPub `
+        --mainExe FatGuysSpeak.Client.exe --channel $ch -o (Join-Path $vpkOut $ch)
+    if ($LASTEXITCODE) { throw "vpk pack ($ch) failed" }
+}
+
+if ($env:GITHUB_TOKEN) {
+    foreach ($ch in @('win', $verChannel)) {
+        vpk upload github --repoUrl $repoUrl --token $env:GITHUB_TOKEN --channel $ch `
+            --tag "v$Version" --releaseName "FatGuysSpeak $Version" --publish -o (Join-Path $vpkOut $ch)
+        if ($LASTEXITCODE) { throw "vpk upload github ($ch) failed" }
+    }
+    Write-Host "Velopack assets uploaded to release v$Version (channels: win, $verChannel)." -ForegroundColor Green
+} else {
+    Write-Host "GITHUB_TOKEN not set - skipped vpk upload. Packages in $vpkOut." -ForegroundColor Yellow
+}
+
 # 8. Commit + tag (NO push)
 git -C $root add Directory.Build.props CHANGELOG.md website/index.html docs/index.html
 git -C $root commit -m "Release $Version"; if ($LASTEXITCODE) { throw 'git commit failed' }
