@@ -14,12 +14,21 @@ public sealed class UpdateService
     private const string RepoUrl = "https://github.com/mgagnon57/FatGuysSpeak";
 
     /// <summary>The version Velopack reports as installed, or null in dev/unpackaged debug.</summary>
+    private string? _installedVersion;
+    private bool _installedVersionChecked;
     public string? InstalledVersion
     {
         get
         {
-            try { var m = new UpdateManager(new GithubSource(RepoUrl, null, false)); return m.IsInstalled ? m.CurrentVersion?.ToString() : null; }
-            catch { return null; }
+            if (_installedVersionChecked) return _installedVersion;
+            _installedVersionChecked = true;
+            try
+            {
+                var m = new UpdateManager(new GithubSource(RepoUrl, null, false));
+                _installedVersion = m.IsInstalled ? m.CurrentVersion?.ToString() : null;
+            }
+            catch { _installedVersion = null; }
+            return _installedVersion;
         }
     }
 
