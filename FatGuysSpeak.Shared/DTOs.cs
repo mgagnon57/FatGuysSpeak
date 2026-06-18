@@ -67,6 +67,8 @@ public record EditMessageRequest(string Content);
 public record AttachmentDto(string Url, string? OriginalFileName = null, string? ContentType = null);
 
 public enum MessageSource { Text, Voice, Stream, AI }
+
+public record UpdateStatusDto(string Current, string? Latest, bool UpdateAvailable, string? ReleaseUrl);
 public enum ServerRole { Member, Moderator, Admin }
 
 public record UserProfileDto(
