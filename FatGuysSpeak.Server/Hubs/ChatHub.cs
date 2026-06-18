@@ -409,13 +409,16 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
 
     // ─── Remote Control ─────────────────────────────────────────────────────────
 
-    private async Task OpenControlSessionAsync(int streamerId, int controllerId, int channelId)
+    // Returns false if a session already exists for this streamer (atomic via TryAdd).
+    private async Task<bool> TryOpenControlSessionAsync(int streamerId, int controllerId, int channelId)
     {
-        RemoteControlSessions[streamerId] = (controllerId, channelId);
+        if (!RemoteControlSessions.TryAdd(streamerId, (controllerId, channelId)))
+            return false;
         var controllerName = OnlineUsers.TryGetValue(controllerId, out var cn) ? cn : "";
         var streamerName   = OnlineUsers.TryGetValue(streamerId,   out var sn) ? sn : "";
         await Clients.User(streamerId.ToString()).SendAsync("ControlActive", controllerId, controllerName);
         await Clients.User(controllerId.ToString()).SendAsync("ControlGranted", streamerId, streamerName);
+        return true;
     }
 
     private async Task CloseControlSessionAsync(int streamerId)
@@ -440,23 +443,15 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
     public async Task GrantControl(int controllerId)
     {
         if (!ActiveStreamers.TryGetValue(UserId, out var info)) return;
-        if (RemoteControlSessions.ContainsKey(UserId))
-        {
+        if (!await TryOpenControlSessionAsync(UserId, controllerId, info.ChannelId))
             await Clients.Caller.SendAsync("ControlBusy");
-            return;
-        }
-        await OpenControlSessionAsync(UserId, controllerId, info.ChannelId);
     }
 
     public async Task AcceptControl(int streamerId)
     {
         if (!ActiveStreamers.TryGetValue(streamerId, out var info)) return;
-        if (RemoteControlSessions.ContainsKey(streamerId))
-        {
+        if (!await TryOpenControlSessionAsync(streamerId, UserId, info.ChannelId))
             await Clients.Caller.SendAsync("ControlBusy");
-            return;
-        }
-        await OpenControlSessionAsync(streamerId, UserId, info.ChannelId);
     }
 
     public Task DenyControl(int otherUserId) =>
@@ -467,8 +462,8 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
     public async Task ReleaseControl()
     {
         var entry = RemoteControlSessions.FirstOrDefault(kv => kv.Value.ControllerId == UserId);
-        if (entry.Value.ControllerId == UserId && RemoteControlSessions.ContainsKey(entry.Key))
-            await CloseControlSessionAsync(entry.Key);
+        if (entry.Value.ControllerId != UserId) return;   // not a controller → no session found
+        await CloseControlSessionAsync(entry.Key);
     }
 
     public async Task SendRemoteInput(FatGuysSpeak.Shared.RemoteInputDto dto)

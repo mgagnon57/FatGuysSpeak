@@ -160,4 +160,13 @@ public class ChatHubRemoteControlTests : IDisposable
         await Hub(viewer.Id, viewer.Username, "conn-v").ReleaseControl();
         Assert.True(Sent($"user:{streamer.Id}", "ControlEnded"));
     }
+
+    [Fact]
+    public async Task DenyControl_NotifiesTheOtherParty()
+    {
+        var (_, streamer, viewer) = await SeedStreamAsync("deny");
+        _sent.Clear();
+        await Hub(streamer.Id, streamer.Username, "conn-s").DenyControl(viewer.Id);
+        Assert.True(Sent($"user:{viewer.Id}", "ControlDeclined"));
+    }
 }
