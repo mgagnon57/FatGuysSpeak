@@ -1,3 +1,4 @@
+using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FatGuysSpeak.Client.Services;
@@ -22,6 +23,16 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
     [ObservableProperty] private string _selectedTheme = ThemeService.Dark;
 
     public string Username => api.CurrentUsername;
+    public string AppVersion
+    {
+        get
+        {
+            var info = Assembly.GetExecutingAssembly()
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            var v = FatGuysSpeak.Shared.VersionInfo.Parse(info);
+            return v.Commit.Length > 0 ? $"{v.Version} ({v.Commit})" : v.Version;
+        }
+    }
     public string InputGainPercent => $"{(int)(InputGain * 100)}%";
     public string OutputVolumePercent => $"{(int)(OutputVolume * 100)}%";
     public string NoiseGateThresholdPercent => $"{(int)(NoiseGateThreshold * 100)}%";
