@@ -13,7 +13,7 @@ namespace FatGuysSpeak.Client.ViewModels;
 public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService) : ObservableObject
 {
     private bool _initialized;
-    private bool _versionSyncAttempted;
+    private string? _versionSyncCheckedFor;   // server version last handled this session
     private static readonly ConcurrentDictionary<string, LinkPreviewDto?> PreviewCache = new();
     private static readonly Regex UrlRegex = new(@"https?://\S+", RegexOptions.Compiled);
 
@@ -73,8 +73,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private string? _controlledName;
 
     // Version sync state
-    [ObservableProperty] private bool _versionSyncing;
-    [ObservableProperty] private string? _versionSyncText;
+    [ObservableProperty] private bool _versionSyncInProgress;   // blocking overlay visible
+    [ObservableProperty] private string? _versionSyncTitle;     // "Updating to v3.0.0…"
+    [ObservableProperty] private string? _versionSyncStage;     // "Downloading…" / "Installing…" / countdown
+    [ObservableProperty] private double _versionSyncProgress;   // 0.0–1.0 for ProgressBar
     [ObservableProperty] private bool _versionMismatch;
     [ObservableProperty] private string? _versionMismatchText;
 
@@ -596,32 +598,57 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private async Task SyncClientToServerAsync()
     {
-        if (_versionSyncAttempted) return;
-        _versionSyncAttempted = true;
-
         var serverVersion = await api.GetServerVersionAsync();
-        if (string.IsNullOrEmpty(serverVersion)) return;
+        if (string.IsNullOrEmpty(serverVersion)) return;          // can't evaluate -> connect as-is
 
         var mine = updateService.InstalledVersion;
-        if (mine is null) return;  // dev / not Velopack-installed -> can't self-update
+        if (mine is null) return;                                 // dev / not Velopack-installed
 
-        var cmp = FatGuysSpeak.Shared.SemVer.Compare(mine, serverVersion);
-        if (cmp == 0) return;            // already matched
-        var downgrade = cmp > 0;
+        if (FatGuysSpeak.Shared.VersionCompat.SameMajor(mine, serverVersion))
+            return;                                               // compatible -> connect, no UI
+
+        if (_versionSyncCheckedFor == serverVersion) return;      // already handled this server this session
+        _versionSyncCheckedFor = serverVersion;
+
+        var downgrade = FatGuysSpeak.Shared.SemVer.Compare(mine, serverVersion) > 0;
+        var verb = downgrade ? "Downgrading" : "Updating";
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            VersionSyncText = downgrade ? $"Downgrading to v{serverVersion}…" : $"Updating to v{serverVersion}…";
-            VersionSyncing = true;
+            VersionMismatch = false;
+            VersionSyncTitle = $"{verb} to v{serverVersion}…";
+            VersionSyncStage = "Downloading…";
+            VersionSyncProgress = 0;
+            VersionSyncInProgress = true;
         });
 
-        var result = await updateService.SyncToServerVersionAsync(serverVersion);
+        var progress = new Progress<int>(p =>
+            MainThread.BeginInvokeOnMainThread(() => VersionSyncProgress = p / 100.0));
+
+        var outcome = await updateService.PrepareAsync(serverVersion, progress);
+
+        if (outcome == Services.UpdateSyncOutcome.Prepared)
+        {
+            MainThread.BeginInvokeOnMainThread(() => VersionSyncStage = "Installing…");
+            await Task.Delay(600);
+            for (var n = 3; n >= 1; n--)
+            {
+                var sec = n;
+                MainThread.BeginInvokeOnMainThread(() =>
+                    VersionSyncStage = $"Restarting to apply v{serverVersion} in {sec}…");
+                await Task.Delay(1000);
+            }
+            updateService.ApplyAndRestart();                      // swaps files + relaunches; process exits
+            return;
+        }
+
+        // Compatible (defensive) or Unavailable -> tear down the overlay
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            VersionSyncing = false;
-            if (result == Services.UpdateSyncResult.Unavailable)
+            VersionSyncInProgress = false;
+            if (outcome == Services.UpdateSyncOutcome.Unavailable)
             {
-                VersionMismatchText = $"Your client (v{mine}) doesn't match the server (v{serverVersion}) "
-                    + "and auto-update isn't available — continue, or update manually.";
+                VersionMismatchText = $"This server needs client v{serverVersion}, but auto-update isn't "
+                    + $"available right now (you're on v{mine}). It'll retry next time you connect.";
                 VersionMismatch = true;
             }
         });
