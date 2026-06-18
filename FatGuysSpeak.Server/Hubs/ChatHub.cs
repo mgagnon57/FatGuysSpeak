@@ -23,6 +23,8 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
     private static readonly ConcurrentDictionary<int, (int ChannelId, int ServerId, string Username)> ActiveStreamers = new();
     // userId -> (channelId, username) for active webcam feeds
     private static readonly ConcurrentDictionary<int, (int ChannelId, string Username)> ActiveCameras = new();
+    // streamerUserId → (controllerUserId, channelId). At most one controller per stream.
+    private static readonly ConcurrentDictionary<int, (int ControllerId, int ChannelId)> RemoteControlSessions = new();
 
     // Exposed for the metrics dashboard — read-only snapshots of live state
     internal static int OnlineUserCount       => OnlineUsers.Count;
@@ -404,6 +406,77 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
 
     public Task StopWatching(int channelId) =>
         Groups.RemoveFromGroupAsync(Context.ConnectionId, $"stream-{channelId}");
+
+    // ─── Remote Control ─────────────────────────────────────────────────────────
+
+    private async Task OpenControlSessionAsync(int streamerId, int controllerId, int channelId)
+    {
+        RemoteControlSessions[streamerId] = (controllerId, channelId);
+        var controllerName = OnlineUsers.TryGetValue(controllerId, out var cn) ? cn : "";
+        var streamerName   = OnlineUsers.TryGetValue(streamerId,   out var sn) ? sn : "";
+        await Clients.User(streamerId.ToString()).SendAsync("ControlActive", controllerId, controllerName);
+        await Clients.User(controllerId.ToString()).SendAsync("ControlGranted", streamerId, streamerName);
+    }
+
+    private async Task CloseControlSessionAsync(int streamerId)
+    {
+        if (!RemoteControlSessions.TryRemove(streamerId, out var s)) return;
+        await Clients.User(streamerId.ToString()).SendAsync("ControlEnded", s.ControllerId);
+        await Clients.User(s.ControllerId.ToString()).SendAsync("ControlEnded", streamerId);
+    }
+
+    public async Task RequestControl(int streamerId)
+    {
+        if (!ActiveStreamers.ContainsKey(streamerId)) return;
+        await Clients.User(streamerId.ToString()).SendAsync("ControlRequested", UserId, Username);
+    }
+
+    public async Task OfferControl(int viewerId)
+    {
+        if (!ActiveStreamers.ContainsKey(UserId)) return;
+        await Clients.User(viewerId.ToString()).SendAsync("ControlOffered", UserId, Username);
+    }
+
+    public async Task GrantControl(int controllerId)
+    {
+        if (!ActiveStreamers.TryGetValue(UserId, out var info)) return;
+        if (RemoteControlSessions.ContainsKey(UserId))
+        {
+            await Clients.Caller.SendAsync("ControlBusy");
+            return;
+        }
+        await OpenControlSessionAsync(UserId, controllerId, info.ChannelId);
+    }
+
+    public async Task AcceptControl(int streamerId)
+    {
+        if (!ActiveStreamers.TryGetValue(streamerId, out var info)) return;
+        if (RemoteControlSessions.ContainsKey(streamerId))
+        {
+            await Clients.Caller.SendAsync("ControlBusy");
+            return;
+        }
+        await OpenControlSessionAsync(streamerId, UserId, info.ChannelId);
+    }
+
+    public Task DenyControl(int otherUserId) =>
+        Clients.User(otherUserId.ToString()).SendAsync("ControlDeclined", UserId);
+
+    public Task StopControl() => CloseControlSessionAsync(UserId);
+
+    public async Task ReleaseControl()
+    {
+        var entry = RemoteControlSessions.FirstOrDefault(kv => kv.Value.ControllerId == UserId);
+        if (entry.Value.ControllerId == UserId && RemoteControlSessions.ContainsKey(entry.Key))
+            await CloseControlSessionAsync(entry.Key);
+    }
+
+    public async Task SendRemoteInput(FatGuysSpeak.Shared.RemoteInputDto dto)
+    {
+        var entry = RemoteControlSessions.FirstOrDefault(kv => kv.Value.ControllerId == UserId);
+        if (entry.Value.ControllerId != UserId) return;   // not a controller → drop
+        await Clients.User(entry.Key.ToString()).SendAsync("ReceiveRemoteInput", dto);
+    }
 
     // ─── Typing Indicators ────────────────────────────────────────────────────
 
