@@ -22,11 +22,19 @@ public partial class MainPage : ContentPage
         // ViewModel fires this when a new message arrives and user is already at the bottom
         _vm.ScrollToLatestRequested += ScrollToBottom;
 
-        // When the Messages collection is replaced (tab switch / channel change), re-scroll to bottom
+        // When the Messages collection is replaced (tab switch / channel change), fade the list
+        // in and re-scroll to bottom — a soft cross-fade so switching channels "flows".
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(_vm.Messages))
-                Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(80), ScrollToBottom);
+            {
+                MessagesView.Opacity = 0;
+                Dispatcher.DispatchDelayed(TimeSpan.FromMilliseconds(80), () =>
+                {
+                    ScrollToBottom();
+                    MessagesView.FadeTo(1, 220, Easing.CubicOut);
+                });
+            }
         };
 
         await _vm.LoadServersAsync();
