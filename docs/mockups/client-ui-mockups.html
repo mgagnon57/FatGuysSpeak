@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FatGuysSpeak — Client UI Mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0909; --bg2:#101010; --bg3:#191717; --bg4:#222020;
+    --red:#d42d00; --red2:#f04010; --amber:#e89000; --green:#36b864;
+    --text:#e9e4d9; --muted:#756e62; --border:#292525;
+    --active:#241310; --hover:#1b1818;
+    --hd:'Bebas Neue',sans-serif; --bd:'DM Mono',monospace;
+  }
+  body{
+    background:var(--bg); color:var(--text); font-family:var(--bd);
+    padding:48px 24px 80px; line-height:1.5;
+  }
+  body::before{
+    content:''; position:fixed; inset:0; z-index:9999; pointer-events:none; opacity:.04;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap{max-width:1180px;margin:0 auto}
+  .pagehead{text-align:center;margin-bottom:14px}
+  .pagehead h1{font-family:var(--hd);font-size:3.4rem;letter-spacing:1px;font-weight:400}
+  .pagehead h1 .r{color:var(--red2)}
+  .pagehead p{color:var(--muted);font-size:.82rem;letter-spacing:.5px}
+  .swatches{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:22px 0 46px}
+  .sw{width:64px;height:48px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:flex-end;padding:4px;font-size:.5rem;color:#fff;text-shadow:0 1px 2px #000}
+  .screencap{margin:54px 0 12px;border-left:3px solid var(--red);padding-left:12px}
+  .screencap .n{font-family:var(--hd);font-size:1.7rem;letter-spacing:1px}
+  .screencap .d{color:var(--muted);font-size:.76rem}
+  .frame{border:1px solid var(--border);border-radius:12px;overflow:hidden;
+    box-shadow:0 24px 80px rgba(0,0,0,.6),0 0 40px rgba(212,45,0,.04);background:var(--bg2)}
+
+  /* ---- shared app chrome ---- */
+  .titlebar{height:30px;background:var(--bg);display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--border)}
+  .titlebar .dot{width:11px;height:11px;border-radius:50%}
+  .tb-logo{font-family:var(--hd);font-size:.95rem;letter-spacing:1px;margin-left:4px}
+  .tb-logo .r{color:var(--red2)}
+  .tb-spacer{flex:1}
+  .tb-win{color:var(--muted);font-size:.7rem;letter-spacing:2px}
+
+  /* ===================== LOGIN ===================== */
+  .login{height:560px;display:flex;align-items:center;justify-content:center;position:relative;
+    background:radial-gradient(ellipse at 50% 35%,rgba(212,45,0,.10) 0%,transparent 60%),var(--bg2)}
+  .login-card{width:360px;padding:38px 34px;background:rgba(16,16,16,.7);border:1px solid var(--border);
+    border-radius:14px;backdrop-filter:blur(4px);box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .login-card .brand{font-family:var(--hd);font-size:1.5rem;letter-spacing:2px;text-align:center;color:var(--muted)}
+  .login-card .brand .r{color:var(--red2)}
+  .login-card h2{font-family:var(--hd);font-size:2.4rem;letter-spacing:1px;text-align:center;font-weight:400;margin-top:4px}
+  .login-card .sub{text-align:center;color:var(--muted);font-size:.74rem;margin-bottom:26px}
+  .fld{margin-bottom:16px}
+  .fld label{display:block;font-size:.6rem;letter-spacing:2px;color:var(--muted);margin-bottom:6px}
+  .fld .inp{height:42px;background:var(--bg);border:1px solid var(--border);border-radius:8px;
+    display:flex;align-items:center;padding:0 12px;color:var(--text);font-size:.84rem}
+  .fld .inp.focus{border-color:var(--red2);box-shadow:0 0 0 3px rgba(240,64,16,.15)}
+  .fld .inp .ph{color:var(--muted)}
+  .btn-red{height:44px;border-radius:8px;background:var(--red);color:#fff;display:flex;align-items:center;
+    justify-content:center;font-family:var(--hd);letter-spacing:2px;font-size:1.05rem;
+    box-shadow:0 6px 22px rgba(212,45,0,.4);margin-top:6px}
+  .btn-ghost{height:42px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);
+    display:flex;align-items:center;justify-content:center;gap:8px;font-size:.78rem;margin-top:12px}
+  .login-foot{text-align:center;color:var(--muted);font-size:.72rem;margin-top:20px}
+  .login-foot a{color:var(--red2);text-decoration:none}
+
+  /* ===================== MAIN CHAT ===================== */
+  .app{height:680px;display:grid;grid-template-columns:64px 232px 1fr 200px}
+  .rail{background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:10px 0;gap:10px}
+  .rail .app-glyph{width:42px;height:42px;border-radius:12px;background:linear-gradient(145deg,var(--red),#8c1e00);
+    display:flex;align-items:center;justify-content:center;font-size:1.1rem;box-shadow:0 4px 14px rgba(212,45,0,.4)}
+  .rail .sep{width:28px;height:1px;background:var(--border)}
+  .srv{position:relative;width:44px;height:44px;border-radius:14px;background:var(--bg4);display:flex;align-items:center;
+    justify-content:center;font-family:var(--hd);font-size:1rem;color:var(--text);cursor:pointer}
+  .srv.active{border-radius:14px;background:var(--bg4);box-shadow:0 0 0 2px var(--red)}
+  .srv.active::before{content:'';position:absolute;left:-10px;top:8px;bottom:8px;width:4px;border-radius:0 4px 4px 0;background:var(--red2)}
+  .srv.add{color:var(--green);background:transparent;border:1px dashed var(--border)}
+  .rail .gear{margin-top:auto;color:var(--muted);font-size:1.1rem}
+
+  .side{background:var(--bg3);border-right:1px solid var(--border);display:flex;flex-direction:column}
+  .side-head{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 14px}
+  .side-head .nm{font-family:var(--hd);font-size:1.15rem;letter-spacing:.5px}
+  .side-head .on{font-size:.6rem;color:var(--green)}
+  .side-search{margin:10px;height:30px;background:var(--bg);border:1px solid var(--border);border-radius:7px;
+    display:flex;align-items:center;padding:0 10px;color:var(--muted);font-size:.72rem}
+  .cat{font-size:.58rem;letter-spacing:2px;color:var(--muted);padding:8px 14px 4px}
+  .ch{display:flex;align-items:center;gap:8px;margin:1px 8px;padding:6px 8px;border-radius:7px;color:var(--muted);font-size:.82rem}
+  .ch .h{opacity:.6}
+  .ch:hover{background:var(--hover);color:var(--text)}
+  .ch.active{background:var(--active);color:var(--text);box-shadow:inset 2px 0 0 var(--red2)}
+  .ch.active .h{color:var(--red2);opacity:1}
+  .vc{display:flex;align-items:center;gap:8px;margin:1px 8px;padding:6px 8px;border-radius:7px;color:var(--muted);font-size:.82rem}
+  .vc:hover{background:var(--hover)}
+  .vc-occ{margin:0 8px 6px 30px;display:flex;flex-direction:column;gap:5px}
+  .vc-occ .u{display:flex;align-items:center;gap:7px;font-size:.72rem;color:var(--text)}
+  .vc-occ .u .av{width:18px;height:18px;border-radius:50%}
+  .side-foot{margin-top:auto;height:50px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--bg)}
+  .side-foot .av{width:30px;height:30px;border-radius:50%}
+  .side-foot .who{flex:1}
+  .side-foot .who .n{font-size:.78rem}
+  .side-foot .who .s{font-size:.58rem;color:var(--green)}
+  .side-foot .ic{color:var(--muted);font-size:.85rem}
+
+  .main{background:var(--bg2);display:flex;flex-direction:column}
+  .main-head{height:48px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 16px}
+  .main-head .hash{color:var(--muted);font-size:1.1rem}
+  .main-head .ttl{font-weight:500;font-size:.9rem}
+  .main-head .topic{color:var(--muted);font-size:.7rem;border-left:1px solid var(--border);padding-left:10px}
+  .main-head .acts{margin-left:auto;display:flex;gap:14px;color:var(--muted)}
+  .msgs{flex:1;padding:16px;display:flex;flex-direction:column;gap:18px;overflow:hidden}
+  .msg{display:flex;gap:12px}
+  .msg .av{width:38px;height:38px;border-radius:50%;flex-shrink:0}
+  .msg .body{flex:1}
+  .msg .meta{display:flex;align-items:baseline;gap:8px}
+  .msg .meta .nm{font-weight:500;font-size:.84rem}
+  .msg .meta .nm.owner{color:var(--red2)}
+  .msg .meta .nm.admin{color:var(--amber)}
+  .msg .meta .t{font-size:.6rem;color:var(--muted)}
+  .msg .txt{font-size:.82rem;color:#cfc9bd;margin-top:2px}
+  .reply-spine{display:flex;align-items:center;gap:6px;font-size:.68rem;color:var(--muted);margin-bottom:3px}
+  .reply-spine::before{content:'';width:18px;height:9px;border-left:2px solid var(--border);border-top:2px solid var(--border);border-radius:6px 0 0 0;display:inline-block}
+  .mention{background:rgba(212,45,0,.10);border-left:2px solid var(--red);padding:6px 10px;border-radius:6px}
+  .mention .tag{color:var(--red2)}
+  .att{margin-top:8px;width:220px;height:120px;border-radius:8px;border:1px solid var(--border);
+    background:linear-gradient(135deg,#2a1410,#140a08);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.7rem}
+  .reacts{display:flex;gap:6px;margin-top:8px}
+  .react{font-size:.68rem;color:var(--text);background:var(--bg4);border:1px solid var(--border);border-radius:12px;padding:2px 8px}
+  .react.mine{border-color:var(--red);background:rgba(212,45,0,.12)}
+  .msg-actions{margin-left:auto;display:flex;gap:10px;color:var(--muted);opacity:.5}
+  .composer{margin:0 16px 16px;background:var(--bg);border:1px solid var(--border);border-radius:10px;
+    display:flex;align-items:center;gap:10px;padding:0 12px;height:46px}
+  .composer.focus{border-color:var(--red2);box-shadow:0 0 0 3px rgba(240,64,16,.12)}
+  .composer .plus{color:var(--muted);font-size:1.2rem}
+  .composer .ph{flex:1;color:var(--muted);font-size:.82rem}
+  .composer .send{width:34px;height:34px;border-radius:8px;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(212,45,0,.4)}
+
+  .members{background:var(--bg3);border-left:1px solid var(--border);padding:14px 0}
+  .members .grp{font-size:.58rem;letter-spacing:2px;color:var(--muted);padding:10px 16px 6px}
+  .mem{display:flex;align-items:center;gap:9px;padding:5px 16px}
+  .mem .av{position:relative;width:30px;height:30px;border-radius:50%}
+  .mem .av .st{position:absolute;right:-1px;bottom:-1px;width:10px;height:10px;border-radius:50%;border:2px solid var(--bg3)}
+  .st.on{background:var(--green)} .st.idle{background:var(--amber)} .st.dnd{background:var(--red)}
+  .mem .n{font-size:.78rem}
+  .mem .n.owner{color:var(--red2)} .mem .n.admin{color:var(--amber)}
+  .mem.off{opacity:.4}
+
+  /* avatars */
+  .a1{background:linear-gradient(135deg,#d42d00,#7a1800)} .a2{background:linear-gradient(135deg,#e89000,#7a4a00)}
+  .a3{background:linear-gradient(135deg,#36b864,#1a5e33)} .a4{background:linear-gradient(135deg,#5a6270,#2a2f38)}
+  .a5{background:linear-gradient(135deg,#9a4de0,#4a1f70)}
+
+  /* ===================== SETTINGS ===================== */
+  .settings{min-height:560px;background:var(--bg2);display:grid;grid-template-columns:200px 1fr}
+  .set-nav{background:var(--bg3);border-right:1px solid var(--border);padding:16px 0}
+  .set-nav .ti{font-size:.58rem;letter-spacing:2px;color:var(--muted);padding:8px 18px}
+  .set-nav .it{padding:8px 18px;font-size:.82rem;color:var(--muted)}
+  .set-nav .it.active{color:var(--text);box-shadow:inset 2px 0 0 var(--red2);background:var(--active)}
+  .set-body{padding:30px 36px}
+  .set-body h2{font-family:var(--hd);font-size:1.8rem;letter-spacing:1px;font-weight:400;margin-bottom:4px}
+  .set-body .hint{color:var(--muted);font-size:.74rem;margin-bottom:24px}
+  .theme-row{display:flex;gap:14px;flex-wrap:wrap}
+  .theme{width:150px;border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer}
+  .theme.sel{border-color:var(--red2);box-shadow:0 0 0 3px rgba(240,64,16,.15)}
+  .theme .prev{height:74px;display:flex}
+  .theme .prev .c{flex:1}
+  .theme .lbl{padding:8px 10px;font-size:.74rem;display:flex;align-items:center;justify-content:space-between}
+  .theme .lbl .chk{color:var(--red2)}
+  .set-section{margin-top:30px}
+  .set-section .st-t{font-size:.6rem;letter-spacing:2px;color:var(--muted);margin-bottom:12px}
+  .row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border);font-size:.82rem}
+  .row .lab .d{color:var(--muted);font-size:.7rem}
+  .toggle{width:40px;height:22px;border-radius:11px;background:var(--bg4);position:relative}
+  .toggle.on{background:var(--red)}
+  .toggle .k{position:absolute;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+  .toggle.on .k{right:2px} .toggle .k{left:2px}
+  .ver{color:var(--muted);font-size:.72rem}
+
+  /* ===================== OVERLAYS ===================== */
+  .overlay-demo{height:420px;position:relative;overflow:hidden}
+  .overlay-demo .blurbg{position:absolute;inset:0;background:var(--bg2);filter:blur(1px);opacity:.5}
+  .dim{position:absolute;inset:0;background:rgba(8,6,6,.8);display:flex;align-items:center;justify-content:center}
+  .upd-card{width:380px;background:#0e0c0c;border:1px solid var(--border);border-radius:12px;padding:30px 28px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.7)}
+  .upd-card .ti{font-family:var(--hd);font-size:1.5rem;letter-spacing:1px;color:var(--text)}
+  .upd-card .ti .r{color:var(--red2)}
+  .pbar{height:8px;border-radius:5px;background:var(--bg4);margin:18px 0 10px;overflow:hidden}
+  .pbar .fill{height:100%;width:64%;background:linear-gradient(90deg,var(--red),var(--red2));border-radius:5px}
+  .upd-card .stage{font-size:.74rem;color:var(--muted)}
+
+  .profile-card{width:320px;background:#0e0c0c;border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.7)}
+  .profile-card .banner{height:70px;background:linear-gradient(135deg,var(--red),#5a1400)}
+  .profile-card .pbody{padding:0 22px 22px;margin-top:-32px}
+  .profile-card .pav{width:72px;height:72px;border-radius:50%;border:4px solid #0e0c0c;position:relative}
+  .profile-card .pav .st{position:absolute;right:2px;bottom:2px;width:16px;height:16px;border-radius:50%;border:3px solid #0e0c0c;background:var(--green)}
+  .profile-card .pn{font-family:var(--hd);font-size:1.6rem;letter-spacing:.5px;margin-top:10px}
+  .profile-card .pmeta{color:var(--muted);font-size:.72rem;margin-bottom:14px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+  .chip{font-size:.62rem;padding:3px 9px;border-radius:11px;border:1px solid var(--border);color:var(--muted)}
+  .chip.owner{color:var(--red2);border-color:rgba(240,64,16,.4);background:rgba(240,64,16,.06)}
+  .prow{display:flex;gap:10px}
+  .prow .b{flex:1;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.76rem}
+  .prow .b.primary{background:var(--red);color:#fff} .prow .b.ghost{border:1px solid var(--border);color:var(--text)}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+  @media(max-width:900px){.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="pagehead">
+    <h1>FATGUYS<span class="r">SPEAK</span> — CLIENT UI</h1>
+    <p>Proposed red/black redesign · matches the landing page · "flows like water"</p>
+  </div>
+  <div class="swatches">
+    <div class="sw" style="background:#0a0909">bg</div>
+    <div class="sw" style="background:#101010">bg2</div>
+    <div class="sw" style="background:#191717">bg3</div>
+    <div class="sw" style="background:#222020">bg4</div>
+    <div class="sw" style="background:#d42d00">red</div>
+    <div class="sw" style="background:#f04010">red2</div>
+    <div class="sw" style="background:#e89000">amber</div>
+    <div class="sw" style="background:#36b864">green</div>
+    <div class="sw" style="background:#e9e4d9;color:#222">text</div>
+    <div class="sw" style="background:#756e62">muted</div>
+  </div>
+
+  <!-- ============ MAIN CHAT ============ -->
+  <div class="screencap"><div class="n">1 · Main Chat</div><div class="d">The core screen — server rail, channels, messages, members, composer, voice.</div></div>
+  <div class="frame">
+    <div class="titlebar">
+      <span class="tb-logo">FATGUYS<span class="r">SPEAK</span></span>
+      <span class="dot" style="background:var(--green)"></span><span style="font-size:.62rem;color:var(--muted)">Connected</span>
+      <span class="tb-spacer"></span><span class="tb-win">—  ▢  ✕</span>
+    </div>
+    <div class="app">
+      <!-- rail -->
+      <div class="rail">
+        <div class="app-glyph">🎙</div>
+        <div class="sep"></div>
+        <div class="srv active a1">FG</div>
+        <div class="srv a4">GW</div>
+        <div class="srv add">+</div>
+        <div class="gear">⚙</div>
+      </div>
+      <!-- sidebar -->
+      <div class="side">
+        <div class="side-head"><span class="nm">FatGuysSpeak</span><span class="on">● 3</span></div>
+        <div class="side-search">🔍 &nbsp;Search</div>
+        <div class="cat">TEXT CHANNELS</div>
+        <div class="ch active"><span class="h">#</span>lobby</div>
+        <div class="ch"><span class="h">#</span>angry-fat-guys</div>
+        <div class="cat">VOICE</div>
+        <div class="vc"><span>📢</span>General</div>
+        <div class="vc-occ">
+          <div class="u"><span class="av a1"></span>BigGus</div>
+          <div class="u"><span class="av a2"></span>FatMike</div>
+        </div>
+        <div class="side-foot">
+          <span class="av a1"></span>
+          <div class="who"><div class="n">BigGus</div><div class="s">● Online</div></div>
+          <span class="ic">🎙</span><span class="ic">🎧</span><span class="ic">⚙</span>
+        </div>
+      </div>
+      <!-- main -->
+      <div class="main">
+        <div class="main-head">
+          <span class="hash">#</span><span class="ttl">lobby</span>
+          <span class="topic">where the crew gathers</span>
+          <span class="acts"><span>📌</span><span>🔍</span><span>👥</span></span>
+        </div>
+        <div class="msgs">
+          <div class="msg">
+            <span class="av a1"></span>
+            <div class="body">
+              <div class="meta"><span class="nm owner">BigGus</span><span class="t">Today 9:41 PM</span></div>
+              <div class="txt">Servers up, voice is crisp. Who's hopping on?</div>
+              <span class="msg-actions"></span>
+            </div>
+          </div>
+          <div class="msg">
+            <span class="av a2"></span>
+            <div class="body">
+              <div class="reply-spine">replying to <span style="color:var(--red2)">@BigGus</span></div>
+              <div class="meta"><span class="nm admin">FatMike</span><span class="t">9:42 PM</span></div>
+              <div class="txt">Give me 5. Grabbing wings 🍗</div>
+              <div class="reacts"><span class="react mine">🔥 3</span><span class="react">😂 2</span></div>
+            </div>
+          </div>
+          <div class="msg">
+            <span class="av a3"></span>
+            <div class="body">
+              <div class="meta"><span class="nm">SlimJim_</span><span class="t">9:44 PM</span></div>
+              <div class="mention"><span class="tag">@everyone</span> new clip dropped — watch this</div>
+              <div class="att">▶  clip_final.mp4</div>
+            </div>
+          </div>
+        </div>
+        <div class="composer focus">
+          <span class="plus">＋</span><span class="ph">Message #lobby</span><span>😊</span>
+          <span class="send">➤</span>
+        </div>
+      </div>
+      <!-- members -->
+      <div class="members">
+        <div class="grp">OWNER — 1</div>
+        <div class="mem"><span class="av a1"><span class="st on"></span></span><span class="n owner">BigGus</span></div>
+        <div class="grp">ADMIN — 1</div>
+        <div class="mem"><span class="av a2"><span class="st idle"></span></span><span class="n admin">FatMike</span></div>
+        <div class="grp">ONLINE — 1</div>
+        <div class="mem"><span class="av a3"><span class="st on"></span></span><span class="n">SlimJim_</span></div>
+        <div class="grp">OFFLINE — 1</div>
+        <div class="mem off"><span class="av a4"><span class="st" style="background:var(--muted)"></span></span><span class="n">QuietKev</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two">
+    <!-- ============ LOGIN ============ -->
+    <div>
+      <div class="screencap"><div class="n">2 · Login</div><div class="d">Grain + red glow, Bebas title, red focus + glow.</div></div>
+      <div class="frame">
+        <div class="titlebar"><span class="tb-logo">FATGUYS<span class="r">SPEAK</span></span><span class="tb-spacer"></span><span class="tb-win">—  ▢  ✕</span></div>
+        <div class="login">
+          <div class="login-card">
+            <div class="brand">FATGUYS<span class="r">SPEAK</span></div>
+            <h2>WELCOME BACK</h2>
+            <div class="sub">We're so excited to see you again!</div>
+            <div class="fld"><label>USERNAME</label><div class="inp">BigGus</div></div>
+            <div class="fld"><label>PASSWORD</label><div class="inp focus">•••••••••</div></div>
+            <div class="fld"><label>SERVER</label><div class="inp"><span class="ph">localhost:5238</span></div></div>
+            <div class="btn-red">LOG IN</div>
+            <div class="btn-ghost"><span>🔵</span> Continue with Google</div>
+            <div class="login-foot">Need an account? <a href="#">Register</a></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ PROFILE + OVERLAY ============ -->
+    <div>
+      <div class="screencap"><div class="n">3 · Profile & Update</div><div class="d">Profile modal; the version-sync overlay restyled.</div></div>
+      <div class="frame">
+        <div class="titlebar"><span class="tb-logo">FATGUYS<span class="r">SPEAK</span></span><span class="tb-spacer"></span><span class="tb-win">—  ▢  ✕</span></div>
+        <div class="overlay-demo">
+          <div class="blurbg"></div>
+          <div class="dim"><div class="profile-card">
+            <div class="banner"></div>
+            <div class="pbody">
+              <div class="pav a1"><span class="st"></span></div>
+              <div class="pn">BigGus</div>
+              <div class="pmeta">● Online · here for 2h 14m</div>
+              <div class="chips"><span class="chip owner">OWNER</span><span class="chip">Founder</span><span class="chip">PTT</span></div>
+              <div class="prow"><div class="b primary">Message</div><div class="b ghost">Call</div></div>
+            </div>
+          </div></div>
+        </div>
+      </div>
+      <div class="frame" style="margin-top:18px">
+        <div class="titlebar"><span class="tb-logo">FATGUYS<span class="r">SPEAK</span></span><span class="tb-spacer"></span><span class="tb-win">—  ▢  ✕</span></div>
+        <div class="overlay-demo" style="height:220px">
+          <div class="blurbg"></div>
+          <div class="dim"><div class="upd-card">
+            <div class="ti">UPDATING TO <span class="r">v2.0.0</span></div>
+            <div class="pbar"><div class="fill"></div></div>
+            <div class="stage">Downloading update…  64%</div>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SETTINGS ============ -->
+  <div class="screencap"><div class="n">4 · Settings — Appearance</div><div class="d">Theme picker with the new "Ember" default selected; live version in About.</div></div>
+  <div class="frame">
+    <div class="titlebar"><span class="tb-logo">FATGUYS<span class="r">SPEAK</span></span><span class="tb-spacer"></span><span class="tb-win">—  ▢  ✕</span></div>
+    <div class="settings">
+      <div class="set-nav">
+        <div class="ti">SETTINGS</div>
+        <div class="it active">Appearance</div>
+        <div class="it">Audio &amp; Voice</div>
+        <div class="it">Notifications</div>
+        <div class="it">Account</div>
+        <div class="it">About</div>
+      </div>
+      <div class="set-body">
+        <h2>APPEARANCE</h2>
+        <div class="hint">Pick a theme. Ember matches the FatGuysSpeak look.</div>
+        <div class="theme-row">
+          <div class="theme sel">
+            <div class="prev"><div class="c" style="background:#0a0909"></div><div class="c" style="background:#191717"></div><div class="c" style="background:#d42d00"></div></div>
+            <div class="lbl">Ember <span class="chk">✓</span></div>
+          </div>
+          <div class="theme">
+            <div class="prev"><div class="c" style="background:#1a1a1a"></div><div class="c" style="background:#2a2a2a"></div><div class="c" style="background:#2d5f9e"></div></div>
+            <div class="lbl">Dark</div>
+          </div>
+          <div class="theme">
+            <div class="prev"><div class="c" style="background:#0e1016"></div><div class="c" style="background:#161b2a"></div><div class="c" style="background:#5865f2"></div></div>
+            <div class="lbl">Midnight</div>
+          </div>
+          <div class="theme">
+            <div class="prev"><div class="c" style="background:#000"></div><div class="c" style="background:#0d0d0d"></div><div class="c" style="background:#2d5f9e"></div></div>
+            <div class="lbl">OLED</div>
+          </div>
+        </div>
+        <div class="set-section">
+          <div class="st-t">INTERFACE</div>
+          <div class="row"><div class="lab">Compact message spacing<div class="d">Tighten rows for more on screen</div></div><div class="toggle"><span class="k"></span></div></div>
+          <div class="row"><div class="lab">Smooth animations<div class="d">Cross-fade channels & slide-in messages</div></div><div class="toggle on"><span class="k"></span></div></div>
+          <div class="row"><div class="lab">Show member list<div class="d"></div></div><div class="toggle on"><span class="k"></span></div></div>
+        </div>
+        <div class="set-section">
+          <div class="st-t">ABOUT</div>
+          <div class="row"><div class="lab">FatGuysSpeak Client</div><div class="ver">v1.2.0 · g3791c98</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p style="text-align:center;color:var(--muted);font-size:.72rem;margin-top:50px">
+    Mockups only — not the running app. Open the plan: docs/superpowers/specs/2026-06-18-client-ui-redesign-design.md
+  </p>
+</div>
+</body>
+</html>

@@ -4,57 +4,57 @@
              xmlns:vm="clr-namespace:FatGuysSpeak.Client.ViewModels"
              x:Class="FatGuysSpeak.Client.Pages.LoginPage"
              Title="FatGuysSpeak"
-             BackgroundColor="#1e1f22">
+             BackgroundColor="{DynamicResource ThemeBgPrimary}">
 
     <ScrollView>
         <VerticalStackLayout Padding="40" Spacing="16" VerticalOptions="Center">
 
             <Label Text="FatGuysSpeak" FontSize="32" FontAttributes="Bold"
-                   TextColor="#5865F2" HorizontalOptions="Center" />
-            <Label Text="Welcome back!" FontSize="18" TextColor="#ffffff"
+                   TextColor="{DynamicResource ThemeAccentLight}" HorizontalOptions="Center" />
+            <Label Text="Welcome back!" FontSize="18" TextColor="{DynamicResource ThemeTextPrimary}"
                    HorizontalOptions="Center" />
             <Label Text="We're so excited to see you again!" FontSize="14"
-                   TextColor="#b5bac1" HorizontalOptions="Center" Margin="0,0,0,16" />
+                   TextColor="{DynamicResource ThemeTextSecondary}" HorizontalOptions="Center" Margin="0,0,0,16" />
 
-            <Label Text="USERNAME" FontSize="12" TextColor="#b5bac1" FontAttributes="Bold" />
+            <Label Text="USERNAME" FontSize="12" TextColor="{DynamicResource ThemeTextSecondary}" FontAttributes="Bold" />
             <Entry x:Name="UsernameEntry" Placeholder="Enter your username"
-                   PlaceholderColor="#72767d" TextColor="White" BackgroundColor="#1e1f22"
+                   PlaceholderColor="{DynamicResource ThemeTextMuted}" TextColor="{DynamicResource ThemeTextPrimary}" BackgroundColor="{DynamicResource ThemeBgInput}"
                    Text="{Binding Username}" />
 
-            <Label Text="PASSWORD" FontSize="12" TextColor="#b5bac1" FontAttributes="Bold" />
+            <Label Text="PASSWORD" FontSize="12" TextColor="{DynamicResource ThemeTextSecondary}" FontAttributes="Bold" />
             <Entry x:Name="PasswordEntry" Placeholder="Enter your password"
-                   PlaceholderColor="#72767d" TextColor="White" BackgroundColor="#1e1f22"
+                   PlaceholderColor="{DynamicResource ThemeTextMuted}" TextColor="{DynamicResource ThemeTextPrimary}" BackgroundColor="{DynamicResource ThemeBgInput}"
                    IsPassword="True" Text="{Binding Password}" />
 
-            <Label Text="SERVER" FontSize="10" TextColor="#4e5058"
+            <Label Text="SERVER" FontSize="10" TextColor="{DynamicResource ThemeTextMuted}"
                    FontAttributes="Bold" Margin="0,8,0,0" />
             <Picker ItemsSource="{Binding ServerPickerItems}"
                     SelectedItem="{Binding SelectedServerOption, Mode=TwoWay}"
                     IsVisible="{Binding HasSavedServers}"
-                    Title="Select or add a server..." TitleColor="#3f4248"
-                    TextColor="#72767d" BackgroundColor="#1e1f22" />
+                    Title="Select or add a server..." TitleColor="{DynamicResource ThemeTextMuted}"
+                    TextColor="{DynamicResource ThemeTextMuted}" BackgroundColor="{DynamicResource ThemeBgInput}" />
             <Entry Placeholder="http://localhost:5238"
                    Text="{Binding ServerUrl}"
                    IsVisible="{Binding IsEnteringNewServer}"
-                   TextColor="#72767d" BackgroundColor="#1e1f22"
-                   PlaceholderColor="#3f4248" FontSize="12" />
+                   TextColor="{DynamicResource ThemeTextMuted}" BackgroundColor="{DynamicResource ThemeBgInput}"
+                   PlaceholderColor="{DynamicResource ThemeTextMuted}" FontSize="12" />
 
-            <Label Text="{Binding ErrorMessage}" TextColor="#ed4245" IsVisible="{Binding ErrorMessage, Converter={StaticResource StringToBoolConverter}}" />
+            <Label Text="{Binding ErrorMessage}" TextColor="{DynamicResource ThemeDanger}" IsVisible="{Binding ErrorMessage, Converter={StaticResource StringToBoolConverter}}" />
 
             <Button Text="Log In" Command="{Binding LoginCommand}"
-                    BackgroundColor="#5865F2" TextColor="White"
-                    CornerRadius="4" HeightRequest="44"
+                    BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
+                    CornerRadius="8" HeightRequest="44"
                     IsEnabled="{Binding IsLoading, Converter={StaticResource InvertBoolConverter}}" />
 
             <Button Text="Continue with Google" Command="{Binding GoogleSignInCommand}"
                     IsVisible="{Binding IsGoogleAvailable}"
                     BackgroundColor="#ffffff" TextColor="#1e1f22"
-                    CornerRadius="4" HeightRequest="44"
+                    CornerRadius="8" HeightRequest="44"
                     IsEnabled="{Binding IsLoading, Converter={StaticResource InvertBoolConverter}}" />
 
             <HorizontalStackLayout HorizontalOptions="Center" Spacing="4">
-                <Label Text="Need an account?" TextColor="#b5bac1" />
-                <Label Text="Register" TextColor="#00b0f4" >
+                <Label Text="Need an account?" TextColor="{DynamicResource ThemeTextSecondary}" />
+                <Label Text="Register" TextColor="{DynamicResource ThemeAccentLight}" >
                     <Label.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnRegisterTapped" />
                     </Label.GestureRecognizers>

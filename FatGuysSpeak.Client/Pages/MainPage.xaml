@@ -47,8 +47,8 @@
                         FontSize="16" WidthRequest="32" HeightRequest="30" Padding="0"
                         ToolTipProperties.Text="Toggle sidebar" />
                 <Label Text="🖥" FontSize="14" TextColor="{DynamicResource ThemeAccentLight}" VerticalOptions="Center" />
-                <Label Text="FatGuysSpeak" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13" VerticalOptions="Center" />
-                <BoxView WidthRequest="1" HeightRequest="14" BackgroundColor="#444444" VerticalOptions="Center" Margin="4,0" />
+                <Label Text="FatGuysSpeak" TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="13" VerticalOptions="Center" />
+                <BoxView WidthRequest="1" HeightRequest="14" BackgroundColor="{DynamicResource ThemeBgElevated}" VerticalOptions="Center" Margin="4,0" />
                 <Ellipse WidthRequest="8" HeightRequest="8"
                          Fill="{Binding ConnectionDotColor}"
                          VerticalOptions="Center" />
@@ -58,7 +58,7 @@
             </HorizontalStackLayout>
             <Label Grid.Column="1"
                    Text="{Binding SelectedChannel.Name, StringFormat='  /  # {0}', FallbackValue=''}"
-                   TextColor="#888888" FontSize="12" VerticalOptions="Center" />
+                   TextColor="{DynamicResource ThemeTextSecondary}" FontSize="12" VerticalOptions="Center" />
         </Grid>
 
         <!-- ═══ RECONNECT BANNER ═══ -->
@@ -68,15 +68,15 @@
             <Label Grid.Column="0" Text="⚠" FontSize="13" TextColor="{Binding ConnectionDotColor}"
                    VerticalOptions="Center" Margin="0,0,8,0" />
             <Label Grid.Column="1" Text="{Binding ConnectionStatusText, StringFormat='Server connection {0}. Voice and messaging are unavailable until reconnected.'}"
-                   TextColor="#d0a060" FontSize="11" VerticalOptions="Center" />
+                   TextColor="{DynamicResource ThemeWarning}" FontSize="11" VerticalOptions="Center" />
         </Grid>
 
         <!-- ═══ VERSION MISMATCH BANNER ═══ -->
         <VerticalStackLayout Grid.Row="2">
             <Grid IsVisible="{Binding VersionMismatch}" ColumnDefinitions="*,Auto" BackgroundColor="#3a2a00" Padding="12,6">
-                <Label Grid.Column="0" VerticalOptions="Center" TextColor="#e8c060" Text="{Binding VersionMismatchText}" />
+                <Label Grid.Column="0" VerticalOptions="Center" TextColor="{DynamicResource ThemeWarning}" Text="{Binding VersionMismatchText}" />
                 <Button Grid.Column="1" Text="✕" Command="{Binding DismissMismatchCommand}"
-                        BackgroundColor="Transparent" TextColor="#e8c060" Padding="6,2" />
+                        BackgroundColor="Transparent" TextColor="{DynamicResource ThemeWarning}" Padding="6,2" />
             </Grid>
         </VerticalStackLayout>
 
@@ -84,7 +84,7 @@
         <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,*,Auto">
 
             <!-- SERVER SIDEBAR -->
-            <Grid Grid.Column="0" BackgroundColor="#111111" RowDefinitions="*,Auto"
+            <Grid Grid.Column="0" BackgroundColor="{DynamicResource ThemeBgHeader}" RowDefinitions="*,Auto"
                   WidthRequest="54" IsVisible="{Binding IsSidebarOpen}">
                 <ScrollView Grid.Row="0">
                     <VerticalStackLayout Spacing="4" Padding="0,8,0,4">
@@ -122,7 +122,7 @@
             </Grid>
 
             <!-- LEFT: Server tree -->
-            <Grid Grid.Column="1" BackgroundColor="#1e1e1e" RowDefinitions="Auto,*,Auto"
+            <Grid Grid.Column="1" BackgroundColor="{DynamicResource ThemeBgPanel}" RowDefinitions="Auto,*,Auto"
                   WidthRequest="216" IsVisible="{Binding IsSidebarOpen}">
 
                 <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,7"
@@ -131,12 +131,12 @@
                            IsVisible="{Binding IsNotDmMode}" />
                     <Label Grid.Column="0" Text="💬" TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0"
                            IsVisible="{Binding IsDmMode}" />
-                    <Label Grid.Column="1" Text="{Binding SelectedServer.Name, FallbackValue='FatGuysSpeak'}" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="12" VerticalOptions="Center"
+                    <Label Grid.Column="1" Text="{Binding SelectedServer.Name, FallbackValue='FatGuysSpeak'}" TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="12" VerticalOptions="Center"
                            IsVisible="{Binding IsNotDmMode}" />
-                    <Label Grid.Column="1" Text="Direct Messages" TextColor="#d0d0d0" FontAttributes="Bold" FontSize="12" VerticalOptions="Center"
+                    <Label Grid.Column="1" Text="Direct Messages" TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="12" VerticalOptions="Center"
                            IsVisible="{Binding IsDmMode}" />
                     <Label Grid.Column="2" Text="{Binding Members.Count, StringFormat='{0} online'}"
-                           TextColor="#666666" FontSize="10" VerticalOptions="Center" Margin="0,0,4,0"
+                           TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center" Margin="0,0,4,0"
                            IsVisible="{Binding IsNotDmMode}" />
                     <Button Grid.Column="3" Text="🔗"
                             Command="{Binding CopyInviteLinkCommand}"
@@ -156,7 +156,7 @@
 
                         <!-- DM conversations list (visible in DM mode) -->
                         <VerticalStackLayout IsVisible="{Binding IsDmMode}" Spacing="0">
-                            <Label Text="  MESSAGES" TextColor="#666666" FontSize="10"
+                            <Label Text="  MESSAGES" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10"
                                    FontAttributes="Bold" Padding="8,8,8,4" />
                             <StackLayout BindableLayout.ItemsSource="{Binding DmConversations}" Spacing="0">
                                 <BindableLayout.ItemTemplate>
@@ -171,7 +171,7 @@
                                             <Grid ColumnDefinitions="Auto,*,Auto">
                                                 <!-- Avatar initials circle -->
                                                 <Frame Grid.Column="0" CornerRadius="14" WidthRequest="28" HeightRequest="28"
-                                                       BackgroundColor="#3a5f9e" Padding="0" Margin="0,0,8,0">
+                                                       BackgroundColor="{DynamicResource ThemeAccent}" Padding="0" Margin="0,0,8,0">
                                                     <Grid>
                                                         <Label Text="{Binding Initials}"
                                                                TextColor="White" FontSize="10" FontAttributes="Bold"
@@ -188,13 +188,13 @@
                                                            TextColor="{Binding IsSelected, Converter={StaticResource ChannelTextConverter}}"
                                                            LineBreakMode="TailTruncation" />
                                                     <Label Text="{Binding LastMessagePreview}"
-                                                           TextColor="#888888" FontSize="10"
+                                                           TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10"
                                                            LineBreakMode="TailTruncation"
                                                            IsVisible="{Binding LastMessagePreview, Converter={StaticResource StringToBoolConverter}}" />
                                                 </VerticalStackLayout>
                                                 <!-- Unread badge -->
                                                 <Border Grid.Column="2"
-                                                        BackgroundColor="#ed4245"
+                                                        BackgroundColor="{DynamicResource ThemeDanger}"
                                                         StrokeThickness="0" StrokeShape="RoundRectangle 8"
                                                         Padding="5,1" MinimumWidthRequest="18"
                                                         IsVisible="{Binding HasUnread}"
@@ -209,7 +209,7 @@
                                 </BindableLayout.ItemTemplate>
                             </StackLayout>
                             <Label Text="Right-click any user to start a direct message."
-                                   TextColor="#555555" FontSize="11"
+                                   TextColor="{DynamicResource ThemeTextMuted}" FontSize="11"
                                    Padding="16,12" />
                         </VerticalStackLayout>
 
@@ -217,7 +217,7 @@
                         <VerticalStackLayout IsVisible="{Binding IsNotDmMode}" Spacing="0">
 
                         <!-- Connected users -->
-                        <Label Text="  CONNECTED" TextColor="#666666" FontSize="10"
+                        <Label Text="  CONNECTED" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10"
                                FontAttributes="Bold" Padding="8,8,8,4"
                                IsVisible="{Binding Members.Count, Converter={StaticResource NullToBoolConverter}}" />
                         <StackLayout BindableLayout.ItemsSource="{Binding Members}" Spacing="0">
@@ -257,7 +257,7 @@
                                                      BackgroundColor="{Binding Status, Converter={StaticResource StatusDotColorConverter}}" />
                                             <Label Text="{Binding RoleIcon}" FontSize="11" VerticalOptions="Center"
                                                    IsVisible="{Binding HasRoleIcon}" />
-                                            <Label Text="{Binding Username}" TextColor="#c0c0c0" FontSize="12" VerticalOptions="Center">
+                                            <Label Text="{Binding Username}" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12" VerticalOptions="Center">
                                                 <Label.GestureRecognizers>
                                                     <TapGestureRecognizer
                                                         Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ViewProfileCommand}"
@@ -323,8 +323,8 @@
                                                     CommandParameter="{Binding .}" />
                                             </Grid.GestureRecognizers>
                                             <Grid ColumnDefinitions="Auto,*">
-                                                <Label Grid.Column="0" Text="{Binding ToggleIcon}" TextColor="#666666" FontSize="9" VerticalOptions="Center" Margin="0,0,4,0" />
-                                                <Label Grid.Column="1" Text="{Binding Name}" TextColor="#666666" FontSize="10" FontAttributes="Bold" VerticalOptions="Center" />
+                                                <Label Grid.Column="0" Text="{Binding ToggleIcon}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="9" VerticalOptions="Center" Margin="0,0,4,0" />
+                                                <Label Grid.Column="1" Text="{Binding Name}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" FontAttributes="Bold" VerticalOptions="Center" />
                                             </Grid>
                                         </Grid>
                                         <!-- Channels in this category -->
@@ -370,7 +370,7 @@
                                                                 <HorizontalStackLayout Grid.Column="2" Spacing="3" VerticalOptions="Center">
                                                                     <Label Text="{Binding NotifIcon}" FontSize="9" VerticalOptions="Center"
                                                                            IsVisible="{Binding NotifLevelOverride, Converter={StaticResource NullToBoolConverter}}" />
-                                                                    <Border BackgroundColor="#d4860f"
+                                                                    <Border BackgroundColor="{DynamicResource ThemeWarning}"
                                                                             StrokeThickness="0" StrokeShape="RoundRectangle 8"
                                                                             Padding="5,1" MinimumWidthRequest="18"
                                                                             IsVisible="{Binding HasMention}">
@@ -402,7 +402,7 @@
                                                                         </FlyoutBase.ContextFlyout>
                                                                         <HorizontalStackLayout Spacing="6">
                                                                             <Label Text="🎧" FontSize="10" TextColor="{DynamicResource ThemeAccentLight}" VerticalOptions="Center" />
-                                                                            <Label Text="{Binding Username}" TextColor="#aaaaaa" FontSize="11" VerticalOptions="Center" />
+                                                                            <Label Text="{Binding Username}" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="11" VerticalOptions="Center" />
                                                                         </HorizontalStackLayout>
                                                                     </Grid>
                                                                 </DataTemplate>
@@ -418,14 +418,14 @@
                         </StackLayout>
                         <Button Text="+ New Channel"
                                 Command="{Binding CreateChannelCommand}"
-                                BackgroundColor="Transparent" TextColor="#555555"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextMuted}"
                                 FontSize="11" HeightRequest="30" Padding="8,0"
                                 HorizontalOptions="Start"
                                 IsVisible="{Binding IsServerAdmin}"
                                 ToolTipProperties.Text="Create a new channel" />
                         <Button Text="+ New Category"
                                 Command="{Binding CreateCategoryPromptCommand}"
-                                BackgroundColor="Transparent" TextColor="#555555"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextMuted}"
                                 FontSize="11" HeightRequest="30" Padding="8,0"
                                 HorizontalOptions="Start"
                                 IsVisible="{Binding IsServerAdmin}"
@@ -435,13 +435,13 @@
                         <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" Margin="0,6,0,2" />
                         <Button Text="+ Join with Invite Code"
                                 Command="{Binding JoinByInviteCommand}"
-                                BackgroundColor="Transparent" TextColor="#666666"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextMuted}"
                                 FontSize="11" HeightRequest="30" Padding="8,0"
                                 HorizontalOptions="Start" />
                         <Button Text="↺ Reset Invite Link"
                                 Command="{Binding ResetInviteLinkCommand}"
                                 IsVisible="{Binding IsServerAdmin}"
-                                BackgroundColor="Transparent" TextColor="#555555"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextMuted}"
                                 FontSize="10" HeightRequest="26" Padding="8,0"
                                 HorizontalOptions="Start"
                                 ToolTipProperties.Text="Invalidate current link and generate a new one" />
@@ -467,11 +467,11 @@
                         </Grid>
                     </Frame>
                     <Label Grid.Column="1" Text="{Binding CurrentUsername}"
-                           TextColor="#c0c0c0" FontSize="12" FontAttributes="Bold"
+                           TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12" FontAttributes="Bold"
                            VerticalOptions="Center" />
                     <Button Grid.Column="2" Text="📷"
                             Command="{Binding UploadAvatarCommand}"
-                            BackgroundColor="Transparent" TextColor="#666666"
+                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextMuted}"
                             FontSize="13" HeightRequest="28" WidthRequest="32" Padding="0"
                             ToolTipProperties.Text="Change profile picture" />
                 </Grid>
@@ -485,25 +485,25 @@
                     <!-- Channel header (hidden in DM mode) -->
                     <Grid Grid.Row="0" Padding="14,8" ColumnDefinitions="Auto,*,Auto,Auto"
                           IsVisible="{Binding IsNotDmMode}">
-                        <Label Grid.Column="0" Text="#" TextColor="#555555" FontSize="16" VerticalOptions="Center" />
+                        <Label Grid.Column="0" Text="#" TextColor="{DynamicResource ThemeTextMuted}" FontSize="16" VerticalOptions="Center" />
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center" Margin="6,0,0,0">
                             <Label Text="{Binding SelectedChannel.Name, FallbackValue='Select a channel'}"
-                                   TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13"
+                                   TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="13"
                                    VerticalOptions="Center" />
                             <Label Text="{Binding CurrentChannelSlowmodeLabel}"
-                                   TextColor="#e09030" FontSize="10"
+                                   TextColor="{DynamicResource ThemeWarning}" FontSize="10"
                                    VerticalOptions="Center"
                                    IsVisible="{Binding CurrentChannelHasSlowmode}" />
                         </HorizontalStackLayout>
                         <Button Grid.Column="2" Text="📌"
                                 Command="{Binding TogglePinsCommand}"
                                 BackgroundColor="{Binding IsPinsOpen, Converter={StaticResource TabBgConverter}}"
-                                TextColor="#888888"
+                                TextColor="{DynamicResource ThemeTextSecondary}"
                                 FontSize="14" HeightRequest="34" WidthRequest="36" Padding="0"
                                 IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}" />
                         <Button Grid.Column="3" Text="🔍"
                                 Command="{Binding ToggleSearchCommand}"
-                                BackgroundColor="Transparent" TextColor="#888888"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}"
                                 FontSize="14" HeightRequest="34" WidthRequest="36" Padding="0"
                                 IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}" />
                     </Grid>
@@ -515,21 +515,21 @@
                                 BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
                                 FontSize="14" HeightRequest="30" WidthRequest="34" Padding="0" />
                         <Label Grid.Column="1" Text="{Binding DmHeaderTitle, StringFormat='💬  {0}'}"
-                               TextColor="#d0d0d0" FontAttributes="Bold" FontSize="13"
+                               TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="13"
                                VerticalOptions="Center" Margin="4,0,0,0" />
                         <Button Grid.Column="2" Text="📌"
                                 Command="{Binding TogglePinsCommand}"
                                 BackgroundColor="{Binding IsPinsOpen, Converter={StaticResource TabBgConverter}}"
-                                TextColor="#888888"
+                                TextColor="{DynamicResource ThemeTextSecondary}"
                                 FontSize="14" HeightRequest="30" WidthRequest="36" Padding="0"
                                 IsVisible="{Binding SelectedDmConversation, Converter={StaticResource NullToBoolConverter}}" />
                     </Grid>
                     <Grid Grid.Row="1" IsVisible="{Binding IsSearchOpen}"
-                          Padding="10,4,10,6" ColumnDefinitions="*,Auto,Auto" BackgroundColor="#1e1e1e">
+                          Padding="10,4,10,6" ColumnDefinitions="*,Auto,Auto" BackgroundColor="{DynamicResource ThemeBgPanel}">
                         <Entry Grid.Column="0"
                                Text="{Binding SearchQuery}"
                                Placeholder="Search in channel…"
-                               PlaceholderColor="#555555" TextColor="#d0d0d0"
+                               PlaceholderColor="#4a443d" TextColor="{DynamicResource ThemeTextPrimary}"
                                BackgroundColor="{DynamicResource ThemeBgPanel}" FontSize="12"
                                ReturnCommand="{Binding SearchCommand}" />
                         <Button Grid.Column="1" Text="Search"
@@ -539,14 +539,14 @@
                                 HeightRequest="32" Margin="6,0,0,0" />
                         <Button Grid.Column="2" Text="✕"
                                 Command="{Binding ClearSearchCommand}"
-                                BackgroundColor="Transparent" TextColor="#888888"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}"
                                 FontSize="13" HeightRequest="32" WidthRequest="32" Padding="0"
                                 Margin="4,0,0,0" />
                     </Grid>
                 </Grid>
 
                 <!-- Tab bar -->
-                <Grid Grid.Row="1" ColumnDefinitions="*,*,*" HeightRequest="34" BackgroundColor="#141420"
+                <Grid Grid.Row="1" ColumnDefinitions="*,*,*" HeightRequest="34" BackgroundColor="{DynamicResource ThemeBgElevated}"
                       IsVisible="{Binding ShowChannelUiElements}">
                     <Button Grid.Column="0" Text="💬 Chat"
                             Command="{Binding SelectTabCommand}" CommandParameter="Text"
@@ -570,11 +570,11 @@
                 <VerticalStackLayout Grid.Row="2"
                                      IsVisible="{Binding ShowChannelUiElements}">
                     <!-- Voice participants row -->
-                    <Grid BackgroundColor="#1a2f1a" Padding="12,5">
+                    <Grid BackgroundColor="{DynamicResource ThemeBgElevated}" Padding="12,5">
                         <HorizontalStackLayout Spacing="14">
                             <HorizontalStackLayout Spacing="5">
-                                <Ellipse WidthRequest="8" HeightRequest="8" Fill="#44bb44" VerticalOptions="Center" />
-                                <Label Text="Voice Active" TextColor="#44bb44" FontSize="11" FontAttributes="Bold" VerticalOptions="Center" />
+                                <Ellipse WidthRequest="8" HeightRequest="8" Fill="#36b864" VerticalOptions="Center" />
+                                <Label Text="Voice Active" TextColor="{DynamicResource ThemeSuccess}" FontSize="11" FontAttributes="Bold" VerticalOptions="Center" />
                             </HorizontalStackLayout>
                             <StackLayout BindableLayout.ItemsSource="{Binding VoiceParticipants}"
                                          Orientation="Horizontal" Spacing="10">
@@ -617,7 +617,7 @@
                     <CollectionView ItemsSource="{Binding VideoTiles}"
                                     IsVisible="{Binding HasVideoTiles}"
                                     HeightRequest="150"
-                                    BackgroundColor="#111111">
+                                    BackgroundColor="{DynamicResource ThemeBgHeader}">
                         <CollectionView.ItemsLayout>
                             <LinearItemsLayout Orientation="Horizontal" ItemSpacing="4" />
                         </CollectionView.ItemsLayout>
@@ -638,19 +638,19 @@
                 </VerticalStackLayout>
 
                 <!-- Stream viewer -->
-                <Grid Grid.Row="3" BackgroundColor="#0a0a12"
+                <Grid Grid.Row="3" BackgroundColor="{DynamicResource ThemeBgHeader}"
                       IsVisible="{Binding StreamViewerVisible}"
                       RowDefinitions="Auto,480">
-                    <Grid Grid.Row="0" BackgroundColor="#141420" ColumnDefinitions="*,Auto,Auto,Auto">
+                    <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgElevated}" ColumnDefinitions="*,Auto,Auto,Auto">
                         <Label Grid.Column="0" Text="{Binding StreamHeaderText}"
                                TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" FontAttributes="Bold"
                                VerticalOptions="Center" Padding="8,5" />
                         <HorizontalStackLayout Grid.Column="1" Spacing="5" VerticalOptions="Center" Margin="0,0,8,0">
                             <Ellipse WidthRequest="8" HeightRequest="8"
                                      Fill="{Binding StreamLatencyColor}" VerticalOptions="Center" />
-                            <Label Text="{Binding StreamLatencyText}" TextColor="#aaaaaa" FontSize="10" VerticalOptions="Center" />
-                            <Label Text="·" TextColor="#555555" FontSize="10" VerticalOptions="Center" />
-                            <Label Text="{Binding StreamQualityLabel}" TextColor="#888888" FontSize="10" VerticalOptions="Center" />
+                            <Label Text="{Binding StreamLatencyText}" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10" VerticalOptions="Center" />
+                            <Label Text="·" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center" />
+                            <Label Text="{Binding StreamQualityLabel}" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10" VerticalOptions="Center" />
                         </HorizontalStackLayout>
                         <Button Grid.Column="2" Text="💬"
                                 Command="{Binding ToggleStreamChatOverlayCommand}"
@@ -664,12 +664,12 @@
                                 HeightRequest="30" WidthRequest="36" Padding="0" Margin="0,0,4,0"
                                 ToolTipProperties.Text="Pop out to separate window" />
                     </Grid>
-                    <Grid Grid.Row="1" IsVisible="{Binding IsStreaming}" BackgroundColor="#0a120a">
+                    <Grid Grid.Row="1" IsVisible="{Binding IsStreaming}" BackgroundColor="{DynamicResource ThemeBgElevated}">
                         <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="8">
                             <Label Text="🟢  You are sharing your screen"
-                                   TextColor="#44bb44" FontSize="14" FontAttributes="Bold" HorizontalOptions="Center" />
+                                   TextColor="{DynamicResource ThemeSuccess}" FontSize="14" FontAttributes="Bold" HorizontalOptions="Center" />
                             <Label Text="{Binding StreamQualityLabel, StringFormat='Quality: {0}'}"
-                                   TextColor="#4a7a4a" FontSize="11" HorizontalOptions="Center" />
+                                   TextColor="{DynamicResource ThemeSuccess}" FontSize="11" HorizontalOptions="Center" />
                         </VerticalStackLayout>
                         <!-- Give control button (sharer offers to most-recently-joined viewer; viewer id via OfferControlCommand with 0 = pending) -->
                         <!-- Note: OfferControl requires a viewer id. Without a viewer panel, this button is wired but hidden until CanOfferControl. -->
@@ -688,24 +688,24 @@
                             <Button Grid.Column="1"
                                     Text="Stop control"
                                     Command="{Binding StopControlCommand}"
-                                    BackgroundColor="#ed4245" TextColor="White" FontSize="10"
+                                    BackgroundColor="{DynamicResource ThemeDanger}" TextColor="White" FontSize="10"
                                     HeightRequest="26" CornerRadius="3" Padding="8,0" />
                         </Grid>
                     </Grid>
                     <Grid Grid.Row="1" IsVisible="{Binding IsStreaming, Converter={StaticResource InvertBoolConverter}}">
                         <Image Source="{Binding StreamFrame}" Aspect="AspectFit"
-                               BackgroundColor="#0a0a0a" IsVisible="{Binding HasStreamFrame}" />
+                               BackgroundColor="{DynamicResource ThemeBgHeader}" IsVisible="{Binding HasStreamFrame}" />
                         <Label Text="⏳  Connecting to stream…"
-                               TextColor="#555555" FontSize="12" FontAttributes="Italic"
+                               TextColor="{DynamicResource ThemeTextMuted}" FontSize="12" FontAttributes="Italic"
                                HorizontalOptions="Center" VerticalOptions="Center"
                                IsVisible="{Binding IsWaitingForStream}" />
                         <VerticalStackLayout HorizontalOptions="Center" VerticalOptions="Center" Spacing="6"
                                              IsVisible="{Binding HasActiveStream, Converter={StaticResource InvertBoolConverter}}">
                             <Label Text="📺" FontSize="36" HorizontalOptions="Center" />
-                            <Label Text="No active stream" TextColor="#555555" FontSize="13"
+                            <Label Text="No active stream" TextColor="{DynamicResource ThemeTextMuted}" FontSize="13"
                                    FontAttributes="Italic" HorizontalOptions="Center" />
                             <Label Text="A notification will appear in chat when someone shares."
-                                   TextColor="#444444" FontSize="10" HorizontalOptions="Center" />
+                                   TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" HorizontalOptions="Center" />
                         </VerticalStackLayout>
                         <!-- Stream chat overlay -->
                         <Border IsVisible="{Binding IsStreamChatOverlayVisible}"
@@ -723,7 +723,7 @@
                                             <Label Text="{Binding Message.AuthorUsername}"
                                                    TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" FontAttributes="Bold" />
                                             <Label Text="{Binding Message.Content}"
-                                                   TextColor="#e0e0e0" FontSize="11"
+                                                   TextColor="{DynamicResource ThemeTextPrimary}" FontSize="11"
                                                    LineBreakMode="TailTruncation" MaxLines="2" />
                                         </VerticalStackLayout>
                                     </DataTemplate>
@@ -733,7 +733,7 @@
                         <!-- Request control button (viewer side) -->
                         <Button Text="🖱 Request Control"
                                 Command="{Binding RequestControlCommand}"
-                                BackgroundColor="#CC2d5f9e"
+                                BackgroundColor="#CCd42d00"
                                 TextColor="White" FontSize="10"
                                 HorizontalOptions="End" VerticalOptions="End"
                                 Margin="0,0,8,8"
@@ -741,7 +741,7 @@
                                 IsVisible="{Binding CanRequestControl}" />
                         <!-- Controlling banner (controller side) -->
                         <Grid VerticalOptions="End" HorizontalOptions="Fill"
-                              BackgroundColor="#CC143060"
+                              BackgroundColor="#CCd42d00"
                               IsVisible="{Binding IsControlling}"
                               Padding="8,6">
                             <Grid.ColumnDefinitions>
@@ -754,14 +754,14 @@
                             <Button Grid.Column="1"
                                     Text="Release"
                                     Command="{Binding ReleaseControlCommand}"
-                                    BackgroundColor="#2d5f9e" TextColor="White" FontSize="10"
+                                    BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White" FontSize="10"
                                     HeightRequest="26" CornerRadius="3" Padding="8,0" />
                         </Grid>
                     </Grid>
                 </Grid>
 
                 <!-- Compact bar when stream is popped out -->
-                <Grid Grid.Row="3" BackgroundColor="#141420" Padding="12,6" IsVisible="{Binding IsFullScreen}">
+                <Grid Grid.Row="3" BackgroundColor="{DynamicResource ThemeBgElevated}" Padding="12,6" IsVisible="{Binding IsFullScreen}">
                     <HorizontalStackLayout Spacing="12" HorizontalOptions="Center">
                         <Label Text="{Binding ActiveStreamerName, StringFormat='📺  {0} — stream in separate window'}"
                                TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" VerticalOptions="Center" />
@@ -787,16 +787,16 @@
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <BoxView Grid.Column="0" HeightRequest="1" BackgroundColor="#ed4245" VerticalOptions="Center"/>
+                                    <BoxView Grid.Column="0" HeightRequest="1" BackgroundColor="{DynamicResource ThemeDanger}" VerticalOptions="Center"/>
                                     <Label Grid.Column="1" Text="  NEW MESSAGES  "
-                                           TextColor="#ed4245" FontSize="10" FontAttributes="Bold"
+                                           TextColor="{DynamicResource ThemeDanger}" FontSize="10" FontAttributes="Bold"
                                            VerticalOptions="Center"/>
-                                    <BoxView Grid.Column="2" HeightRequest="1" BackgroundColor="#ed4245" VerticalOptions="Center"/>
+                                    <BoxView Grid.Column="2" HeightRequest="1" BackgroundColor="{DynamicResource ThemeDanger}" VerticalOptions="Center"/>
                                 </Grid>
                                 <!-- System notification -->
                                 <Label IsVisible="{Binding IsSystemMessage}"
                                        Text="{Binding Message.Content}"
-                                       TextColor="#4a7a4a" FontSize="11" FontAttributes="Italic"
+                                       TextColor="{DynamicResource ThemeSuccess}" FontSize="11" FontAttributes="Italic"
                                        HorizontalOptions="Center" Padding="0,5" />
                                 <!-- Regular message -->
                                 <Grid Padding="14,6" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
@@ -839,7 +839,7 @@
                                     <!-- Reply quote (shown above author when replying to a message) -->
                                     <Border Grid.Row="0" Grid.Column="1"
                                             IsVisible="{Binding HasReply}"
-                                            BackgroundColor="#0f0f1a" StrokeThickness="0"
+                                            BackgroundColor="{DynamicResource ThemeBgPanel}" StrokeThickness="0"
                                             StrokeShape="RoundRectangle 3"
                                             Margin="0,2,0,4" Padding="8,4">
                                         <HorizontalStackLayout Spacing="8">
@@ -849,7 +849,7 @@
                                                 <Label Text="{Binding ReplyAuthor}"
                                                        TextColor="{DynamicResource ThemeAccentLight}" FontSize="10" FontAttributes="Bold" />
                                                 <Label Text="{Binding ReplyBodyPreview}"
-                                                       TextColor="#888888" FontSize="10"
+                                                       TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10"
                                                        LineBreakMode="TailTruncation" MaxLines="1" />
                                             </VerticalStackLayout>
                                         </HorizontalStackLayout>
@@ -882,24 +882,24 @@
                                         <Label Text="{Binding AuthorRoleIcon}" FontSize="11" VerticalOptions="Center"
                                                IsVisible="{Binding HasAuthorRoleIcon}" />
                                         <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
-                                               TextColor="#555555" FontSize="10" VerticalOptions="End" Margin="0,0,0,1" />
-                                        <Label Text="(edited)" TextColor="#555555" FontSize="10"
+                                               TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="End" Margin="0,0,0,1" />
+                                        <Label Text="(edited)" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10"
                                                VerticalOptions="End" Margin="0,0,0,1"
                                                IsVisible="{Binding IsEdited}" />
-                                        <Label Text="@mention" TextColor="#f0a030" FontSize="10" FontAttributes="Bold"
+                                        <Label Text="@mention" TextColor="{DynamicResource ThemeWarning}" FontSize="10" FontAttributes="Bold"
                                                VerticalOptions="End" Margin="0,0,0,1"
                                                IsVisible="{Binding IsMention}" />
                                         <Label Text="🤖 AI" TextColor="#a855f7" FontSize="10" FontAttributes="Bold"
                                                VerticalOptions="End" Margin="0,0,0,1"
                                                IsVisible="{Binding IsBot}" />
-                                        <Label Text="📌" TextColor="#f0a030" FontSize="10"
+                                        <Label Text="📌" TextColor="{DynamicResource ThemeWarning}" FontSize="10"
                                                VerticalOptions="End" Margin="0,0,0,1"
                                                IsVisible="{Binding IsPinned}" />
                                     </HorizontalStackLayout>
                                     <!-- Deleted state -->
                                     <Label Grid.Row="2" Grid.Column="1"
                                            Text="✗  This message was deleted."
-                                           TextColor="#555555" FontSize="12" FontAttributes="Italic"
+                                           TextColor="{DynamicResource ThemeTextMuted}" FontSize="12" FontAttributes="Italic"
                                            IsVisible="{Binding IsDeleted}" />
                                     <!-- Normal content (hidden when deleted) -->
                                     <controls:MarkdownView Grid.Row="2" Grid.Column="1"
@@ -926,8 +926,8 @@
                                     <!-- GIF paused -->
                                     <Border Grid.Row="3" Grid.Column="1"
                                             IsVisible="{Binding GifPaused}"
-                                            BackgroundColor="#111111"
-                                            StrokeThickness="1" Stroke="#333333"
+                                            BackgroundColor="{DynamicResource ThemeBgHeader}"
+                                            StrokeThickness="1" Stroke="#292525"
                                             StrokeShape="RoundRectangle 6"
                                             WidthRequest="160" HeightRequest="38"
                                             HorizontalOptions="Start"
@@ -941,8 +941,8 @@
                                     <!-- File attachment card (non-image files) -->
                                     <Border Grid.Row="3" Grid.Column="1"
                                             IsVisible="{Binding IsFileAttachment}"
-                                            BackgroundColor="#1e1e2e"
-                                            StrokeThickness="1" Stroke="#333355"
+                                            BackgroundColor="{DynamicResource ThemeBgPanel}"
+                                            StrokeThickness="1" Stroke="#292525"
                                             StrokeShape="RoundRectangle 6"
                                             HorizontalOptions="Start"
                                             Margin="0,4,0,0" Padding="10,8">
@@ -951,7 +951,7 @@
                                                    FontSize="28" VerticalOptions="Center" />
                                             <VerticalStackLayout Spacing="2" VerticalOptions="Center">
                                                 <Label Text="{Binding AttachmentFileName}"
-                                                       TextColor="#d0d0d0" FontSize="12"
+                                                       TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
                                                        FontAttributes="Bold"
                                                        MaximumWidthRequest="260"
                                                        LineBreakMode="TailTruncation" />
@@ -977,7 +977,7 @@
                                                         Stroke="{Binding IsOwn, Converter={StaticResource ReactionStrokeConverter}}"
                                                         StrokeShape="RoundRectangle 12">
                                                     <Label Text="{Binding Display}"
-                                                           FontSize="12" TextColor="#c8c8c8">
+                                                           FontSize="12" TextColor="{DynamicResource ThemeTextPrimary}">
                                                         <Label.GestureRecognizers>
                                                             <TapGestureRecognizer Command="{Binding ToggleCommand}" />
                                                         </Label.GestureRecognizers>
@@ -996,16 +996,16 @@
                                         <BoxView Grid.Column="0" BackgroundColor="{DynamicResource ThemeAccent}"
                                                  WidthRequest="4" CornerRadius="2" VerticalOptions="Fill" />
                                         <VerticalStackLayout Grid.Column="1" Padding="10,8" Spacing="3"
-                                                             BackgroundColor="#1e1e2e">
+                                                             BackgroundColor="{DynamicResource ThemeBgPanel}">
                                             <Label Text="{Binding Preview.SiteName}"
                                                    TextColor="{DynamicResource ThemeAccentLight}" FontSize="10" FontAttributes="Bold"
                                                    IsVisible="{Binding Preview.SiteName, Converter={StaticResource StringToBoolConverter}}" />
                                             <Label Text="{Binding Preview.Title}"
-                                                   TextColor="#d0d0d0" FontSize="13" FontAttributes="Bold"
+                                                   TextColor="{DynamicResource ThemeTextPrimary}" FontSize="13" FontAttributes="Bold"
                                                    IsVisible="{Binding Preview.Title, Converter={StaticResource StringToBoolConverter}}"
                                                    MaxLines="2" LineBreakMode="TailTruncation" />
                                             <Label Text="{Binding Preview.Description}"
-                                                   TextColor="#888888" FontSize="11"
+                                                   TextColor="{DynamicResource ThemeTextSecondary}" FontSize="11"
                                                    IsVisible="{Binding Preview.Description, Converter={StaticResource StringToBoolConverter}}"
                                                    MaxLines="3" LineBreakMode="TailTruncation" />
                                             <Image Source="{Binding Preview.ImageUrl}"
@@ -1016,13 +1016,13 @@
                                             <HorizontalStackLayout Spacing="8" Margin="0,6,0,2">
                                                 <Button Text="🔗 Open in Browser"
                                                         Command="{Binding OpenLinkCommand}"
-                                                        BackgroundColor="{DynamicResource ThemeAccent}" TextColor="#d0d0d0"
+                                                        BackgroundColor="{DynamicResource ThemeAccent}" TextColor="{DynamicResource ThemeTextPrimary}"
                                                         FontSize="11" CornerRadius="4"
                                                         Padding="10,4" HeightRequest="28" />
                                                 <Button Text="▶ Watch in App"
                                                         Command="{Binding WatchVideoCommand}"
                                                         IsVisible="{Binding IsVideoLink}"
-                                                        BackgroundColor="#23a55a" TextColor="#ffffff"
+                                                        BackgroundColor="{DynamicResource ThemeSuccess}" TextColor="{DynamicResource ThemeTextPrimary}"
                                                         FontSize="11" CornerRadius="4"
                                                         Padding="10,4" HeightRequest="28" />
                                             </HorizontalStackLayout>
@@ -1045,7 +1045,7 @@
                                     <Label Grid.Row="6" Grid.Column="1"
                                            Text="Seen"
                                            IsVisible="{Binding ShowSeenReceipt}"
-                                           TextColor="#5c6bc0" FontSize="10"
+                                           TextColor="{DynamicResource ThemeAccentLight}" FontSize="10"
                                            HorizontalOptions="End"
                                            Margin="0,2,4,0" />
                                 </Grid>
@@ -1058,7 +1058,7 @@
                 <Border IsVisible="{Binding HasUnreadBelow}"
                         VerticalOptions="End" HorizontalOptions="Center"
                         Margin="0,0,0,10"
-                        BackgroundColor="#ed4245" StrokeThickness="0"
+                        BackgroundColor="{DynamicResource ThemeDanger}" StrokeThickness="0"
                         StrokeShape="RoundRectangle 16">
                     <Button Text="{Binding UnreadPillText}"
                             Command="{Binding ScrollToLatestCommand}"
@@ -1083,9 +1083,9 @@
                                     <Label Text="{Binding AuthorRoleIcon}" FontSize="10" VerticalOptions="Center"
                                            IsVisible="{Binding HasAuthorRoleIcon}" />
                                     <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
-                                           TextColor="#555555" FontSize="10" VerticalOptions="Center" />
+                                           TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center" />
                                 </HorizontalStackLayout>
-                                <Label Text="{Binding Message.Content}" TextColor="#c8c8c8"
+                                <Label Text="{Binding Message.Content}" TextColor="{DynamicResource ThemeTextPrimary}"
                                        FontSize="13" LineBreakMode="WordWrap" />
                                 <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeBgPanel}" Margin="0,4,0,0" />
                             </VerticalStackLayout>
@@ -1093,7 +1093,7 @@
                     </CollectionView.ItemTemplate>
                     <CollectionView.EmptyView>
                         <Label Text="{Binding SearchEmptyText}"
-                               TextColor="#555555" FontSize="13" FontAttributes="Italic"
+                               TextColor="{DynamicResource ThemeTextMuted}" FontSize="13" FontAttributes="Italic"
                                HorizontalOptions="Center" VerticalOptions="Start"
                                Margin="0,32,0,0" />
                     </CollectionView.EmptyView>
@@ -1109,8 +1109,8 @@
                 <Grid Grid.Row="4" IsVisible="{Binding IsPinsOpen}" BackgroundColor="{DynamicResource ThemeBgPrimary}"
                       RowDefinitions="Auto,*">
                     <Label Grid.Row="0" Text="📌  Pinned Messages"
-                           TextColor="#f0a030" FontSize="13" FontAttributes="Bold"
-                           Padding="14,10,14,6" BackgroundColor="#202030" />
+                           TextColor="{DynamicResource ThemeWarning}" FontSize="13" FontAttributes="Bold"
+                           Padding="14,10,14,6" BackgroundColor="{DynamicResource ThemeBgElevated}" />
                     <CollectionView Grid.Row="1" ItemsSource="{Binding PinnedMessages}"
                                     BackgroundColor="{DynamicResource ThemeBgPrimary}">
                         <CollectionView.ItemTemplate>
@@ -1130,11 +1130,11 @@
                                         <Label Text="{Binding AuthorRoleIcon}" FontSize="10" VerticalOptions="Center"
                                                IsVisible="{Binding HasAuthorRoleIcon}" />
                                         <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
-                                               TextColor="#555555" FontSize="10" VerticalOptions="End" />
+                                               TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="End" />
                                     </HorizontalStackLayout>
                                     <Label Grid.Row="1" Grid.Column="1"
                                            Text="{Binding Message.Content}"
-                                           TextColor="#c8c8c8" FontSize="12"
+                                           TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
                                            LineBreakMode="WordWrap" MaxLines="4" />
                                     <BoxView Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
                                              HeightRequest="1" BackgroundColor="{DynamicResource ThemeBgPanel}"
@@ -1144,7 +1144,7 @@
                         </CollectionView.ItemTemplate>
                         <CollectionView.EmptyView>
                             <Label Text="No pinned messages yet."
-                                   TextColor="#555555" FontSize="13" FontAttributes="Italic"
+                                   TextColor="{DynamicResource ThemeTextMuted}" FontSize="13" FontAttributes="Italic"
                                    HorizontalOptions="Center" VerticalOptions="Start"
                                    Margin="0,32,0,0" />
                         </CollectionView.EmptyView>
@@ -1153,7 +1153,7 @@
 
                 <!-- PTT hint (Voice tab only) -->
                 <Label Grid.Row="5"
-                       BackgroundColor="#1a1a2a" Padding="12,8"
+                       BackgroundColor="{DynamicResource ThemeBgPanel}" Padding="12,8"
                        IsVisible="{Binding IsVoiceTab}"
                        Text="{Binding VoiceHintText}"
                        TextColor="{Binding VoiceHintColor}"
@@ -1165,7 +1165,7 @@
                       IsVisible="{Binding ShowMessageInput}">
                     <!-- Reply bar -->
                     <Grid Grid.Row="0" IsVisible="{Binding IsReplying}"
-                          BackgroundColor="#1e1e2e" Margin="-12,0,-12,4" Padding="12,5"
+                          BackgroundColor="{DynamicResource ThemeBgPanel}" Margin="-12,0,-12,4" Padding="12,5"
                           ColumnDefinitions="Auto,*,Auto">
                         <Label Grid.Column="0" Text="↩" TextColor="{DynamicResource ThemeAccentLight}"
                                FontSize="12" VerticalOptions="Center" Margin="0,0,8,0" />
@@ -1173,30 +1173,30 @@
                             <Label Text="{Binding ReplyingToUsername, StringFormat='Replying to {0}'}"
                                    TextColor="{DynamicResource ThemeAccentLight}" FontSize="10" FontAttributes="Bold" />
                             <Label Text="{Binding ReplyingToPreview}"
-                                   TextColor="#888888" FontSize="10"
+                                   TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10"
                                    LineBreakMode="TailTruncation" MaxLines="1" />
                         </VerticalStackLayout>
                         <Button Grid.Column="2" Text="✕"
                                 Command="{Binding CancelReplyCommand}"
-                                BackgroundColor="Transparent" TextColor="#888888"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}"
                                 FontSize="13" HeightRequest="28" WidthRequest="28" Padding="0" />
                     </Grid>
                     <!-- Live speech hypothesis -->
                     <Label Grid.Row="1"
                            Text="{Binding HypothesisText, StringFormat='🎙 {0}…'}"
-                           TextColor="#f0a030" FontSize="11" FontAttributes="Italic"
+                           TextColor="{DynamicResource ThemeWarning}" FontSize="11" FontAttributes="Italic"
                            Margin="0,0,0,2"
                            IsVisible="{Binding HypothesisText, Converter={StaticResource StringToBoolConverter}}" />
                     <!-- Typing indicator -->
                     <Label Grid.Row="2"
                            Text="{Binding TypingText}"
-                           TextColor="#888888" FontSize="10" FontAttributes="Italic"
+                           TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10" FontAttributes="Italic"
                            Margin="0,0,0,2"
                            IsVisible="{Binding TypingText, Converter={StaticResource StringToBoolConverter}}" />
                     <!-- Slowmode cooldown indicator -->
                     <Label Grid.Row="2"
                            Text="{Binding SlowmodeCooldownLabel}"
-                           TextColor="#e09030" FontSize="10" FontAttributes="Bold"
+                           TextColor="{DynamicResource ThemeWarning}" FontSize="10" FontAttributes="Bold"
                            HorizontalOptions="End" Margin="0,0,0,2"
                            IsVisible="{Binding IsCooldownActive}" />
                     <!-- Pending attachment preview -->
@@ -1209,12 +1209,12 @@
                                    IsVisible="{Binding PendingIsImage}" />
                             <!-- File icon (only when pending is a non-image file) -->
                             <Border IsVisible="{Binding PendingIsImage, Converter={StaticResource InvertBoolConverter}}"
-                                    BackgroundColor="#1e1e2e" StrokeThickness="1" Stroke="#333355"
+                                    BackgroundColor="{DynamicResource ThemeBgPanel}" StrokeThickness="1" Stroke="#292525"
                                     StrokeShape="RoundRectangle 4" Padding="8,4">
                                 <HorizontalStackLayout Spacing="6" VerticalOptions="Center">
                                     <Label Text="📁" FontSize="20" VerticalOptions="Center" />
                                     <Label Text="{Binding PendingAttachmentFileName}"
-                                           TextColor="#d0d0d0" FontSize="11"
+                                           TextColor="{DynamicResource ThemeTextPrimary}" FontSize="11"
                                            VerticalOptions="Center"
                                            MaximumWidthRequest="200"
                                            LineBreakMode="TailTruncation" />
@@ -1227,12 +1227,12 @@
                                    VerticalOptions="Center"
                                    IsVisible="{Binding PendingIsImage, Converter={StaticResource InvertBoolConverter}}" />
                             <Button Text="✕" Command="{Binding ClearAttachmentCommand}"
-                                    BackgroundColor="Transparent" TextColor="#888888"
+                                    BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}"
                                     FontSize="14" Padding="4,0" HeightRequest="28" WidthRequest="28" />
                         </HorizontalStackLayout>
                     </Grid>
                     <!-- Emoji picker panel -->
-                    <Border Grid.Row="4" BackgroundColor="#1e1e1e" StrokeThickness="0" Padding="4,4,4,4"
+                    <Border Grid.Row="4" BackgroundColor="{DynamicResource ThemeBgPanel}" StrokeThickness="0" Padding="4,4,4,4"
                             IsVisible="{Binding IsEmojiPickerOpen}">
                         <ScrollView HeightRequest="108" Orientation="Vertical">
                             <FlexLayout BindableLayout.ItemsSource="{x:Static shared:EmojiData.Common}"
@@ -1255,7 +1255,7 @@
                         </ScrollView>
                     </Border>
                     <!-- GIF picker panel -->
-                    <Border Grid.Row="5" BackgroundColor="#1e1e1e" StrokeThickness="0" Padding="4,6,4,4"
+                    <Border Grid.Row="5" BackgroundColor="{DynamicResource ThemeBgPanel}" StrokeThickness="0" Padding="4,6,4,4"
                             IsVisible="{Binding IsGifPickerOpen}">
                         <Grid RowDefinitions="Auto,*">
                             <!-- Search bar -->
@@ -1264,7 +1264,7 @@
                                        Placeholder="Search GIFs…"
                                        Text="{Binding GifSearchQuery}"
                                        ReturnCommand="{Binding SearchGifsCommand}"
-                                       BackgroundColor="{DynamicResource ThemeBgPanel}" TextColor="#d0d0d0" PlaceholderColor="#555555" />
+                                       BackgroundColor="{DynamicResource ThemeBgPanel}" TextColor="{DynamicResource ThemeTextPrimary}" PlaceholderColor="#4a443d" />
                                 <Button Grid.Column="1" Text="Search"
                                         Command="{Binding SearchGifsCommand}"
                                         BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White" FontSize="12"
@@ -1277,7 +1277,7 @@
                             <!-- Error / empty state -->
                             <Label Grid.Row="1"
                                    Text="{Binding GifErrorText}"
-                                   TextColor="#e67e22" FontSize="11"
+                                   TextColor="{DynamicResource ThemeWarning}" FontSize="11"
                                    Margin="4,8"
                                    IsVisible="{Binding GifErrorText, Converter={StaticResource StringToBoolConverter}}" />
                             <!-- GIF grid -->
@@ -1309,12 +1309,12 @@
                     <Grid Grid.Row="6" ColumnDefinitions="Auto,Auto,Auto,*,Auto">
                         <Button Grid.Column="0" Text="😊"
                                 Command="{Binding ToggleEmojiPickerCommand}"
-                                BackgroundColor="Transparent" TextColor="#888888"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}"
                                 FontSize="16" HeightRequest="36" WidthRequest="40" Padding="0" Margin="0,0,2,0"
                                 ToolTipProperties.Text="Emoji picker" />
                         <Button Grid.Column="1" Text="📎"
                                 Command="{Binding PickAttachmentCommand}"
-                                BackgroundColor="Transparent" TextColor="#888888" FontSize="16"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="16"
                                 HeightRequest="36" WidthRequest="40" Padding="0" Margin="0,0,2,0"
                                 ToolTipProperties.Text="Attach an image" />
                         <Button Grid.Column="2" Text="GIF"
@@ -1326,7 +1326,7 @@
                                 ToolTipProperties.Text="GIF picker" />
                         <Entry Grid.Column="3"
                                Placeholder="{Binding MessagePlaceholderText}"
-                               BackgroundColor="{DynamicResource ThemeBgPrimary}" PlaceholderColor="#555555" TextColor="#d0d0d0"
+                               BackgroundColor="{DynamicResource ThemeBgPrimary}" PlaceholderColor="#4a443d" TextColor="{DynamicResource ThemeTextPrimary}"
                                Text="{Binding MessageInput}" ReturnCommand="{Binding SendMessageCommand}" />
                         <Button Grid.Column="4" Text="Send" Command="{Binding SendMessageCommand}"
                                 BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White" CornerRadius="3"
@@ -1339,22 +1339,22 @@
                 <Label Grid.Row="6"
                        Text="{Binding TypingText}"
                        BackgroundColor="{DynamicResource ThemeBgHeader}"
-                       TextColor="#888888" FontSize="10" FontAttributes="Italic"
+                       TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10" FontAttributes="Italic"
                        Padding="14,4"
                        IsVisible="{Binding IsStreamTab, Converter={StaticResource InvertBoolConverter}}" />
 
             </Grid>
 
             <!-- ═══ THREAD PANEL ═══ -->
-            <Grid Grid.Column="3" BackgroundColor="#1a1a2e" WidthRequest="320"
+            <Grid Grid.Column="3" BackgroundColor="{DynamicResource ThemeBgPanel}" WidthRequest="320"
                   IsVisible="{Binding IsThreadOpen}"
                   RowDefinitions="Auto,*,Auto">
                 <!-- Thread header -->
-                <Grid Grid.Row="0" BackgroundColor="#252535" Padding="12,8" ColumnDefinitions="*,Auto">
-                    <Label Grid.Column="0" Text="🧵 Thread" TextColor="#d0d0d0"
+                <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgElevated}" Padding="12,8" ColumnDefinitions="*,Auto">
+                    <Label Grid.Column="0" Text="🧵 Thread" TextColor="{DynamicResource ThemeTextPrimary}"
                            FontAttributes="Bold" FontSize="13" VerticalOptions="Center" />
                     <Button Grid.Column="1" Text="✕" Command="{Binding CloseThreadCommand}"
-                            BackgroundColor="Transparent" TextColor="#888888"
+                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}"
                             FontSize="13" WidthRequest="28" HeightRequest="28" Padding="0" />
                 </Grid>
                 <!-- Thread messages -->
@@ -1378,12 +1378,12 @@
                                         <Label Text="{Binding AuthorRoleIcon}" FontSize="10" VerticalOptions="Center"
                                                IsVisible="{Binding HasAuthorRoleIcon}" />
                                         <Label Text="{Binding Message.CreatedAt, Converter={StaticResource UtcToLocalTimeConverter}}"
-                                               TextColor="#555555" FontSize="10" VerticalOptions="End" Margin="0,0,0,1" />
+                                               TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="End" Margin="0,0,0,1" />
                                     </HorizontalStackLayout>
-                                    <Label Text="{Binding Message.Content}" TextColor="#d0d0d0" FontSize="12"
+                                    <Label Text="{Binding Message.Content}" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
                                            LineBreakMode="WordWrap"
                                            IsVisible="{Binding IsDeleted, Converter={StaticResource InvertBoolConverter}}" />
-                                    <Label Text="✗  This message was deleted." TextColor="#555555"
+                                    <Label Text="✗  This message was deleted." TextColor="{DynamicResource ThemeTextMuted}"
                                            FontSize="11" FontAttributes="Italic"
                                            IsVisible="{Binding IsDeleted}" />
                                 </VerticalStackLayout>
@@ -1394,7 +1394,7 @@
                 <!-- Thread reply input -->
                 <Grid Grid.Row="2" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,6" ColumnDefinitions="*,Auto">
                     <Entry Grid.Column="0" Placeholder="Reply in thread…"
-                           BackgroundColor="{DynamicResource ThemeBgPrimary}" PlaceholderColor="#555555" TextColor="#d0d0d0"
+                           BackgroundColor="{DynamicResource ThemeBgPrimary}" PlaceholderColor="#4a443d" TextColor="{DynamicResource ThemeTextPrimary}"
                            Text="{Binding ThreadInput}"
                            ReturnCommand="{Binding SendThreadMessageCommand}" />
                     <Button Grid.Column="1" Text="Send" Command="{Binding SendThreadMessageCommand}"
@@ -1433,7 +1433,7 @@
                     ToolTipProperties.Text="Play your mic back to yourself to test audio" />
 
             <VerticalStackLayout Grid.Column="3" VerticalOptions="Center" Spacing="1" Margin="0,0,8,0">
-                <Label Text="MIC" TextColor="#666666" FontSize="8" HorizontalOptions="Center" />
+                <Label Text="MIC" TextColor="{DynamicResource ThemeTextMuted}" FontSize="8" HorizontalOptions="Center" />
                 <ProgressBar Progress="{Binding MicLevel}"
                              ProgressColor="{Binding MicLevel, Converter={StaticResource MicLevelColorConverter}}"
                              WidthRequest="80" HeightRequest="10" BackgroundColor="{DynamicResource ThemeBgPrimary}" />
@@ -1464,43 +1464,43 @@
                     ToolTipProperties.Text="Toggle webcam video in voice channel" />
 
             <HorizontalStackLayout Grid.Column="7" Spacing="6" VerticalOptions="Center" Margin="8,0">
-                <Ellipse WidthRequest="8" HeightRequest="8" Fill="#44bb44"
+                <Ellipse WidthRequest="8" HeightRequest="8" Fill="#36b864"
                          IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}"
                          VerticalOptions="Center" />
                 <Label Text="{Binding SelectedChannel.Name, StringFormat='🎙 {0}', FallbackValue='No channel'}"
-                       TextColor="#888888" FontSize="11" VerticalOptions="Center" />
-                <Label Text="● LOOPBACK" TextColor="#f0a030" FontSize="10" FontAttributes="Bold"
+                       TextColor="{DynamicResource ThemeTextSecondary}" FontSize="11" VerticalOptions="Center" />
+                <Label Text="● LOOPBACK" TextColor="{DynamicResource ThemeWarning}" FontSize="10" FontAttributes="Bold"
                        VerticalOptions="Center" IsVisible="{Binding IsLoopbackActive}" />
             </HorizontalStackLayout>
 
-            <Label Grid.Column="8" Text="{Binding CurrentServerUrl}" TextColor="#555555"
+            <Label Grid.Column="8" Text="{Binding CurrentServerUrl}" TextColor="{DynamicResource ThemeTextMuted}"
                    FontSize="10" VerticalOptions="Center" Margin="0,0,12,0" />
 
             <Button Grid.Column="9" Text="⚙"
                     Command="{Binding OpenSettingsCommand}"
-                    BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#aaaaaa" FontSize="14"
+                    BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="14"
                     WidthRequest="36" HeightRequest="32" CornerRadius="3" Margin="0,0,4,0"
                     ToolTipProperties.Text="Settings" />
 
             <Button Grid.Column="10" Text="Sign Out"
                     Command="{Binding LogoutCommand}"
-                    BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#cc4444"
+                    BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="{DynamicResource ThemeDanger}"
                     FontSize="11" FontAttributes="Bold"
                     HeightRequest="32" CornerRadius="3" Padding="10,0" />
         </Grid>
 
         <!-- ═══ VERSION SYNC OVERLAY (blocking; covers the whole page) ═══ -->
         <Grid Grid.RowSpan="5" IsVisible="{Binding VersionSyncInProgress}"
-              BackgroundColor="#cc000814">
-            <Border Stroke="#2a4a80" StrokeThickness="1" BackgroundColor="#0e1830"
+              BackgroundColor="#cc0a0909">
+            <Border Stroke="#292525" StrokeThickness="1" BackgroundColor="{DynamicResource ThemeBgElevated}"
                     Padding="28,22" WidthRequest="360"
                     HorizontalOptions="Center" VerticalOptions="Center"
                     StrokeShape="RoundRectangle 10">
                 <VerticalStackLayout Spacing="14">
-                    <Label Text="{Binding VersionSyncTitle}" TextColor="#cfe0ff"
+                    <Label Text="{Binding VersionSyncTitle}" TextColor="{DynamicResource ThemeTextPrimary}"
                            FontAttributes="Bold" FontSize="15" HorizontalOptions="Center" />
-                    <ProgressBar Progress="{Binding VersionSyncProgress}" ProgressColor="#5a8de0" />
-                    <Label Text="{Binding VersionSyncStage}" TextColor="#90a8d0"
+                    <ProgressBar Progress="{Binding VersionSyncProgress}" ProgressColor="#f04010" />
+                    <Label Text="{Binding VersionSyncStage}" TextColor="{DynamicResource ThemeTextSecondary}"
                            FontSize="12" HorizontalOptions="Center" />
                 </VerticalStackLayout>
             </Border>

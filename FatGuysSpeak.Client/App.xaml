@@ -10,18 +10,23 @@
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- Theme colors — updated at runtime by ThemeService via DynamicResource -->
-            <Color x:Key="ThemeBgPrimary">#1a1a1a</Color>
-            <Color x:Key="ThemeBgPanel">#2a2a2a</Color>
-            <Color x:Key="ThemeBgHeader">#252525</Color>
-            <Color x:Key="ThemeBgElevated">#3a3a3a</Color>
-            <Color x:Key="ThemeBgInput">#141414</Color>
-            <Color x:Key="ThemeDivider">#333333</Color>
-            <Color x:Key="ThemeAccent">#2d5f9e</Color>
-            <Color x:Key="ThemeAccentLight">#8ab4d4</Color>
-            <Color x:Key="ThemeTextPrimary">#d0d0d0</Color>
-            <Color x:Key="ThemeTextSecondary">#888888</Color>
-            <Color x:Key="ThemeTextMuted">#666666</Color>
+            <!-- Theme colors (Ember default) — updated at runtime by ThemeService via DynamicResource -->
+            <Color x:Key="ThemeBgPrimary">#101010</Color>
+            <Color x:Key="ThemeBgPanel">#191717</Color>
+            <Color x:Key="ThemeBgHeader">#0a0909</Color>
+            <Color x:Key="ThemeBgElevated">#222020</Color>
+            <Color x:Key="ThemeBgInput">#0a0909</Color>
+            <Color x:Key="ThemeBgActive">#241310</Color>
+            <Color x:Key="ThemeDivider">#292525</Color>
+            <Color x:Key="ThemeAccent">#d42d00</Color>
+            <Color x:Key="ThemeAccentLight">#f04010</Color>
+            <Color x:Key="ThemeAccentMuted">#2a1208</Color>
+            <Color x:Key="ThemeTextPrimary">#e9e4d9</Color>
+            <Color x:Key="ThemeTextSecondary">#756e62</Color>
+            <Color x:Key="ThemeTextMuted">#4a443d</Color>
+            <Color x:Key="ThemeDanger">#d42d00</Color>
+            <Color x:Key="ThemeWarning">#e89000</Color>
+            <Color x:Key="ThemeSuccess">#36b864</Color>
 
             <local:StringToBoolConverter x:Key="StringToBoolConverter" />
             <local:InvertBoolConverter x:Key="InvertBoolConverter" />

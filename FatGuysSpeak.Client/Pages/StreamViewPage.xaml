@@ -11,7 +11,7 @@
                IsVisible="{Binding HasStreamFrame}" />
 
         <Label Text="⏳  Waiting for stream…"
-               TextColor="#555555" FontSize="16" FontAttributes="Italic"
+               TextColor="{DynamicResource ThemeTextMuted}" FontSize="16" FontAttributes="Italic"
                HorizontalOptions="Center" VerticalOptions="Center"
                IsVisible="{Binding HasStreamFrame, Converter={StaticResource InvertBoolConverter}}" />
 
@@ -25,10 +25,10 @@
                          Fill="{Binding StreamLatencyColor}"
                          VerticalOptions="Center" />
                 <Label Text="{Binding StreamLatencyText}"
-                       TextColor="#aaaaaa" FontSize="10" VerticalOptions="Center" />
-                <Label Text="·" TextColor="#555555" FontSize="10" VerticalOptions="Center" />
+                       TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10" VerticalOptions="Center" />
+                <Label Text="·" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center" />
                 <Label Text="{Binding StreamQualityLabel}"
-                       TextColor="#888888" FontSize="10" VerticalOptions="Center" />
+                       TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10" VerticalOptions="Center" />
             </HorizontalStackLayout>
         </VerticalStackLayout>
 
@@ -44,7 +44,7 @@
         <!-- Request control button (viewer): shown when CanRequestControl -->
         <Button Text="🖱 Request Control"
                 Command="{Binding RequestControlCommand}"
-                BackgroundColor="#CC2d5f9e"
+                BackgroundColor="#CCd42d00"
                 TextColor="White" FontSize="11"
                 HorizontalOptions="End" VerticalOptions="End"
                 Margin="0,0,8,8"
@@ -67,13 +67,13 @@
             <Button Grid.Column="1"
                     Text="Stop control"
                     Command="{Binding StopControlCommand}"
-                    BackgroundColor="#ed4245" TextColor="White" FontSize="11"
+                    BackgroundColor="{DynamicResource ThemeDanger}" TextColor="White" FontSize="11"
                     HeightRequest="30" CornerRadius="4" Padding="10,0" />
         </Grid>
 
         <!-- Banner: I am controlling (blue, controller side) -->
         <Grid VerticalOptions="End" HorizontalOptions="Fill"
-              BackgroundColor="#CC143060"
+              BackgroundColor="#CCd42d00"
               IsVisible="{Binding IsControlling}"
               Padding="12,8">
             <Grid.ColumnDefinitions>
@@ -87,7 +87,7 @@
             <Button Grid.Column="1"
                     Text="Release"
                     Command="{Binding ReleaseControlCommand}"
-                    BackgroundColor="#2d5f9e" TextColor="White" FontSize="11"
+                    BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White" FontSize="11"
                     HeightRequest="30" CornerRadius="4" Padding="10,0" />
         </Grid>
     </Grid>

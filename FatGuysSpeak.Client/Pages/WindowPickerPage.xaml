@@ -11,24 +11,24 @@
     <Grid RowDefinitions="Auto,Auto,*,Auto">
 
         <!-- Header -->
-        <Grid Grid.Row="0" BackgroundColor="#252525" Padding="16,12"
+        <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgElevated}" Padding="16,12"
               ColumnDefinitions="*,Auto">
             <Label Grid.Column="0" Text="Choose what to share"
-                   TextColor="#d0d0d0" FontAttributes="Bold" FontSize="14"
+                   TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="14"
                    VerticalOptions="Center" />
             <Button Grid.Column="1" Text="✕"
                     Command="{Binding CancelCommand}"
-                    BackgroundColor="Transparent" TextColor="#666666"
+                    BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextMuted}"
                     FontSize="16" WidthRequest="32" HeightRequest="32"
                     Padding="0" CornerRadius="3" />
         </Grid>
 
         <!-- Search -->
-        <Grid Grid.Row="1" Padding="14,10" BackgroundColor="#1e1e1e">
+        <Grid Grid.Row="1" Padding="14,10" BackgroundColor="{DynamicResource ThemeBgPanel}">
             <Entry Placeholder="Search apps..."
                    Text="{Binding SearchText}"
-                   TextColor="#d0d0d0" BackgroundColor="#2a2a2a"
-                   PlaceholderColor="#555555" FontSize="12" />
+                   TextColor="{DynamicResource ThemeTextPrimary}" BackgroundColor="#2a2a2a"
+                   PlaceholderColor="#4a443d" FontSize="12" />
         </Grid>
 
         <!-- Window list -->
@@ -66,11 +66,11 @@
                         <VerticalStackLayout Grid.Column="1" Spacing="2"
                                              VerticalOptions="Center">
                             <Label Text="{Binding DisplayTitle}"
-                                   TextColor="#d0d0d0" FontSize="12"
+                                   TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
                                    FontAttributes="Bold"
                                    LineBreakMode="TailTruncation" />
                             <Label Text="{Binding DisplaySubtitle}"
-                                   TextColor="#666666" FontSize="11"
+                                   TextColor="{DynamicResource ThemeTextMuted}" FontSize="11"
                                    LineBreakMode="TailTruncation"
                                    IsVisible="{Binding DisplaySubtitle,
                                        Converter={StaticResource StringToBoolConverter}}" />
@@ -81,20 +81,20 @@
         </CollectionView>
 
         <!-- Bottom bar -->
-        <Grid Grid.Row="3" BackgroundColor="#252525" Padding="14,10"
+        <Grid Grid.Row="3" BackgroundColor="{DynamicResource ThemeBgElevated}" Padding="14,10"
               ColumnDefinitions="*,Auto,Auto">
             <Label Grid.Column="0"
                    Text="Select a window or Entire Screen to share"
-                   TextColor="#555555" FontSize="11"
+                   TextColor="{DynamicResource ThemeTextMuted}" FontSize="11"
                    VerticalOptions="Center" />
             <Button Grid.Column="1" Text="Cancel"
                     Command="{Binding CancelCommand}"
-                    BackgroundColor="#3a3a3a" TextColor="#aaaaaa"
+                    BackgroundColor="#3a3a3a" TextColor="{DynamicResource ThemeTextSecondary}"
                     HeightRequest="32" CornerRadius="3"
                     Padding="14,0" Margin="0,0,8,0" FontSize="12" />
             <Button Grid.Column="2" Text="Share"
                     Command="{Binding ShareCommand}"
-                    BackgroundColor="#2d5f9e" TextColor="White"
+                    BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
                     HeightRequest="32" CornerRadius="3"
                     Padding="14,0" FontSize="12" />
         </Grid>

@@ -1,5 +1,6 @@
 using System.Globalization;
 using FatGuysSpeak.Shared;
+using FatGuysSpeak.Client.Services;
 
 namespace FatGuysSpeak.Client;
 
@@ -53,7 +54,7 @@ public class DeafenButtonConverter : IValueConverter
 public class MutedBgConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        Color.FromArgb(value is true ? "#7a2020" : "#3a3a3a");
+        value is true ? ThemeService.Get("ThemeAccentMuted") : ThemeService.Get("ThemeBgElevated");
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }
 
@@ -74,14 +75,14 @@ public class VoiceStatusLabelConverter : IValueConverter
 public class ChannelSelectionConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        Color.FromArgb(value is true ? "#2d5f9e" : "Transparent");
+        value is true ? ThemeService.Get("ThemeBgActive") : Colors.Transparent;
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }
 
 public class ChannelTextConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        Color.FromArgb(value is true ? "#ffffff" : "#a0a0a0");
+        value is true ? ThemeService.Get("ThemeTextPrimary") : ThemeService.Get("ThemeTextSecondary");
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }
 
@@ -156,7 +157,7 @@ public class UtcToLocalTimeConverter : IValueConverter
 public class TabBgConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        Color.FromArgb(value is true ? "#2d5f9e" : "#1a1a2a");
+        value is true ? ThemeService.Get("ThemeAccent") : ThemeService.Get("ThemeBgPanel");
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }
 
@@ -164,7 +165,7 @@ public class TabBgConverter : IValueConverter
 public class MentionBgConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        Color.FromArgb(value is true ? "#2a240a" : "Transparent");
+        value is true ? ThemeService.Get("ThemeAccentMuted") : Colors.Transparent;
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }
 
@@ -172,7 +173,7 @@ public class MentionBgConverter : IValueConverter
 public class UnreadBadgeBgConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        Color.FromArgb(value is true ? "#ed4245" : "Transparent");
+        value is true ? ThemeService.Get("ThemeAccent") : Colors.Transparent;
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }
 
@@ -194,7 +195,7 @@ public class StatusDotColorConverter : IValueConverter
 public class ReactionBgConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        Color.FromArgb(value is true ? "#1e3a5f" : "#2a2a2a");
+        value is true ? ThemeService.Get("ThemeAccentMuted") : ThemeService.Get("ThemeBgElevated");
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }
 
@@ -202,7 +203,7 @@ public class ReactionBgConverter : IValueConverter
 public class ActiveButtonTextColorConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        Color.FromArgb(value is true ? "#2d5f9e" : "#888888");
+        value is true ? ThemeService.Get("ThemeAccentLight") : ThemeService.Get("ThemeTextSecondary");
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }
 
@@ -210,6 +211,6 @@ public class ActiveButtonTextColorConverter : IValueConverter
 public class ReactionStrokeConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        Color.FromArgb(value is true ? "#2d5f9e" : "#3a3a3a");
+        value is true ? ThemeService.Get("ThemeAccent") : ThemeService.Get("ThemeDivider");
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => null;
 }

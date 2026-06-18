@@ -3,51 +3,51 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FatGuysSpeak.Client.Pages.RegisterPage"
              Title="Create Account"
-             BackgroundColor="#1e1f22">
+             BackgroundColor="{DynamicResource ThemeBgInput}">
 
     <ScrollView>
         <VerticalStackLayout Padding="40" Spacing="16" VerticalOptions="Center">
 
             <Label Text="Create an account" FontSize="24" FontAttributes="Bold"
-                   TextColor="#ffffff" HorizontalOptions="Center" />
+                   TextColor="{DynamicResource ThemeTextPrimary}" HorizontalOptions="Center" />
 
-            <Label Text="EMAIL" FontSize="12" TextColor="#b5bac1" FontAttributes="Bold" />
-            <Entry Placeholder="Enter your email" PlaceholderColor="#72767d"
-                   TextColor="White" BackgroundColor="#1e1f22"
+            <Label Text="EMAIL" FontSize="12" TextColor="{DynamicResource ThemeTextSecondary}" FontAttributes="Bold" />
+            <Entry Placeholder="Enter your email" PlaceholderColor="{DynamicResource ThemeTextMuted}"
+                   TextColor="White" BackgroundColor="{DynamicResource ThemeBgInput}"
                    Keyboard="Email" Text="{Binding Email}" />
 
-            <Label Text="USERNAME" FontSize="12" TextColor="#b5bac1" FontAttributes="Bold" />
-            <Entry Placeholder="Choose a username" PlaceholderColor="#72767d"
-                   TextColor="White" BackgroundColor="#1e1f22" Text="{Binding Username}" />
+            <Label Text="USERNAME" FontSize="12" TextColor="{DynamicResource ThemeTextSecondary}" FontAttributes="Bold" />
+            <Entry Placeholder="Choose a username" PlaceholderColor="{DynamicResource ThemeTextMuted}"
+                   TextColor="White" BackgroundColor="{DynamicResource ThemeBgInput}" Text="{Binding Username}" />
 
-            <Label Text="PASSWORD" FontSize="12" TextColor="#b5bac1" FontAttributes="Bold" />
-            <Entry Placeholder="Choose a password" PlaceholderColor="#72767d"
-                   TextColor="White" BackgroundColor="#1e1f22"
+            <Label Text="PASSWORD" FontSize="12" TextColor="{DynamicResource ThemeTextSecondary}" FontAttributes="Bold" />
+            <Entry Placeholder="Choose a password" PlaceholderColor="{DynamicResource ThemeTextMuted}"
+                   TextColor="White" BackgroundColor="{DynamicResource ThemeBgInput}"
                    IsPassword="True" Text="{Binding Password}" />
 
-            <Label Text="SERVER" FontSize="10" TextColor="#4e5058"
+            <Label Text="SERVER" FontSize="10" TextColor="{DynamicResource ThemeTextMuted}"
                    FontAttributes="Bold" Margin="0,8,0,0" />
             <Picker ItemsSource="{Binding ServerPickerItems}"
                     SelectedItem="{Binding SelectedServerOption, Mode=TwoWay}"
                     IsVisible="{Binding HasSavedServers}"
-                    Title="Select or add a server..." TitleColor="#3f4248"
-                    TextColor="#72767d" BackgroundColor="#1e1f22" />
+                    Title="Select or add a server..." TitleColor="{DynamicResource ThemeTextMuted}"
+                    TextColor="{DynamicResource ThemeTextMuted}" BackgroundColor="{DynamicResource ThemeBgInput}" />
             <Entry Placeholder="http://localhost:5238"
                    Text="{Binding ServerUrl}"
                    IsVisible="{Binding IsEnteringNewServer}"
-                   TextColor="#72767d" BackgroundColor="#1e1f22"
-                   PlaceholderColor="#3f4248" FontSize="12" />
+                   TextColor="{DynamicResource ThemeTextMuted}" BackgroundColor="{DynamicResource ThemeBgInput}"
+                   PlaceholderColor="{DynamicResource ThemeTextMuted}" FontSize="12" />
 
-            <Label Text="{Binding ErrorMessage}" TextColor="#ed4245"
+            <Label Text="{Binding ErrorMessage}" TextColor="{DynamicResource ThemeDanger}"
                    IsVisible="{Binding ErrorMessage, Converter={StaticResource StringToBoolConverter}}" />
 
             <Button Text="Continue" Command="{Binding RegisterCommand}"
-                    BackgroundColor="#5865F2" TextColor="White"
+                    BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
                     CornerRadius="4" HeightRequest="44" />
 
             <HorizontalStackLayout HorizontalOptions="Center" Spacing="4">
-                <Label Text="Already have an account?" TextColor="#b5bac1" />
-                <Label Text="Log In" TextColor="#00b0f4">
+                <Label Text="Already have an account?" TextColor="{DynamicResource ThemeTextSecondary}" />
+                <Label Text="Log In" TextColor="{DynamicResource ThemeAccentLight}">
                     <Label.GestureRecognizers>
                         <TapGestureRecognizer Tapped="OnLoginTapped" />
                     </Label.GestureRecognizers>

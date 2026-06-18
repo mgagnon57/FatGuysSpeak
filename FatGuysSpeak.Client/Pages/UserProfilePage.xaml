@@ -36,7 +36,7 @@
             </Frame>
 
             <Label Text="{Binding Profile.Username}"
-                   TextColor="#e0e0e0" FontSize="20" FontAttributes="Bold"
+                   TextColor="{DynamicResource ThemeTextPrimary}" FontSize="20" FontAttributes="Bold"
                    HorizontalOptions="Center" Margin="0,0,0,8" />
 
             <!-- Status row -->
@@ -47,7 +47,7 @@
             </HorizontalStackLayout>
 
             <!-- Last seen -->
-            <Label Text="{Binding LastSeenText}" TextColor="#555555" FontSize="11"
+            <Label Text="{Binding LastSeenText}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="11"
                    HorizontalOptions="Center" IsVisible="{Binding HasLastSeen}" Margin="0,0,0,4" />
 
             <!-- Role -->
@@ -55,7 +55,7 @@
                    HorizontalOptions="Center" IsVisible="{Binding HasRole}" Margin="0,0,0,4" />
 
             <!-- Joined date -->
-            <Label Text="{Binding JoinedText}" TextColor="#666666" FontSize="11"
+            <Label Text="{Binding JoinedText}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="11"
                    HorizontalOptions="Center" Margin="0,0,0,20" />
 
             <!-- Block / Unblock (other users only) -->
@@ -71,13 +71,13 @@
 
             <!-- Bio display (not editing) -->
             <VerticalStackLayout IsVisible="{Binding IsEditingBio, Converter={StaticResource InvertBool}}" Spacing="6">
-                <Label Text="ABOUT ME" TextColor="#666666" FontSize="10" FontAttributes="Bold"
+                <Label Text="ABOUT ME" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" FontAttributes="Bold"
                        HorizontalOptions="Start" Margin="0,0,0,4" />
                 <Label Text="{Binding Profile.Bio}"
-                       TextColor="#c0c0c0" FontSize="13" LineBreakMode="WordWrap"
+                       TextColor="{DynamicResource ThemeTextPrimary}" FontSize="13" LineBreakMode="WordWrap"
                        IsVisible="{Binding HasBio}" />
                 <Label Text="No bio set yet."
-                       TextColor="#555555" FontSize="12" FontAttributes="Italic"
+                       TextColor="{DynamicResource ThemeTextMuted}" FontSize="12" FontAttributes="Italic"
                        IsVisible="{Binding HasBio, Converter={StaticResource InvertBool}}" />
                 <Button Text="✏ Edit Bio"
                         Command="{Binding StartEditBioCommand}"
@@ -89,16 +89,16 @@
 
             <!-- Bio editor (own profile, editing) -->
             <VerticalStackLayout IsVisible="{Binding IsEditingBio}" Spacing="8">
-                <Label Text="ABOUT ME" TextColor="#666666" FontSize="10" FontAttributes="Bold"
+                <Label Text="ABOUT ME" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" FontAttributes="Bold"
                        HorizontalOptions="Start" />
                 <Editor Text="{Binding BioInput}"
                         HeightRequest="90"
-                        BackgroundColor="{DynamicResource ThemeBgInput}" TextColor="#d0d0d0"
-                        PlaceholderColor="#555555"
+                        BackgroundColor="{DynamicResource ThemeBgInput}" TextColor="{DynamicResource ThemeTextPrimary}"
+                        PlaceholderColor="#4a443d"
                         Placeholder="Write something about yourself…"
                         FontSize="13" />
                 <Label Text="{Binding BioError}"
-                       TextColor="#ed4245" FontSize="11"
+                       TextColor="{DynamicResource ThemeDanger}" FontSize="11"
                        IsVisible="{Binding BioError, Converter={StaticResource StringToBool}}" />
                 <HorizontalStackLayout Spacing="8">
                     <Button Text="Save"
@@ -107,7 +107,7 @@
                             FontSize="12" CornerRadius="4" HeightRequest="32" Padding="16,0" />
                     <Button Text="Cancel"
                             Command="{Binding CancelEditBioCommand}"
-                            BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="#c0c0c0"
+                            BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="{DynamicResource ThemeTextPrimary}"
                             FontSize="12" CornerRadius="4" HeightRequest="32" Padding="14,0" />
                 </HorizontalStackLayout>
             </VerticalStackLayout>
@@ -118,24 +118,24 @@
 
             <!-- Status picker (own profile only) -->
             <VerticalStackLayout IsVisible="{Binding IsOwnProfile}" Spacing="6">
-                <Label Text="SET STATUS" TextColor="#666666" FontSize="10" FontAttributes="Bold"
+                <Label Text="SET STATUS" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" FontAttributes="Bold"
                        HorizontalOptions="Center" Margin="0,0,0,4" />
                 <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
                     <Button Grid.Row="0" Grid.Column="0" Text="🟢 Online"
                             Command="{Binding SetStatusCommand}" CommandParameter="Online"
-                            BackgroundColor="#1a2a1a" TextColor="#c0c0c0" FontSize="12"
+                            BackgroundColor="#1a2a1a" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
                             CornerRadius="6" HeightRequest="36" />
                     <Button Grid.Row="0" Grid.Column="1" Text="🌙 Away"
                             Command="{Binding SetStatusCommand}" CommandParameter="Away"
-                            BackgroundColor="#2a1e0a" TextColor="#c0c0c0" FontSize="12"
+                            BackgroundColor="#2a1e0a" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
                             CornerRadius="6" HeightRequest="36" />
                     <Button Grid.Row="1" Grid.Column="0" Text="⛔ Do Not Disturb"
                             Command="{Binding SetStatusCommand}" CommandParameter="DoNotDisturb"
-                            BackgroundColor="#2a1010" TextColor="#c0c0c0" FontSize="11"
+                            BackgroundColor="#2a1010" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="11"
                             CornerRadius="6" HeightRequest="36" />
                     <Button Grid.Row="1" Grid.Column="1" Text="⚫ Offline"
                             Command="{Binding SetStatusCommand}" CommandParameter="Offline"
-                            BackgroundColor="#1a1a1a" TextColor="#c0c0c0" FontSize="12"
+                            BackgroundColor="#1a1a1a" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
                             CornerRadius="6" HeightRequest="36" />
                 </Grid>
             </VerticalStackLayout>
