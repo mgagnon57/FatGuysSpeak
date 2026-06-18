@@ -8,7 +8,7 @@ namespace FatGuysSpeak.Server.Controllers;
 
 [ApiController]
 [Authorize(Policy = "DashboardAdmin")]
-public class MetricsController(ServerMetricsService metrics) : ControllerBase
+public class MetricsController(ServerMetricsService metrics, UpdateStatus updateStatus) : ControllerBase
 {
     [HttpGet("/api/metrics")]
     public IActionResult GetMetrics() => Ok(metrics.GetSnapshot());
@@ -21,7 +21,20 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
         var label = $"FatGuysSpeak v{v.Version}"
             + (v.Commit.Length > 0 ? $" · {v.Commit}" : "")
             + (v.BuildDate.Length > 0 ? $" · {v.BuildDate}" : "");
-        return Content(Html.Replace("{{VERSION}}", System.Net.WebUtility.HtmlEncode(label)), "text/html");
+
+        var banner = "";
+        if (SemVer.IsOutdated(v.Version, updateStatus.LatestVersion))
+        {
+            var lv = System.Net.WebUtility.HtmlEncode(updateStatus.LatestVersion);
+            var url = System.Net.WebUtility.HtmlEncode(
+                updateStatus.ReleaseUrl ?? "https://github.com/mgagnon57/FatGuysSpeak/releases/latest");
+            banner = $"<div class=\"update-banner\">⬆ Server update available: v{lv} — "
+                + $"<a href=\"{url}\" target=\"_blank\" rel=\"noopener\">Release notes</a></div>";
+        }
+
+        return Content(Html
+            .Replace("{{VERSION}}", System.Net.WebUtility.HtmlEncode(label))
+            .Replace("{{UPDATE_BANNER}}", banner), "text/html");
     }
 
     private const string Html = """
@@ -51,6 +64,9 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           @keyframes pulse { 0%,100% { opacity:1; box-shadow:0 0 0 0 rgba(68,187,68,.4); }
                              50%  { opacity:.6; box-shadow:0 0 0 5px rgba(68,187,68,0); } }
           .live-text { font-size: 11px; color: #666; }
+
+          .update-banner { background:#3a2a00; border:1px solid #6a5000; color:#e8c060; padding:8px 16px; margin:0 0 12px; font-size:13px; border-radius:4px; }
+          .update-banner a { color:#f0c070; }
 
           /* ── Tabs ── */
           .tabs { display: flex; gap: 2px; margin-bottom: 16px; border-bottom: 1px solid #2e2e2e; }
@@ -216,6 +232,7 @@ public class MetricsController(ServerMetricsService metrics) : ControllerBase
           </div>
         </header>
 
+          {{UPDATE_BANNER}}
         <div class="tabs">
           <button class="tab-btn active" data-click="tab" data-tab="overview" title="Server health metrics, message throughput, and rate-limit overview">Overview</button>
           <button class="tab-btn" data-click="tab" data-tab="users" title="View all users — change roles, mute, kick, or temporarily ban">Users</button>
