@@ -1,4 +1,5 @@
 using System.Text;
+using System.Reflection;
 using System.Threading.RateLimiting;
 using FatGuysSpeak.Server.Data;
 using FatGuysSpeak.Server.Hubs;
@@ -842,6 +843,12 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapGet("/api/version", () =>
+{
+    var info = typeof(Program).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+    return Results.Ok(FatGuysSpeak.Shared.VersionInfo.Parse(info));
+});
 app.MapHub<ChatHub>("/hubs/chat");
 
 #if WINDOWS
