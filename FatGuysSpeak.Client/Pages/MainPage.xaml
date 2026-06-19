@@ -81,48 +81,10 @@
         </VerticalStackLayout>
 
         <!-- ═══ MAIN CONTENT ═══ -->
-        <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,*,Auto">
-
-            <!-- SERVER SIDEBAR -->
-            <Grid Grid.Column="0" BackgroundColor="{DynamicResource ThemeBgHeader}" RowDefinitions="*,Auto"
-                  WidthRequest="54" IsVisible="{Binding IsSidebarOpen}">
-                <ScrollView Grid.Row="0">
-                    <VerticalStackLayout Spacing="4" Padding="0,8,0,4">
-                        <StackLayout BindableLayout.ItemsSource="{Binding Servers}" Spacing="4">
-                            <BindableLayout.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ServerViewItem">
-                                    <Grid HeightRequest="48" WidthRequest="54">
-                                        <Grid.GestureRecognizers>
-                                            <TapGestureRecognizer
-                                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectServerCommand}"
-                                                CommandParameter="{Binding .}" />
-                                        </Grid.GestureRecognizers>
-                                        <BoxView WidthRequest="4" HeightRequest="32" CornerRadius="2"
-                                                 BackgroundColor="#ffffff"
-                                                 VerticalOptions="Center" HorizontalOptions="Start"
-                                                 IsVisible="{Binding IsSelected}" />
-                                        <Frame CornerRadius="16" WidthRequest="40" HeightRequest="40"
-                                               BackgroundColor="{DynamicResource ThemeAccent}" Padding="0"
-                                               HorizontalOptions="Center" VerticalOptions="Center">
-                                            <Grid>
-                                                <Label Text="{Binding Initials}" TextColor="White"
-                                                       FontSize="14" FontAttributes="Bold"
-                                                       HorizontalOptions="Center" VerticalOptions="Center"
-                                                       IsVisible="{Binding HasIcon, Converter={StaticResource InvertBoolConverter}}" />
-                                                <Image Source="{Binding IconUrl}" Aspect="AspectFill"
-                                                       IsVisible="{Binding HasIcon}" />
-                                            </Grid>
-                                        </Frame>
-                                    </Grid>
-                                </DataTemplate>
-                            </BindableLayout.ItemTemplate>
-                        </StackLayout>
-                    </VerticalStackLayout>
-                </ScrollView>
-            </Grid>
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto">
 
             <!-- LEFT: Server tree -->
-            <Grid Grid.Column="1" BackgroundColor="{DynamicResource ThemeBgPanel}" RowDefinitions="Auto,*,Auto"
+            <Grid Grid.Column="0" BackgroundColor="{DynamicResource ThemeBgPanel}" RowDefinitions="Auto,*,Auto"
                   WidthRequest="216" IsVisible="{Binding IsSidebarOpen}">
 
                 <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,7"
@@ -502,7 +464,7 @@
             </Grid>
 
             <!-- RIGHT: Chat panel -->
-            <Grid Grid.Column="2" BackgroundColor="{DynamicResource ThemeBgPrimary}" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto">
+            <Grid Grid.Column="1" BackgroundColor="{DynamicResource ThemeBgPrimary}" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto">
 
                 <!-- Channel header / DM header -->
                 <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgHeader}" RowDefinitions="Auto,Auto">
@@ -1370,7 +1332,7 @@
             </Grid>
 
             <!-- ═══ THREAD PANEL ═══ -->
-            <Grid Grid.Column="3" BackgroundColor="{DynamicResource ThemeBgPanel}" WidthRequest="320"
+            <Grid Grid.Column="2" BackgroundColor="{DynamicResource ThemeBgPanel}" WidthRequest="320"
                   IsVisible="{Binding IsThreadOpen}"
                   RowDefinitions="Auto,*,Auto">
                 <!-- Thread header -->
