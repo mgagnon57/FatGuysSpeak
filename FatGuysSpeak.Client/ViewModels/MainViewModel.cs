@@ -683,6 +683,22 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         var channelList = await api.GetChannelsAsync(item.Server.Id);
         Channels = new ObservableCollection<ChannelViewItem>((channelList ?? []).Select(c => new ChannelViewItem(c)));
         RebuildCategorizedChannels();
+
+        // Prefetch every channel's occupants so the sidebar shows who's in each channel — even
+        // channels you're not in. Live changes arrive via the server-wide UserJoined/LeftChannel.
+        if (hub.IsConnected)
+        {
+            foreach (var ch in Channels)
+            {
+                var occ = await hub.GetChannelOccupantsAsync(ch.Channel.Id);
+                MainThread.BeginInvokeOnMainThread(() =>
+                {
+                    ch.Occupants.Clear();
+                    foreach (var u in occ) ch.Occupants.Add(u);
+                });
+            }
+        }
+
         var onlineList = hub.IsConnected ? await hub.GetOnlineUsersAsync(item.Server.Id) : [];
         // Load role map first so MemberViewItems are built with correct roles
         _memberRoles.Clear();

@@ -92,6 +92,39 @@ public class ChannelDeletionTests : IDisposable
     }
 
     [Fact]
+    public async Task NextChannelId_CatchesUp_WhenCounterTrailsTableMax()
+    {
+        // Reproduces the live UNIQUE-constraint collision: another insert path (default channels
+        // at server creation used auto-increment) advanced the Channels table past the persisted
+        // counter, so the next explicit-id insert collided. NextChannelIdAsync must self-heal.
+        await SeedAsync();
+        var hi = await _db.Db.Channels.MaxAsync(c => c.Id);
+
+        var seq = await _db.Db.AppSequences.FindAsync("channel");
+        if (seq is null) { seq = new AppSequence { Name = "channel" }; _db.Db.AppSequences.Add(seq); }
+        seq.Value = hi - 1;               // counter is BEHIND the real table max
+        await _db.Db.SaveChangesAsync();
+
+        var next = await ServersController.NextChannelIdAsync(_db.Db);
+
+        Assert.True(next > hi, $"next id {next} must exceed current max {hi} to avoid a UNIQUE collision");
+        Assert.False(await _db.Db.Channels.AnyAsync(c => c.Id == next), "next id must not already exist");
+    }
+
+    [Fact]
+    public async Task CreateServerThenChannel_NeverCollides()
+    {
+        // End-to-end version of the same bug: create a fresh server (seeds default channels) and
+        // then a channel — the explicit id must not collide with an auto-incremented default id.
+        await SeedAsync();
+        var result = await _servers.CreateServer(new CreateServerRequest("Fresh", null));
+        var dto = (ServerDto)((OkObjectResult)result.Result!).Value!;
+
+        var created = await _servers.CreateChannel(dto.Id, new CreateChannelRequest("extra", ChannelType.Text));
+        Assert.IsType<OkObjectResult>(created.Result); // would be a 500 on collision
+    }
+
+    [Fact]
     public async Task NormalCreate_KeepsChannelsIsolated()
     {
         await SeedAsync();
