@@ -75,13 +75,13 @@ public class BotServiceTests : IDisposable
         await _db.Db.SaveChangesAsync();
         BotService.BotUserId = botUser.Id;
 
-        var svc = MakeBotService(MakeHttpFactory("Hello from FatBot!"), MakeConfig());
+        var svc = MakeBotService(MakeHttpFactory("Hello from PorkChop!"), MakeConfig());
 
-        await svc.RespondAsync(channel.Id, server.Id, "@FatBot hello");
+        await svc.RespondAsync(channel.Id, server.Id, "@PorkChop hello");
 
         var msg = _db.Db.Messages.FirstOrDefault(m => m.Source == MessageSource.AI);
         Assert.NotNull(msg);
-        Assert.Equal("Hello from FatBot!", msg.Content);
+        Assert.Equal("Hello from PorkChop!", msg.Content);
         Assert.Equal(BotService.BotUserId, msg.AuthorId);
     }
 
@@ -118,7 +118,7 @@ public class BotServiceTests : IDisposable
                .Returns(new HttpClient(handler.Object) { BaseAddress = new Uri("https://api.anthropic.com/v1/") });
 
         var svc = MakeBotService(factory.Object, MakeConfig());
-        await svc.RespondAsync(channel.Id, server.Id, "@FatBot hi");
+        await svc.RespondAsync(channel.Id, server.Id, "@PorkChop hi");
 
         Assert.NotNull(captured);
         var body = await captured!.Content!.ReadAsStringAsync();
@@ -134,7 +134,7 @@ public class BotServiceTests : IDisposable
 
         var svc = MakeBotService(MakeHttpFactory("should not be called"), MakeConfig(apiKey: ""));
 
-        await svc.RespondAsync(channel.Id, server.Id, "@FatBot hello");
+        await svc.RespondAsync(channel.Id, server.Id, "@PorkChop hello");
 
         Assert.False(_db.Db.Messages.Any(m => m.Source == MessageSource.AI));
     }
@@ -148,7 +148,7 @@ public class BotServiceTests : IDisposable
 
         var svc = MakeBotService(MakeHttpFactory("should not be called"), MakeConfig());
 
-        await svc.RespondAsync(channel.Id, server.Id, "@FatBot hello");
+        await svc.RespondAsync(channel.Id, server.Id, "@PorkChop hello");
 
         Assert.False(_db.Db.Messages.Any(m => m.Source == MessageSource.AI));
     }
@@ -189,7 +189,7 @@ public class BotServiceTests : IDisposable
                .Returns(new HttpClient(handler.Object) { BaseAddress = new Uri("https://api.anthropic.com/v1/") });
 
         var svc = MakeBotService(factory.Object, MakeConfig());
-        await svc.RespondAsync(channel.Id, server.Id, "@FatBot hi");
+        await svc.RespondAsync(channel.Id, server.Id, "@PorkChop hi");
 
         var body = await captured!.Content!.ReadAsStringAsync();
         Assert.Contains("user message", body);

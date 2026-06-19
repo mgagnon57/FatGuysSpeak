@@ -769,6 +769,15 @@ using (var scope = app.Services.CreateScope())
         ctx.Database.ExecuteSqlRaw(@"UPDATE ChannelPermissions SET MinRoleToWrite = 2 WHERE MinRoleToWrite = 1");
     }
 
+    // Bot rebrand: FatBot -> PorkChop. Rename the existing bot user so its id/history carry over
+    // instead of orphaning the old account and seeding a fresh one.
+    var legacyBot = ctx.Users.FirstOrDefault(u => u.Username == "FatBot");
+    if (legacyBot is not null && !ctx.Users.Any(u => u.Username == FatGuysSpeak.Server.Services.BotService.BotUsername))
+    {
+        legacyBot.Username = FatGuysSpeak.Server.Services.BotService.BotUsername;
+        ctx.SaveChanges();
+    }
+
     // Seed bot user
     var botUser = ctx.Users.FirstOrDefault(u => u.Username == FatGuysSpeak.Server.Services.BotService.BotUsername);
     if (botUser is null)

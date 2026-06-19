@@ -10,7 +10,7 @@ namespace FatGuysSpeak.Server.Services;
 
 public class BotService(IHttpClientFactory httpFactory, IConfiguration config, IServiceScopeFactory scopeFactory, IHubContext<ChatHub> hub)
 {
-    public const string BotUsername = "FatBot";
+    public const string BotUsername = "PorkChop";
     public static int BotUserId { get; set; }
 
     private readonly string _apiKey = config["Anthropic:ApiKey"] ?? "";
@@ -18,7 +18,11 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
     public async Task RespondAsync(int channelId, int serverId, string triggerContent)
     {
-        if (string.IsNullOrEmpty(_apiKey) || BotUserId == 0) return;
+        if (string.IsNullOrEmpty(_apiKey) || BotUserId == 0)
+        {
+            Console.WriteLine($"[PorkChop] not responding — Anthropic API key set: {!string.IsNullOrEmpty(_apiKey)}, bot user id: {BotUserId}. Set Anthropic:ApiKey and restart to enable replies.");
+            return;
+        }
 
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -33,7 +37,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         var contextLines = recent.Select(m => $"{m.Author.Username}: {m.Content}").ToList();
         var reply = await CallClaudeAsync(triggerContent, contextLines);
-        if (reply is null) return;
+        if (reply is null) { Console.WriteLine("[PorkChop] no reply produced (see any Anthropic error above)."); return; }
 
         var msg = new Message
         {
@@ -63,18 +67,23 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
             {
                 model      = _model,
                 max_tokens = 1024,
-                system     = "You are FatBot, a helpful and friendly assistant in a Discord-like chat app called FatGuysSpeak. Keep responses concise and conversational.",
+                system     = "You are PorkChop, a friendly, down-to-earth advisor in a chat app called FatGuysSpeak. People mention you (@PorkChop) when they have a question or want advice. Read their message and the recent conversation, then give practical, helpful advice or a clear answer. Be concise and conversational, and don't be afraid to have a little personality.",
                 messages   = new[] { new { role = "user", content } }
             };
 
             var res = await client.PostAsJsonAsync("messages", payload);
-            if (!res.IsSuccessStatusCode) return null;
+            if (!res.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"[PorkChop] Anthropic API {(int)res.StatusCode}: {await res.Content.ReadAsStringAsync()}");
+                return null;
+            }
 
             var data = await res.Content.ReadFromJsonAsync<AnthropicResponse>();
             return data?.Content?.FirstOrDefault(b => b.Type == "text")?.Text?.Trim();
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[PorkChop] Anthropic call failed: {ex.Message}");
             return null;
         }
     }
