@@ -50,3 +50,7 @@ FatGuysSpeak.Server/uploads/
 release-output/
 release-staging/
 release-zips/
+
+# server log files
+logs/
+**/logs/

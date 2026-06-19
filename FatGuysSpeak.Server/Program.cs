@@ -10,8 +10,28 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ── Logging: console + rolling daily file so a beta/run is diagnosable after the fact ──
+var logDir = Path.Combine(builder.Environment.ContentRootPath, "logs");
+Directory.CreateDirectory(logDir);
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File(Path.Combine(logDir, "fatguys-.log"),
+        rollingInterval: RollingInterval.Day, retainedFileCountLimit: 14,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
+builder.Host.UseSerilog();
+AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+    Log.Fatal(e.ExceptionObject as Exception, "Unhandled exception — process terminating");
+AppDomain.CurrentDomain.ProcessExit += (_, _) => Log.CloseAndFlush();
 
 builder.WebHost.ConfigureKestrel(k => k.Limits.MaxRequestBodySize = 26 * 1024 * 1024); // 26 MB — covers 25 MB file uploads
 
