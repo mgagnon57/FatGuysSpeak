@@ -58,4 +58,21 @@ public partial class MainPage : ContentPage
     {
         _vm.OnScrollPositionChanged(e.LastVisibleItemIndex);
     }
+
+    // Drag a voice occupant: stamp the user's id into the OS drag payload so Windows accepts the
+    // drop (a drag with no data package won't register a drop target on WinUI).
+    private void OnOccupantDragStarting(object? sender, DragStartingEventArgs e)
+    {
+        if (sender is Element el && el.BindingContext is FatGuysSpeak.Shared.UserDto user)
+            e.Data.Text = user.Id.ToString();
+    }
+
+    // Drop on a channel row: read the dragged user's id and ask the VM to move them.
+    private async void OnChannelDrop(object? sender, DropEventArgs e)
+    {
+        if (sender is not Element el || el.BindingContext is not ChannelViewItem ch) return;
+        var text = await e.Data.GetTextAsync();
+        if (int.TryParse(text, out var userId))
+            await _vm.MoveUserToVoiceChannel(userId, ch.Channel.Id);
+    }
 }

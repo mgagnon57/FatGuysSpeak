@@ -1830,20 +1830,14 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     }
 
     private int _voiceChannelId;
-    private FatGuysSpeak.Shared.UserDto? _draggedUser;
 
-    [RelayCommand]
-    private void BeginUserDrag(FatGuysSpeak.Shared.UserDto user) => _draggedUser = user;
-
-    [RelayCommand]
-    private async Task DropUserOnChannel(ChannelViewItem target)
+    /// <summary>Called from MainPage drag/drop code-behind when a voice occupant is dropped on a
+    /// channel. Gated to mods/admins (server re-checks); dragging yourself is a no-op.</summary>
+    public async Task MoveUserToVoiceChannel(int targetUserId, int channelId)
     {
-        var user = _draggedUser;
-        _draggedUser = null;
-        if (user is null || target is null) return;
-        if (!IsAdminOrModerator) return;                 // server re-checks; this just gates the UI path
-        if (user.Id == api.CurrentUserId) return;         // dragging yourself is a no-op
-        await hub.MoveUserToVoiceChannelAsync(user.Id, target.Channel.Id);
+        if (!IsAdminOrModerator) return;
+        if (targetUserId == api.CurrentUserId) return;
+        await hub.MoveUserToVoiceChannelAsync(targetUserId, channelId);
     }
 
     private async Task JoinVoiceAsync(ChannelDto channel)

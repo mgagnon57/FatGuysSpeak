@@ -372,8 +372,7 @@
                                                                     CommandParameter="{Binding .}" />
                                                                 <DropGestureRecognizer
                                                                     AllowDrop="{Binding BindingContext.IsAdminOrModerator, Source={x:Reference RootPage}}"
-                                                                    DropCommand="{Binding BindingContext.DropUserOnChannelCommand, Source={x:Reference RootPage}}"
-                                                                    DropCommandParameter="{Binding .}" />
+                                                                    Drop="OnChannelDrop" />
                                                             </Grid.GestureRecognizers>
                                                             <BoxView WidthRequest="3" HorizontalOptions="Start" VerticalOptions="Fill"
                                                                      Color="{DynamicResource ThemeAccent}" Margin="-8,-5,0,-5"
@@ -414,8 +413,7 @@
                                                                         <Grid.GestureRecognizers>
                                                                             <DragGestureRecognizer
                                                                                 CanDrag="{Binding BindingContext.IsAdminOrModerator, Source={x:Reference RootPage}}"
-                                                                                DragStartingCommand="{Binding BindingContext.BeginUserDragCommand, Source={x:Reference RootPage}}"
-                                                                                DragStartingCommandParameter="{Binding .}" />
+                                                                                DragStarting="OnOccupantDragStarting" />
                                                                         </Grid.GestureRecognizers>
                                                                         <FlyoutBase.ContextFlyout>
                                                                             <MenuFlyout>
