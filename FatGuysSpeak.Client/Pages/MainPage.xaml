@@ -371,7 +371,7 @@
                                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectChannelCommand}"
                                                                     CommandParameter="{Binding .}" />
                                                                 <DropGestureRecognizer
-                                                                    AllowDrop="{Binding BindingContext.IsAdminOrModerator, Source={x:Reference RootPage}}"
+                                                                    AllowDrop="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsAdminOrModerator}"
                                                                     Drop="OnChannelDrop" />
                                                             </Grid.GestureRecognizers>
                                                             <BoxView WidthRequest="3" HorizontalOptions="Start" VerticalOptions="Fill"
@@ -412,7 +412,7 @@
                                                                     <Grid Padding="28,3,8,3" BackgroundColor="Transparent">
                                                                         <Grid.GestureRecognizers>
                                                                             <DragGestureRecognizer
-                                                                                CanDrag="{Binding BindingContext.IsAdminOrModerator, Source={x:Reference RootPage}}"
+                                                                                CanDrag="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsAdminOrModerator}"
                                                                                 DragStarting="OnOccupantDragStarting" />
                                                                         </Grid.GestureRecognizers>
                                                                         <FlyoutBase.ContextFlyout>
