@@ -238,7 +238,7 @@ public class ServersControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task SetMemberRole_AdminPromotesMemberToModerator_Succeeds()
+    public async Task SetMemberRole_AdminPromotesMemberToAdmin_Succeeds()
     {
         await SeedAsync();
         var member = new User { Username = "member2", Email = "m2@test.com", PasswordHash = "*" };
@@ -249,15 +249,15 @@ public class ServersControllerTests : IDisposable
         await _testDb.Db.SaveChangesAsync();
 
         var result = await _controller.SetMemberRole(_server.Id, member.Id,
-            new SetRoleRequest(ServerRole.Moderator));
+            new SetRoleRequest(ServerRole.Admin));
 
         Assert.IsType<NoContentResult>(result);
         var updated = await _testDb.Db.ServerMembers.FindAsync(_server.Id, member.Id);
-        Assert.Equal(ServerRole.Moderator, updated!.Role);
+        Assert.Equal(ServerRole.Admin, updated!.Role);
     }
 
     [Fact]
-    public async Task SetMemberRole_NonAdminCannotPromoteToModerator_ReturnsForbid()
+    public async Task SetMemberRole_NonAdminCannotPromoteToAdmin_ReturnsForbid()
     {
         await SeedAsync();
         var member = new User { Username = "member2", Email = "m2@test.com", PasswordHash = "*" };
@@ -272,7 +272,7 @@ public class ServersControllerTests : IDisposable
         TestHelpers.SetUser(_controller, member.Id, member.Username);
 
         var result = await _controller.SetMemberRole(_server.Id, target.Id,
-            new SetRoleRequest(ServerRole.Moderator));
+            new SetRoleRequest(ServerRole.Admin));
 
         Assert.IsType<ForbidResult>(result);
     }

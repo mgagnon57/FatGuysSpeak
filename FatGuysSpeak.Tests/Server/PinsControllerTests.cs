@@ -44,8 +44,6 @@ public class PinsControllerTests : IDisposable
     private async Task<(GuildServer server, Channel channel, User mod, Message msg)> SeedChannelAsync()
     {
         var (server, mod) = await TestHelpers.SeedServerAsync(_testDb.Db, "pins");
-        mod.ServerMemberships.First().Role = ServerRole.Moderator;
-        await _testDb.Db.SaveChangesAsync();
         var channel = _testDb.Db.Channels.First(c => c.ServerId == server.Id
                                                    && c.Type == ChannelType.Text);
         var msg = new Message
@@ -65,7 +63,7 @@ public class PinsControllerTests : IDisposable
     // ── Channel pins ──────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task PinChannelMessage_Moderator_ReturnsOk()
+    public async Task PinChannelMessage_Admin_ReturnsOk()
     {
         var (_, channel, mod, msg) = await SeedChannelAsync();
         var result = await MakeController(mod.Id, mod.Username).PinChannelMessage(channel.Id, msg.Id);
@@ -73,7 +71,7 @@ public class PinsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task PinChannelMessage_Moderator_PersistsPin()
+    public async Task PinChannelMessage_Admin_PersistsPin()
     {
         var (_, channel, mod, msg) = await SeedChannelAsync();
         await MakeController(mod.Id, mod.Username).PinChannelMessage(channel.Id, msg.Id);
@@ -81,7 +79,7 @@ public class PinsControllerTests : IDisposable
     }
 
     [Fact]
-    public async Task PinChannelMessage_Moderator_BroadcastsMessagePinned()
+    public async Task PinChannelMessage_Admin_BroadcastsMessagePinned()
     {
         var (_, channel, mod, msg) = await SeedChannelAsync();
         _hubCalls.Clear();

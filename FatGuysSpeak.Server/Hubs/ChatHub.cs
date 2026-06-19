@@ -156,7 +156,7 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         await Clients.Caller.SendAsync("VoiceParticipants", existing);
     }
 
-    /// <summary>Moderator/admin moves any member into a channel: validates + audits, then tells
+    /// <summary>An admin moves any member into a channel: validates + audits, then tells
     /// the target's client to switch to that channel (reuses the proven ForceJoinChannel relay
     /// that Kick-Voice uses). Silent no-op on any invalid request.</summary>
     public async Task MoveUserToChannel(int targetUserId, int channelId)
@@ -168,9 +168,9 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
             .FirstOrDefaultAsync(c => c.Id == channelId);
         if (channel is null) return;
 
-        // Caller must be a Moderator+ member of the channel's server (flat permission).
+        // Caller must be an admin of the channel's server (flat permission).
         var mover = channel.Server.Members.FirstOrDefault(m => m.UserId == UserId);
-        if (mover is null || mover.Role < ServerRole.Moderator) return;
+        if (mover is null || mover.Role < ServerRole.Admin) return;
 
         // Target must be a member of that server.
         var target = channel.Server.Members.FirstOrDefault(m => m.UserId == targetUserId);

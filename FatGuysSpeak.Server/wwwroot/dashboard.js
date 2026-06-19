@@ -221,7 +221,7 @@ function userCell(u) {
 // Default ordering: online users first, then alphabetical. Column sort overrides this (set below).
 let userSort = { key: 'online', dir: 'desc' };
 function sortUsers(list) {
-  const roleRank = { Admin: 3, Moderator: 2, Member: 1 };
+  const roleRank = { Admin: 2, Member: 1 };
   const roleOf = (u) => serverMembers.find(m => m.userId === u.id)?.role ?? null;
   const cmp = (a, b) => {
     let r = 0;
@@ -239,18 +239,17 @@ function sortUsers(list) {
   return [...list].sort(cmp);
 }
 
-const ROLE_STR = { 0: 'Member', 1: 'Moderator', 2: 'Admin' };
-const ROLE_NUM = { Member: 0, Moderator: 1, Admin: 2 };
+const ROLE_STR = { 0: 'Member', 2: 'Admin' };
+const ROLE_NUM = { Member: 0, Admin: 2 };
 function toRoleStr(r) { return typeof r === 'string' ? r : (ROLE_STR[r] ?? 'Member'); }
 
 const ROLE_TIPS = {
-  Member:    'Member\n• Send and read messages\n• Join voice channels\n• React to messages',
-  Moderator: 'Moderator\n• Everything a Member can do\n• Delete any message in the server\n• Access moderator-restricted channels',
-  Admin:     'Admin\n• Everything a Moderator can do\n• Create and delete channels\n• Set per-channel read/write permissions\n• Promote or demote members\n• Kick members from the server',
+  Member: 'Member\n• Send and read messages\n• Join voice channels\n• React to messages',
+  Admin:  'Admin\n• Everything a Member can do\n• Create and delete channels\n• Set per-channel read/write permissions\n• Promote or demote members\n• Kick members from the server',
 };
 
 function roleBadge(role) {
-  const map = { Admin: '#f04010', Moderator: '#36b864', Member: '#4a443d' };
+  const map = { Admin: '#f04010', Member: '#4a443d' };
   const col = map[role] || '#4a443d';
   const tip = (ROLE_TIPS[role] || role || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   return `<span class="badge role-tip" style="background:${col}22;color:${col};cursor:help" data-tip="${tip}">${role ?? '—'}</span>`;
@@ -266,8 +265,8 @@ function renderUsers(users) {
   tbody.innerHTML = users.map(u => {
     const member = serverMembers.find(m => m.userId === u.id);
     const role = member?.role ?? null;
-    const nextUp   = role === 'Member' ? 'Moderator' : 'Admin';
-    const nextDown = role === 'Admin'  ? 'Moderator' : 'Member';
+    const nextUp   = 'Admin';
+    const nextDown = 'Member';
     const roleCell = role
       ? `<div style="display:flex;align-items:center;gap:4px">${roleBadge(role)}
          <span class="role-arrows" style="margin-left:auto;display:inline-flex;gap:4px">
@@ -441,16 +440,14 @@ async function promoteUser(userId, btn) {
   if (!currentServerId) return;
   const member = serverMembers.find(m => m.userId === userId);
   if (!member) return;
-  const next = member.role === 'Member' ? 'Moderator' : 'Admin';
-  await setRole(userId, next, btn);
+  await setRole(userId, 'Admin', btn);
 }
 
 async function demoteUser(userId, btn) {
   if (!currentServerId) return;
   const member = serverMembers.find(m => m.userId === userId);
   if (!member) return;
-  const prev = member.role === 'Admin' ? 'Moderator' : 'Member';
-  await setRole(userId, prev, btn);
+  await setRole(userId, 'Member', btn);
 }
 
 async function setRole(userId, role, btn) {
@@ -881,7 +878,7 @@ async function loadChannels() {
   }
 }
 
-const roles = ['Member','Moderator','Admin'];
+const roles = ['Member','Admin'];
 
 function renderChannels(channels, serverId) {
   const tbody = document.getElementById('channelTableBody');

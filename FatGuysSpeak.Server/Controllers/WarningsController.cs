@@ -20,7 +20,7 @@ public class WarningsController(AppDbContext db) : ControllerBase
     public async Task<ActionResult<List<UserWarningDto>>> GetWarnings(int serverId, int userId)
     {
         var actorMember = await db.ServerMembers.FindAsync(serverId, ActorId);
-        if (actorMember is null || actorMember.Role < ServerRole.Moderator) return Forbid();
+        if (actorMember is null || actorMember.Role < ServerRole.Admin) return Forbid();
 
         var warnings = await db.UserWarnings
             .Where(w => w.ServerId == serverId && w.UserId == userId)
@@ -37,7 +37,7 @@ public class WarningsController(AppDbContext db) : ControllerBase
             return BadRequest("Reason must be 1–500 characters.");
 
         var actorMember = await db.ServerMembers.FindAsync(serverId, ActorId);
-        if (actorMember is null || actorMember.Role < ServerRole.Moderator) return Forbid();
+        if (actorMember is null || actorMember.Role < ServerRole.Admin) return Forbid();
 
         var targetMember = await db.ServerMembers.FindAsync(serverId, userId);
         if (targetMember is null) return NotFound("User is not a member of this server.");

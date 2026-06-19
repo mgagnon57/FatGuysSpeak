@@ -105,19 +105,6 @@ public class ChatHubMoveUserTests : IDisposable
     }
 
     [Fact]
-    public async Task ModeratorMovesMember_IsAllowed()
-    {
-        var (server, _) = await TestHelpers.SeedServerAsync(_testDb.Db, "mv-mod");
-        var dest = await AddVoiceChannelAsync(server.Id, "Dest");
-        var mod = await AddMemberAsync(server.Id, "mv-themod", ServerRole.Moderator);
-        var target = await AddMemberAsync(server.Id, "mv-tgt2", ServerRole.Member);
-
-        await CreateHub(mod.Id, mod.Username, "conn-mod").MoveUserToChannel(target.Id, dest.Id);
-
-        Assert.True(WasSentTo($"user:{target.Id}", "ForceJoinChannel"));
-    }
-
-    [Fact]
     public async Task MemberCaller_CannotMove_NoSend_NoAudit()
     {
         var (server, _) = await TestHelpers.SeedServerAsync(_testDb.Db, "mv-member");

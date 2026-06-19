@@ -48,7 +48,6 @@ public partial class UserProfileViewModel : ObservableObject
     public string RoleText => Profile?.Role switch
     {
         ServerRole.Admin => "👑 Admin",
-        ServerRole.Moderator => "🛡 Moderator",
         ServerRole.Member => "👤 Member",
         _ => ""
     };

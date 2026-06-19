@@ -138,7 +138,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
             return StatusCode(403, $"You are muted until {until}.");
         }
 
-        if (channel.SlowmodeSeconds > 0 && senderMember.Role < ServerRole.Moderator)
+        if (channel.SlowmodeSeconds > 0 && senderMember.Role < ServerRole.Admin)
         {
             var lastMsg = await db.Messages
                 .Where(m => m.ChannelId == channelId && m.AuthorId == UserId)
@@ -174,7 +174,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
 
         var filteredContent = req.Content?.Trim() ?? "";
 
-        if (senderMember.Role < ServerRole.Moderator && !string.IsNullOrEmpty(filteredContent))
+        if (senderMember.Role < ServerRole.Admin && !string.IsNullOrEmpty(filteredContent))
         {
             var filters = await db.WordFilters.Where(f => f.ServerId == channel.ServerId).ToListAsync();
             if (filters.Count > 0)
@@ -199,7 +199,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
                 return StatusCode(403, "You don't have permission to mention @everyone in this server.");
         }
 
-        if (senderMember.Role < ServerRole.Moderator && automod.IsSpam(UserId, channelId, filteredContent))
+        if (senderMember.Role < ServerRole.Admin && automod.IsSpam(UserId, channelId, filteredContent))
             return StatusCode(429, "Message blocked: slow down or avoid sending duplicate messages.");
 
         var message = new Message
@@ -338,7 +338,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
         if (channel is not null)
         {
             var member = await db.ServerMembers.FindAsync(channel.ServerId, UserId);
-            if (member is not null && member.Role < ServerRole.Moderator)
+            if (member is not null && member.Role < ServerRole.Admin)
             {
                 var filters = await db.WordFilters.Where(f => f.ServerId == channel.ServerId).ToListAsync();
                 if (filters.Count > 0)

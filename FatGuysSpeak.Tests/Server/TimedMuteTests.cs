@@ -41,7 +41,7 @@ public class TimedMuteTests : IDisposable
     private int ChannelId => _testDb.Db.Channels.First(c => c.ServerId == _server.Id && c.Type == ChannelType.Text).Id;
 
     [Fact]
-    public async Task MuteUser_AsModerator_SetsMutedUntil()
+    public async Task MuteUser_AsAdmin_SetsMutedUntil()
     {
         await SeedAsync();
         TestHelpers.SetUser(_serverCtrl, _admin.Id, _admin.Username);
@@ -85,12 +85,13 @@ public class TimedMuteTests : IDisposable
     public async Task MuteUser_CannotMuteHigherRole_ReturnsForbid()
     {
         await SeedAsync();
-        var mod = new User { Username = "mod", Email = "mod@test.com", PasswordHash = "*" };
-        _testDb.Db.Users.Add(mod);
+        // A second admin cannot mute a peer admin (mute requires the target's role be strictly lower).
+        var other = new User { Username = "admin2", Email = "admin2@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(other);
         await _testDb.Db.SaveChangesAsync();
-        _testDb.Db.ServerMembers.Add(new ServerMember { ServerId = _server.Id, UserId = mod.Id, Role = ServerRole.Moderator });
+        _testDb.Db.ServerMembers.Add(new ServerMember { ServerId = _server.Id, UserId = other.Id, Role = ServerRole.Admin });
         await _testDb.Db.SaveChangesAsync();
-        TestHelpers.SetUser(_serverCtrl, mod.Id, mod.Username);
+        TestHelpers.SetUser(_serverCtrl, other.Id, other.Username);
 
         var result = await _serverCtrl.MuteUser(_server.Id, _admin.Id, new MuteUserRequest(300));
 

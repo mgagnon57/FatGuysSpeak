@@ -347,7 +347,6 @@ public class MetricsController(ServerMetricsService metrics, UpdateStatus update
                 style="background:#161414;border:1px solid #292525;border-radius:4px;color:#e9e4d9;font-size:11px;padding:5px 8px;font-family:inherit">
                 <option value="">All roles</option>
                 <option value="Admin">Admin</option>
-                <option value="Moderator">Moderator</option>
                 <option value="Member">Member</option>
               </select>
               <input class="search-box" id="userSearch" placeholder="Filter by username…" data-input="filterUsers" title="Type to filter the list by username" />
@@ -478,7 +477,7 @@ public class MetricsController(ServerMetricsService metrics, UpdateStatus update
             </div>
           </div>
           <p style="font-size:11px;color:#4a443d;margin-bottom:12px">
-            New patterns use <strong style="color:#756e62">Delete</strong> severity — the message is blocked and the sender sees an error. Moderators and Admins bypass the filter. The API supports <em>Log</em> (replace with ***) and <em>Mute</em> (block + auto-mute 10 min) severities.
+            New patterns use <strong style="color:#756e62">Delete</strong> severity — the message is blocked and the sender sees an error. Admins bypass the filter. The API supports <em>Log</em> (replace with ***) and <em>Mute</em> (block + auto-mute 10 min) severities.
           </p>
           <table class="user-table" id="wfTable">
             <thead>

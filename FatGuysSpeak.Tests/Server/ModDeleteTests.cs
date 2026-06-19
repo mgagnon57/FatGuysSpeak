@@ -38,7 +38,7 @@ public class ModDeleteTests : IDisposable
 
         _db.Db.ServerMembers.AddRange(
             new ServerMember { ServerId = _server.Id, UserId = _member.Id, Role = ServerRole.Member },
-            new ServerMember { ServerId = _server.Id, UserId = _moderator.Id, Role = ServerRole.Moderator }
+            new ServerMember { ServerId = _server.Id, UserId = _moderator.Id, Role = ServerRole.Member }
         );
         await _db.Db.SaveChangesAsync();
     }
@@ -49,19 +49,6 @@ public class ModDeleteTests : IDisposable
         _db.Db.Messages.Add(msg);
         await _db.Db.SaveChangesAsync();
         return msg;
-    }
-
-    [Fact]
-    public async Task DeleteMessage_Moderator_CannotDeleteOthersMessage()
-    {
-        await SeedAsync();
-        var msg = await AddMessageAsync(_member.Id, "bad message");
-        TestHelpers.SetUser(_ctrl, _moderator.Id, _moderator.Username);
-
-        var result = await _ctrl.DeleteMessage(_channel.Id, msg.Id);
-
-        Assert.IsType<ForbidResult>(result);
-        Assert.False(_db.Db.Messages.Find(msg.Id)!.IsDeleted);
     }
 
     [Fact]

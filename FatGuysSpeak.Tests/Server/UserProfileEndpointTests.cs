@@ -42,7 +42,7 @@ public class UserProfileEndpointTests : IDisposable
             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc), TotalOnlineSeconds = 3600 };
         _testDb.Db.Users.Add(user);
         await _testDb.Db.SaveChangesAsync();
-        _testDb.Db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, Role = ServerRole.Moderator });
+        _testDb.Db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, Role = ServerRole.Admin });
         _testDb.Db.UserSessions.Add(new UserSession { UserId = user.Id, TokenHash = "h1", IpAddress = "1.2.3.4", UserAgent = "UA", CreatedAt = DateTime.UtcNow });
         var channel = _testDb.Db.Channels.First();
         _testDb.Db.Messages.Add(new Message { AuthorId = user.Id, ChannelId = channel.Id, Content = "hi" });
@@ -53,7 +53,7 @@ public class UserProfileEndpointTests : IDisposable
         var ok = Assert.IsType<OkObjectResult>(result);
         var dto = Assert.IsType<UserProfileAdminDto>(ok.Value);
         Assert.Equal("jane", dto.Username);
-        Assert.Equal("Moderator", dto.Role);
+        Assert.Equal("Admin", dto.Role);
         Assert.Equal(1, dto.MessageCount);
         Assert.Equal("1.2.3.4", dto.LastLoginIp);
         Assert.Equal(1, dto.ActiveSessionCount);

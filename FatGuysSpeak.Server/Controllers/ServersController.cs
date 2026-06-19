@@ -358,7 +358,7 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
     {
         if (req.Seconds < 0 || req.Seconds > 86400) return BadRequest("Mute duration must be 0–86400 seconds.");
         var actor = await db.ServerMembers.FindAsync(serverId, UserId);
-        if (actor is null || actor.Role < ServerRole.Moderator) return Forbid();
+        if (actor is null || actor.Role < ServerRole.Admin) return Forbid();
 
         var target = await db.ServerMembers.Include(m => m.User)
             .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == targetUserId);

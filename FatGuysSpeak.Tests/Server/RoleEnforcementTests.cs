@@ -37,7 +37,7 @@ public class RoleEnforcementTests : IDisposable
 
         _db.Db.ServerMembers.AddRange(
             new ServerMember { ServerId = _server.Id, UserId = _member.Id, Role = ServerRole.Member },
-            new ServerMember { ServerId = _server.Id, UserId = _moderator.Id, Role = ServerRole.Moderator }
+            new ServerMember { ServerId = _server.Id, UserId = _moderator.Id, Role = ServerRole.Member }
         );
         await _db.Db.SaveChangesAsync();
     }
@@ -60,17 +60,6 @@ public class RoleEnforcementTests : IDisposable
     {
         await SeedAsync();
         TestHelpers.SetUser(_ctrl, _member.Id, _member.Username);
-
-        var result = await _ctrl.CreateChannel(_server.Id, new CreateChannelRequest("dev", ChannelType.Text));
-
-        Assert.IsType<ForbidResult>(result.Result);
-    }
-
-    [Fact]
-    public async Task CreateChannel_AsModerator_ReturnsForbid()
-    {
-        await SeedAsync();
-        TestHelpers.SetUser(_ctrl, _moderator.Id, _moderator.Username);
 
         var result = await _ctrl.CreateChannel(_server.Id, new CreateChannelRequest("dev", ChannelType.Text));
 
@@ -158,19 +147,6 @@ public class RoleEnforcementTests : IDisposable
     // ── SetMemberRole ─────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task SetMemberRole_AdminPromotesToModerator_Succeeds()
-    {
-        await SeedAsync();
-        TestHelpers.SetUser(_ctrl, _owner.Id, _owner.Username);
-
-        var result = await _ctrl.SetMemberRole(_server.Id, _member.Id, new SetRoleRequest(ServerRole.Moderator));
-
-        Assert.IsType<NoContentResult>(result);
-        var updated = _db.Db.ServerMembers.Find(_server.Id, _member.Id);
-        Assert.Equal(ServerRole.Moderator, updated!.Role);
-    }
-
-    [Fact]
     public async Task SetMemberRole_AdminPromotesToAdmin_Succeeds_WhenIsOwner()
     {
         await SeedAsync();
@@ -209,12 +185,12 @@ public class RoleEnforcementTests : IDisposable
         await SeedAsync();
         TestHelpers.SetUser(_ctrl, _owner.Id, _owner.Username);
 
-        await _ctrl.SetMemberRole(_server.Id, _member.Id, new SetRoleRequest(ServerRole.Moderator));
+        await _ctrl.SetMemberRole(_server.Id, _member.Id, new SetRoleRequest(ServerRole.Admin));
 
         var log = _db.Db.AuditLogs.FirstOrDefault(a => a.Action == "RoleChanged");
         Assert.NotNull(log);
         Assert.Equal(_member.Id, log.TargetId);
-        Assert.Contains("Moderator", log.Detail);
+        Assert.Contains("Admin", log.Detail);
     }
 
     // ── GetMyServers returns MyRole ────────────────────────────────────────────

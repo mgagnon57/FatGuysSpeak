@@ -749,6 +749,14 @@ using (var scope = app.Services.CreateScope())
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ExternalLogins_Provider_ProviderUserId ON ExternalLogins (Provider, ProviderUserId)");
     }
 
+    // Role simplification: the Moderator role (1) was removed in favour of a flat Admin/Member
+    // model. Demote any lingering moderators to Member. Idempotent — once no Role=1 rows remain
+    // this is a no-op, so it is safe to run on every startup.
+    if (isPostgres)
+        ctx.Database.ExecuteSqlRaw(@"UPDATE ""ServerMembers"" SET ""Role"" = 0 WHERE ""Role"" = 1");
+    else
+        ctx.Database.ExecuteSqlRaw(@"UPDATE ServerMembers SET Role = 0 WHERE Role = 1");
+
     // Seed bot user
     var botUser = ctx.Users.FirstOrDefault(u => u.Username == FatGuysSpeak.Server.Services.BotService.BotUsername);
     if (botUser is null)

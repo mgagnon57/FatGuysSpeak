@@ -60,10 +60,9 @@ public partial class MessageViewItem : ObservableObject
     public string AuthorRoleIcon => AuthorRole switch
     {
         ServerRole.Admin => "👑",
-        ServerRole.Moderator => "🛡",
         _ => ""
     };
-    public bool HasAuthorRoleIcon => AuthorRole >= ServerRole.Moderator;
+    public bool HasAuthorRoleIcon => AuthorRole >= ServerRole.Admin;
 
     public bool HasAttachment => Message.AttachmentUrl is not null;
     public bool HasGifAttachment => IsGifUrl(Message.AttachmentUrl);

@@ -69,7 +69,10 @@ public record AttachmentDto(string Url, string? OriginalFileName = null, string?
 public enum MessageSource { Text, Voice, Stream, AI }
 
 public record UpdateStatusDto(string Current, string? Latest, bool UpdateAvailable, string? ReleaseUrl);
-public enum ServerRole { Member, Moderator, Admin }
+// Two roles only: you are an Admin or you are not. Admin keeps numeric value 2 so existing
+// rows in long-lived databases stay valid; the old Moderator (1) is migrated to Member at
+// startup. A finer-grained per-channel permission model is planned for later.
+public enum ServerRole { Member = 0, Admin = 2 }
 
 public record UserProfileDto(
     int Id,

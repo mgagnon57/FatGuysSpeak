@@ -62,18 +62,18 @@ public class ChannelPermissionsTests : IDisposable
     }
 
     [Fact]
-    public async Task SetPermissions_Admin_CanSetModeratorWrite()
+    public async Task SetPermissions_Admin_CanSetAdminWrite()
     {
         await SeedAsync();
         TestHelpers.SetUser(_ctrl, _owner.Id, _owner.Username);
 
         var result = await _ctrl.SetPermissions(_server.Id, _channel.Id,
-            new SetChannelPermissionRequest(ServerRole.Member, ServerRole.Moderator));
+            new SetChannelPermissionRequest(ServerRole.Member, ServerRole.Admin));
 
         Assert.IsType<OkObjectResult>(result.Result);
         var perm = _db.Db.ChannelPermissions.Find(_channel.Id);
         Assert.NotNull(perm);
-        Assert.Equal(ServerRole.Moderator, perm.MinRoleToWrite);
+        Assert.Equal(ServerRole.Admin, perm.MinRoleToWrite);
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public class ChannelPermissionsTests : IDisposable
         TestHelpers.SetUser(_ctrl, _member.Id, _member.Username);
 
         var result = await _ctrl.SetPermissions(_server.Id, _channel.Id,
-            new SetChannelPermissionRequest(ServerRole.Moderator, ServerRole.Moderator));
+            new SetChannelPermissionRequest(ServerRole.Admin, ServerRole.Admin));
 
         Assert.IsType<ForbidResult>(result.Result);
     }
@@ -128,12 +128,12 @@ public class ChannelPermissionsTests : IDisposable
         TestHelpers.SetUser(_ctrl, _owner.Id, _owner.Username);
 
         await _ctrl.SetPermissions(_server.Id, _channel.Id,
-            new SetChannelPermissionRequest(ServerRole.Moderator, ServerRole.Moderator));
+            new SetChannelPermissionRequest(ServerRole.Admin, ServerRole.Admin));
 
         var log = _db.Db.AuditLogs.FirstOrDefault(a => a.Action == "ChannelPermissionsChanged");
         Assert.NotNull(log);
         Assert.Equal(_channel.Id, log.TargetId);
-        Assert.Contains("Moderator", log.Detail);
+        Assert.Contains("Admin", log.Detail);
     }
 
     [Fact]
@@ -143,14 +143,14 @@ public class ChannelPermissionsTests : IDisposable
         TestHelpers.SetUser(_ctrl, _owner.Id, _owner.Username);
 
         await _ctrl.SetPermissions(_server.Id, _channel.Id,
-            new SetChannelPermissionRequest(ServerRole.Moderator, ServerRole.Admin));
+            new SetChannelPermissionRequest(ServerRole.Admin, ServerRole.Admin));
 
         TestHelpers.SetUser(_ctrl, _member.Id, _member.Username);
         var result = await _ctrl.GetPermissions(_server.Id, _channel.Id);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<ChannelPermissionDto>(ok.Value);
-        Assert.Equal(ServerRole.Moderator, dto.MinRoleToRead);
+        Assert.Equal(ServerRole.Admin, dto.MinRoleToRead);
         Assert.Equal(ServerRole.Admin, dto.MinRoleToWrite);
     }
 }

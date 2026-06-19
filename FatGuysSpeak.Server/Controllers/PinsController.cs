@@ -36,7 +36,7 @@ public class PinsController(AppDbContext db, IHubContext<ChatHub> hub) : Control
     [HttpPost("api/channels/{channelId}/messages/{messageId}/pin")]
     public async Task<ActionResult> PinChannelMessage(int channelId, int messageId)
     {
-        if (!await IsModeratorOfChannelAsync(channelId)) return Forbid();
+        if (!await IsAdminOfChannelAsync(channelId)) return Forbid();
 
         var message = await db.Messages.FindAsync(messageId);
         if (message is null || message.ChannelId != channelId) return NotFound();
@@ -56,7 +56,7 @@ public class PinsController(AppDbContext db, IHubContext<ChatHub> hub) : Control
     [HttpDelete("api/channels/{channelId}/messages/{messageId}/pin")]
     public async Task<ActionResult> UnpinChannelMessage(int channelId, int messageId)
     {
-        if (!await IsModeratorOfChannelAsync(channelId)) return Forbid();
+        if (!await IsAdminOfChannelAsync(channelId)) return Forbid();
 
         var pin = await db.PinnedMessages
             .FirstOrDefaultAsync(p => p.MessageId == messageId && p.ChannelId == channelId);
@@ -144,13 +144,13 @@ public class PinsController(AppDbContext db, IHubContext<ChatHub> hub) : Control
         return channel?.Server.Members.Any(m => m.UserId == UserId) ?? false;
     }
 
-    private async Task<bool> IsModeratorOfChannelAsync(int channelId)
+    private async Task<bool> IsAdminOfChannelAsync(int channelId)
     {
         var channel = await db.Channels.Include(c => c.Server).ThenInclude(s => s.Members)
             .FirstOrDefaultAsync(c => c.Id == channelId);
         if (channel is null) return false;
         var member = channel.Server.Members.FirstOrDefault(m => m.UserId == UserId);
-        return member is not null && member.Role >= ServerRole.Moderator;
+        return member is not null && member.Role >= ServerRole.Admin;
     }
 
     private Task<bool> IsParticipantAsync(int conversationId) =>

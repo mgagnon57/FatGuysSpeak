@@ -18,11 +18,10 @@ public partial class MemberViewItem : ObservableObject
     public string RoleIcon => Role switch
     {
         ServerRole.Admin => "👑",
-        ServerRole.Moderator => "🛡",
         _ => ""
     };
 
-    public bool HasRoleIcon => Role >= ServerRole.Moderator;
+    public bool HasRoleIcon => Role >= ServerRole.Admin;
 
     public MemberViewItem(UserDto user, ServerRole role = ServerRole.Member)
     {

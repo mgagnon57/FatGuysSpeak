@@ -231,10 +231,6 @@
                                                     CommandParameter="{Binding Id}" />
                                                 <MenuFlyoutItem Text="🎤 Test My Mic (Loopback)"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ToggleMicLoopbackCommand}" />
-                                                <MenuFlyoutItem Text="🛡 Make Moderator"
-                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.PromoteToModeratorCommand}"
-                                                    CommandParameter="{Binding Id}"
-                                                    IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}" />
                                                 <MenuFlyoutItem Text="👑 Make Admin"
                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ElevateToAdminCommand}"
                                                     CommandParameter="{Binding Id}"
@@ -371,7 +367,7 @@
                                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.SelectChannelCommand}"
                                                                     CommandParameter="{Binding .}" />
                                                                 <DropGestureRecognizer
-                                                                    AllowDrop="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsAdminOrModerator}"
+                                                                    AllowDrop="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}"
                                                                     DragOver="OnChannelDragOver"
                                                                     Drop="OnChannelDrop" />
                                                             </Grid.GestureRecognizers>
@@ -413,13 +409,13 @@
                                                                     <Grid Padding="28,3,8,3" BackgroundColor="Transparent">
                                                                         <Grid.GestureRecognizers>
                                                                             <DragGestureRecognizer
-                                                                                CanDrag="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsAdminOrModerator}"
+                                                                                CanDrag="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}"
                                                                                 DragStarting="OnOccupantDragStarting" />
                                                                         </Grid.GestureRecognizers>
                                                                         <FlyoutBase.ContextFlyout>
                                                                             <MenuFlyout>
                                                                                 <MenuFlyoutItem Text="↔ Move to Channel…"
-                                                                                    IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsAdminOrModerator}"
+                                                                                    IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsServerAdmin}"
                                                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.PromptMoveUserCommand}"
                                                                                     CommandParameter="{Binding .}" />
                                                                             </MenuFlyout>

@@ -150,7 +150,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     public ServerRole CurrentServerRole => SelectedServer?.MyRole ?? ServerRole.Member;
     public bool IsServerAdmin => CurrentServerRole >= ServerRole.Admin;
-    public bool IsAdminOrModerator => CurrentServerRole >= ServerRole.Moderator;
 
     public bool IsTextTab => SelectedTab == "Text";
     public bool IsVoiceTab => SelectedTab == "Voice";
@@ -274,7 +273,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         OnPropertyChanged(nameof(CurrentServerRole));
         OnPropertyChanged(nameof(IsServerAdmin));
-        OnPropertyChanged(nameof(IsAdminOrModerator));
     }
 
     partial void OnHubConnectionStateChanged(string value)
@@ -1211,7 +1209,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
             var channelItem = Channels.FirstOrDefault(c => c.Channel.Id == SelectedChannel.Id);
             if (channelItem?.SlowmodeSeconds > 0
-                && _memberRoles.GetValueOrDefault(api.CurrentUserId) < ServerRole.Moderator)
+                && _memberRoles.GetValueOrDefault(api.CurrentUserId) < ServerRole.Admin)
                 _ = StartSlowmodeCooldownAsync(channelItem.SlowmodeSeconds);
         }
         else if (!string.IsNullOrEmpty(err))
@@ -1845,11 +1843,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private int _voiceChannelId;
 
-    /// <summary>Called from drag/drop code-behind or the right-click menu. Gated to mods/admins
+    /// <summary>Called from drag/drop code-behind or the right-click menu. Gated to admins
     /// (server re-checks); moving yourself is a no-op.</summary>
     public async Task MoveUserToChannel(int targetUserId, int channelId)
     {
-        if (!IsAdminOrModerator) return;
+        if (!IsServerAdmin) return;
         if (targetUserId == api.CurrentUserId) return;
         await hub.MoveUserToChannelAsync(targetUserId, channelId);
     }
@@ -1859,7 +1857,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [RelayCommand]
     private async Task PromptMoveUser(FatGuysSpeak.Shared.UserDto user)
     {
-        if (user is null || !IsAdminOrModerator || user.Id == api.CurrentUserId) return;
+        if (user is null || !IsServerAdmin || user.Id == api.CurrentUserId) return;
         var names = Channels.Select(c => c.Channel.Name).ToArray();
         if (names.Length == 0) return;
         var choice = await Shell.Current.DisplayActionSheet($"Move {user.Username} to…", "Cancel", null, names);
@@ -2535,7 +2533,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                 SelectedServer = SelectedServer with { MyRole = role };
                 OnPropertyChanged(nameof(CurrentServerRole));
                 OnPropertyChanged(nameof(IsServerAdmin));
-                OnPropertyChanged(nameof(IsAdminOrModerator));
                 var isAdmin = role >= ServerRole.Admin;
                 foreach (var m in _textMsgs.Concat(_voiceMsgs).Concat(_streamMsgs))
                     m.CanModerate = isAdmin;
@@ -2586,16 +2583,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (!IsServerAdmin || SelectedServer is null) return;
         if (_memberRoles.GetValueOrDefault(userId) == ServerRole.Admin) return;
         var ok = await api.SetMemberRoleAsync(SelectedServer.Id, userId, ServerRole.Admin);
-        if (!ok)
-            toast.Show("FatGuysSpeak", "Failed to update role.");
-    }
-
-    [RelayCommand]
-    public async Task PromoteToModeratorAsync(int userId)
-    {
-        if (!IsServerAdmin || SelectedServer is null) return;
-        if (_memberRoles.GetValueOrDefault(userId) >= ServerRole.Moderator) return;
-        var ok = await api.SetMemberRoleAsync(SelectedServer.Id, userId, ServerRole.Moderator);
         if (!ok)
             toast.Show("FatGuysSpeak", "Failed to update role.");
     }

@@ -227,28 +227,6 @@ public class MessagesControllerEditDeleteTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteMessage_Moderator_CannotDeleteOthersMessage()
-    {
-        await SeedAsync();
-        var moderator = new User { Username = "mod1", Email = "mod1@test.com", PasswordHash = "*" };
-        _testDb.Db.Users.Add(moderator);
-        await _testDb.Db.SaveChangesAsync();
-        _testDb.Db.ServerMembers.Add(new FatGuysSpeak.Server.Models.ServerMember
-        {
-            ServerId = _server.Id, UserId = moderator.Id,
-            Role = FatGuysSpeak.Shared.ServerRole.Moderator
-        });
-        await _testDb.Db.SaveChangesAsync();
-
-        var msg = await AddMessageAsync(authorId: _owner.Id, content: "owner message");
-        TestHelpers.SetUser(_controller, moderator.Id, moderator.Username);
-
-        var result = await _controller.DeleteMessage(_textChannel.Id, msg.Id);
-
-        Assert.IsType<ForbidResult>(result);
-    }
-
-    [Fact]
     public async Task DeleteMessage_Admin_CanDeleteOthersMessage()
     {
         await SeedAsync();
