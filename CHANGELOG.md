@@ -5,6 +5,10 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 
 ## [Unreleased]
 ### Added
+- Move members between channels: admins can right-click anyone in the connected list (or drag
+  an occupant) and drop them into another channel; the moved user's client follows automatically.
+- Cross-channel presence: the sidebar shows who is in every channel — including channels you are
+  not currently in — and updates live as people move around.
 - Message Log moderation console: content/author/channel/server/date search, full-history
   paging, multi-select and criteria-based delete, restore, and CSV export.
 - Remote desktop control during a screen share (request -> approve -> drive), with a
@@ -16,8 +20,17 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
   behind; the client shows a dismissible "update available" banner via GET /api/update-status.
 
 ### Changed
+- Roles simplified to a flat Member/Admin model — the Moderator role was removed (a finer-grained
+  per-channel permission model is planned). A startup migration demotes existing moderators to
+  Member and rewrites any Moderator-restricted channel permission to Admin.
 - The per-server default (Lobby) channel can be renamed but not deleted; the dashboard
   "Kick Voice" action now authoritatively removes the user from voice and bumps them to Lobby.
+
+### Fixed
+- New channels could collide on a recycled id and surface a deleted channel's messages; channel
+  ids are now allocated from a monotonic counter that never reuses a value.
+- Moving a member between channels intermittently did nothing on the first attempt — the target's
+  channel switch now runs on the UI thread, so it lands every time.
 
 ## [1.1.0] - 2026-06-16
 ### Added
