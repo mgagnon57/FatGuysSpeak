@@ -501,6 +501,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.ChannelUpdated    += OnChannelUpdated;
         hub.ChannelDeleted    += OnChannelDeleted;
         hub.ForceJoinChannel  += OnForceJoinChannel;
+        hub.ForceMoveToVoice += OnForceMoveToVoice;
         hub.UserJoinedChannel += OnUserJoinedChannel;
         hub.UserLeftChannel   += OnUserLeftChannel;
         hub.VoiceDataReceived += OnVoiceDataReceived;
@@ -1767,6 +1768,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.ChannelUpdated         -= OnChannelUpdated;
         hub.ChannelDeleted         -= OnChannelDeleted;
         hub.ForceJoinChannel       -= OnForceJoinChannel;
+        hub.ForceMoveToVoice       -= OnForceMoveToVoice;
         hub.UserJoinedChannel      -= OnUserJoinedChannel;
         hub.UserLeftChannel        -= OnUserLeftChannel;
         hub.VoiceDataReceived      -= OnVoiceDataReceived;
@@ -1828,6 +1830,21 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     }
 
     private int _voiceChannelId;
+    private FatGuysSpeak.Shared.UserDto? _draggedUser;
+
+    [RelayCommand]
+    private void BeginUserDrag(FatGuysSpeak.Shared.UserDto user) => _draggedUser = user;
+
+    [RelayCommand]
+    private async Task DropUserOnChannel(ChannelViewItem target)
+    {
+        var user = _draggedUser;
+        _draggedUser = null;
+        if (user is null || target is null) return;
+        if (!IsAdminOrModerator) return;                 // server re-checks; this just gates the UI path
+        if (user.Id == api.CurrentUserId) return;         // dragging yourself is a no-op
+        await hub.MoveUserToVoiceChannelAsync(user.Id, target.Channel.Id);
+    }
 
     private async Task JoinVoiceAsync(ChannelDto channel)
     {
@@ -2376,6 +2393,18 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         var item = Channels.FirstOrDefault(c => c.Channel.Id == channelId);
         if (item is null) return;
         _ = SelectChannelAsync(item);
+    }
+
+    private void OnForceMoveToVoice(int channelId, string mover)
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            var item = Channels.FirstOrDefault(c => c.Channel.Id == channelId);
+            if (item is null || _voiceChannelId == channelId) return;
+            if (InVoice) await LeaveVoiceAsync();
+            await JoinVoiceAsync(item.Channel);
+            toast.Show("FatGuysSpeak", $"Moved to #{item.Channel.Name} by {mover}");
+        });
     }
 
     private void OnChannelUpdated(ChannelDto dto)
