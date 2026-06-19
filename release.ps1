@@ -72,7 +72,13 @@ $repoUrl = 'https://github.com/mgagnon57/FatGuysSpeak'
 $verChannel = 'v' + ($Version -replace '\.', '-')        # 1.2.0 -> v1-2-0 (matches UpdateChannel.ForVersion)
 $clientPub = Join-Path $root 'release-output\client-pub'
 Remove-Item -Recurse -Force $clientPub -ErrorAction SilentlyContinue
-dotnet publish (Join-Path $root 'FatGuysSpeak.Client') -c Release -f net9.0-windows10.0.19041.0 -o $clientPub
+# SELF-CONTAINED: bundle the .NET runtime so non-technical users are never prompted to install
+# .NET. Notes: use the portable 'win-x64' RID (the net9.0 Shared lib doesn't know legacy
+# 'win10-x64'); UseMonoRuntime=false forces the Windows CoreCLR runtime pack (MAUI defaults to
+# Mono, whose win-x64 pack doesn't exist); PublishReadyToRun=false avoids flaky crossgen.
+dotnet publish (Join-Path $root 'FatGuysSpeak.Client') -c Release -f net9.0-windows10.0.19041.0 `
+    -r win-x64 --self-contained true -p:UseMonoRuntime=false -p:PublishReadyToRun=false `
+    -p:WindowsPackageType=None -o $clientPub
 if ($LASTEXITCODE) { throw 'client publish failed' }
 
 $vpkOut = Join-Path $root 'release-output\vpk'
