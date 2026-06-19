@@ -41,12 +41,13 @@
         <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgPanel}" Padding="10,6"
               ColumnDefinitions="Auto,*,Auto">
             <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
-                <Button Text="☰"
-                        Command="{Binding ToggleSidebarCommand}"
-                        BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
-                        FontSize="16" WidthRequest="32" HeightRequest="30" Padding="0"
-                        ToolTipProperties.Text="Toggle sidebar" />
-                <Label Text="🖥" FontSize="14" TextColor="{DynamicResource ThemeAccentLight}" VerticalOptions="Center" />
+                <!-- Non-clickable FGS brand mark (replaced the old sidebar-toggle hamburger). -->
+                <Border BackgroundColor="{DynamicResource ThemeAccent}" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 6" Padding="6,2" VerticalOptions="Center"
+                        InputTransparent="True">
+                    <Label Text="FGS" FontFamily="Bebas" CharacterSpacing="1" TextColor="White"
+                           FontSize="13" FontAttributes="Bold" VerticalOptions="Center" />
+                </Border>
                 <Label Text="FatGuysSpeak" FontFamily="Bebas" CharacterSpacing="1" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="17" VerticalOptions="Center" />
                 <BoxView WidthRequest="1" HeightRequest="14" BackgroundColor="{DynamicResource ThemeBgElevated}" VerticalOptions="Center" Margin="4,0" />
                 <Ellipse WidthRequest="8" HeightRequest="8"
