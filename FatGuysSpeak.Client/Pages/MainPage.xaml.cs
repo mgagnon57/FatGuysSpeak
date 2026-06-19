@@ -94,6 +94,6 @@ public partial class MainPage : ContentPage
         try { text = await e.Data.GetTextAsync(); } catch (Exception ex) { DndLog($"Drop GetTextAsync threw {ex.GetType().Name}"); }
         DndLog($"Drop  channel={ch?.Channel.Name}  text={text}");
         if (ch is not null && int.TryParse(text, out var userId))
-            await _vm.MoveUserToVoiceChannel(userId, ch.Channel.Id);
+            await _vm.MoveUserToChannel(userId, ch.Channel.Id);
     }
 }

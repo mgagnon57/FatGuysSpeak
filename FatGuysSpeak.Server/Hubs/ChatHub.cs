@@ -154,30 +154,25 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         await Clients.Caller.SendAsync("VoiceParticipants", existing);
     }
 
-    /// <summary>Moderator/admin force-moves a target user's live voice session into another
-    /// voice channel. The server validates + audits, then tells the TARGET's client to switch
-    /// (it runs its own join path). Silent no-op on any invalid request.</summary>
-    public async Task MoveUserToVoiceChannel(int targetUserId, int channelId)
+    /// <summary>Moderator/admin moves any member into a channel: validates + audits, then tells
+    /// the target's client to switch to that channel (reuses the proven ForceJoinChannel relay
+    /// that Kick-Voice uses). Silent no-op on any invalid request.</summary>
+    public async Task MoveUserToChannel(int targetUserId, int channelId)
     {
+        if (targetUserId == UserId) return;   // moving yourself is just normal navigation
+
         var channel = await db.Channels
             .Include(c => c.Server).ThenInclude(s => s.Members)
             .FirstOrDefaultAsync(c => c.Id == channelId);
         if (channel is null) return;
 
-        // Caller must be a Moderator+ member of the destination channel's server (flat permission).
+        // Caller must be a Moderator+ member of the channel's server (flat permission).
         var mover = channel.Server.Members.FirstOrDefault(m => m.UserId == UserId);
         if (mover is null || mover.Role < ServerRole.Moderator) return;
 
         // Target must be a member of that server.
         var target = channel.Server.Members.FirstOrDefault(m => m.UserId == targetUserId);
         if (target is null) return;
-
-        // Target must currently be in voice, not already in the destination, on the same server.
-        if (!VoiceChannelMap.TryGetValue(targetUserId, out var currentVoice)) return;
-        if (currentVoice == channelId) return;
-        var currentServerId = await db.Channels.Where(c => c.Id == currentVoice)
-            .Select(c => (int?)c.ServerId).FirstOrDefaultAsync();
-        if (currentServerId != channel.ServerId) return;
 
         // Respect the destination's read permission for the target.
         var perm = await db.ChannelPermissions.FindAsync(channelId);
@@ -193,14 +188,15 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
             ServerId = channel.ServerId,
             ActorId = UserId,
             ActorUsername = Username,
-            Action = "VoiceMoved",
+            Action = "UserMoved",
             TargetId = targetUserId,
             TargetUsername = targetName,
             Detail = $"to #{channel.Name}"
         });
         await db.SaveChangesAsync();
 
-        await Clients.User(targetUserId.ToString()).SendAsync("ForceMoveToVoice", channelId, Username);
+        // Tell the target's client to switch to that channel (it already handles ForceJoinChannel).
+        await Clients.User(targetUserId.ToString()).SendAsync("ForceJoinChannel", channelId);
     }
 
     private const int MaxVoicePacketBytes = 8_192;

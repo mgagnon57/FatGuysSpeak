@@ -86,81 +86,74 @@ public class ChatHubMoveUserTests : IDisposable
             (typeof(ChatHub).GetField(name, flags)?.GetValue(null) as System.Collections.IDictionary)?.Clear();
     }
 
+    // The move tells the TARGET's client to switch to the channel via the existing ForceJoinChannel
+    // relay (the same one Kick-Voice uses). The target does NOT need to be in voice.
+
     [Fact]
-    public async Task AdminMovesMemberInVoice_SendsForceMoveToTarget_AndWritesAudit()
+    public async Task AdminMovesMember_SendsForceJoinToTarget_AndWritesAudit()
     {
         var (server, owner) = await TestHelpers.SeedServerAsync(_testDb.Db, "mv-admin");
-        var voiceA = _testDb.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Voice);
-        var voiceB = await AddVoiceChannelAsync(server.Id, "Voice B");
+        var dest = await AddVoiceChannelAsync(server.Id, "Dest");
         var target = await AddMemberAsync(server.Id, "mv-target", ServerRole.Member);
 
-        await CreateHub(target.Id, target.Username, "conn-target").JoinVoiceChannel(voiceA.Id);
-        _sent.Clear();
-        await CreateHub(owner.Id, owner.Username, "conn-admin").MoveUserToVoiceChannel(target.Id, voiceB.Id);
+        await CreateHub(owner.Id, owner.Username, "conn-admin").MoveUserToChannel(target.Id, dest.Id);
 
-        Assert.True(WasSentTo($"user:{target.Id}", "ForceMoveToVoice"));
-        var (_, args) = LastSent($"user:{target.Id}", "ForceMoveToVoice");
-        Assert.Equal(voiceB.Id, (int)args[0]);
-        Assert.Equal(owner.Username, (string)args[1]);
-        Assert.True(await _testDb.Db.AuditLogs.AnyAsync(a => a.Action == "VoiceMoved" && a.TargetId == target.Id && a.ActorId == owner.Id));
+        Assert.True(WasSentTo($"user:{target.Id}", "ForceJoinChannel"));
+        var (_, args) = LastSent($"user:{target.Id}", "ForceJoinChannel");
+        Assert.Equal(dest.Id, (int)args[0]);
+        Assert.True(await _testDb.Db.AuditLogs.AnyAsync(a => a.Action == "UserMoved" && a.TargetId == target.Id && a.ActorId == owner.Id));
     }
 
     [Fact]
     public async Task ModeratorMovesMember_IsAllowed()
     {
         var (server, _) = await TestHelpers.SeedServerAsync(_testDb.Db, "mv-mod");
-        var voiceA = _testDb.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Voice);
-        var voiceB = await AddVoiceChannelAsync(server.Id, "Voice B");
+        var dest = await AddVoiceChannelAsync(server.Id, "Dest");
         var mod = await AddMemberAsync(server.Id, "mv-themod", ServerRole.Moderator);
         var target = await AddMemberAsync(server.Id, "mv-tgt2", ServerRole.Member);
 
-        await CreateHub(target.Id, target.Username, "conn-t2").JoinVoiceChannel(voiceA.Id);
-        _sent.Clear();
-        await CreateHub(mod.Id, mod.Username, "conn-mod").MoveUserToVoiceChannel(target.Id, voiceB.Id);
+        await CreateHub(mod.Id, mod.Username, "conn-mod").MoveUserToChannel(target.Id, dest.Id);
 
-        Assert.True(WasSentTo($"user:{target.Id}", "ForceMoveToVoice"));
+        Assert.True(WasSentTo($"user:{target.Id}", "ForceJoinChannel"));
     }
 
     [Fact]
     public async Task MemberCaller_CannotMove_NoSend_NoAudit()
     {
         var (server, _) = await TestHelpers.SeedServerAsync(_testDb.Db, "mv-member");
-        var voiceA = _testDb.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Voice);
-        var voiceB = await AddVoiceChannelAsync(server.Id, "Voice B");
+        var dest = await AddVoiceChannelAsync(server.Id, "Dest");
         var caller = await AddMemberAsync(server.Id, "mv-lowcaller", ServerRole.Member);
         var target = await AddMemberAsync(server.Id, "mv-tgt3", ServerRole.Member);
 
-        await CreateHub(target.Id, target.Username, "conn-t3").JoinVoiceChannel(voiceA.Id);
-        _sent.Clear();
-        await CreateHub(caller.Id, caller.Username, "conn-low").MoveUserToVoiceChannel(target.Id, voiceB.Id);
+        await CreateHub(caller.Id, caller.Username, "conn-low").MoveUserToChannel(target.Id, dest.Id);
 
-        Assert.False(WasSentTo($"user:{target.Id}", "ForceMoveToVoice"));
-        Assert.False(await _testDb.Db.AuditLogs.AnyAsync(a => a.Action == "VoiceMoved"));
+        Assert.False(WasSentTo($"user:{target.Id}", "ForceJoinChannel"));
+        Assert.False(await _testDb.Db.AuditLogs.AnyAsync(a => a.Action == "UserMoved"));
     }
 
     [Fact]
-    public async Task TargetNotInVoice_NoSend()
+    public async Task MovingSelf_IsNoOp()
     {
-        var (server, owner) = await TestHelpers.SeedServerAsync(_testDb.Db, "mv-novoice");
-        var voiceB = await AddVoiceChannelAsync(server.Id, "Voice B");
-        var target = await AddMemberAsync(server.Id, "mv-idle", ServerRole.Member);
+        var (server, owner) = await TestHelpers.SeedServerAsync(_testDb.Db, "mv-self");
+        var dest = await AddVoiceChannelAsync(server.Id, "Dest");
 
-        await CreateHub(owner.Id, owner.Username, "conn-a").MoveUserToVoiceChannel(target.Id, voiceB.Id);
+        await CreateHub(owner.Id, owner.Username, "conn-self").MoveUserToChannel(owner.Id, dest.Id);
 
-        Assert.False(WasSentTo($"user:{target.Id}", "ForceMoveToVoice"));
+        Assert.False(WasSentTo($"user:{owner.Id}", "ForceJoinChannel"));
     }
 
     [Fact]
-    public async Task TargetAlreadyInDestination_NoSend()
+    public async Task TargetNotAMemberOfServer_NoSend()
     {
-        var (server, owner) = await TestHelpers.SeedServerAsync(_testDb.Db, "mv-same");
-        var voiceA = _testDb.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Voice);
-        var target = await AddMemberAsync(server.Id, "mv-tgt4", ServerRole.Member);
+        var (server, owner) = await TestHelpers.SeedServerAsync(_testDb.Db, "mv-nonmember");
+        var dest = await AddVoiceChannelAsync(server.Id, "Dest");
+        // A user that exists but is NOT a member of this server.
+        var stranger = new User { Username = "mv-stranger", Email = "mv-stranger@test.com", PasswordHash = "*" };
+        _testDb.Db.Users.Add(stranger);
+        await _testDb.Db.SaveChangesAsync();
 
-        await CreateHub(target.Id, target.Username, "conn-t4").JoinVoiceChannel(voiceA.Id);
-        _sent.Clear();
-        await CreateHub(owner.Id, owner.Username, "conn-a").MoveUserToVoiceChannel(target.Id, voiceA.Id);
+        await CreateHub(owner.Id, owner.Username, "conn-a").MoveUserToChannel(stranger.Id, dest.Id);
 
-        Assert.False(WasSentTo($"user:{target.Id}", "ForceMoveToVoice"));
+        Assert.False(WasSentTo($"user:{stranger.Id}", "ForceJoinChannel"));
     }
 }

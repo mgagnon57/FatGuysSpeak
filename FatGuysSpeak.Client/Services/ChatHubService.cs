@@ -17,7 +17,6 @@ public class ChatHubService
     public event Action<ChannelDto>? ChannelUpdated;
     public event Action<int>? ChannelDeleted;
     public event Action<int>? ForceJoinChannel;
-    public event Action<int, string>? ForceMoveToVoice;   // (channelId, moverUsername) — target switches voice
     public event Action<int, UserDto>? UserJoinedChannel;
     public event Action<int, UserDto>? UserLeftChannel;
     public event Action<byte[]>? VoiceDataReceived;
@@ -91,7 +90,6 @@ public class ChatHubService
         _connection.On<ChannelDto>("ChannelUpdated", dto => ChannelUpdated?.Invoke(dto));
         _connection.On<int>("ChannelDeleted", id => ChannelDeleted?.Invoke(id));
         _connection.On<int>("ForceJoinChannel", id => ForceJoinChannel?.Invoke(id));
-        _connection.On<int, string>("ForceMoveToVoice", (channelId, mover) => ForceMoveToVoice?.Invoke(channelId, mover));
         _connection.On<int, UserDto>("UserJoinedChannel", (cid, dto) => UserJoinedChannel?.Invoke(cid, dto));
         _connection.On<int, UserDto>("UserLeftChannel", (cid, dto) => UserLeftChannel?.Invoke(cid, dto));
         _connection.On<byte[]>("ReceiveVoiceData", data => VoiceDataReceived?.Invoke(data));
@@ -162,8 +160,8 @@ public class ChatHubService
     public Task JoinVoiceChannelAsync(int channelId) =>
         _connection!.InvokeAsync("JoinVoiceChannel", channelId);
 
-    public Task MoveUserToVoiceChannelAsync(int targetUserId, int channelId) =>
-        _connection!.InvokeAsync("MoveUserToVoiceChannel", targetUserId, channelId);
+    public Task MoveUserToChannelAsync(int targetUserId, int channelId) =>
+        _connection!.InvokeAsync("MoveUserToChannel", targetUserId, channelId);
 
     public Task SendVoiceDataAsync(byte[] data) =>
         _connection?.InvokeAsync("SendVoiceData", data) ?? Task.CompletedTask;

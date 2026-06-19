@@ -501,7 +501,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.ChannelUpdated    += OnChannelUpdated;
         hub.ChannelDeleted    += OnChannelDeleted;
         hub.ForceJoinChannel  += OnForceJoinChannel;
-        hub.ForceMoveToVoice += OnForceMoveToVoice;
         hub.UserJoinedChannel += OnUserJoinedChannel;
         hub.UserLeftChannel   += OnUserLeftChannel;
         hub.VoiceDataReceived += OnVoiceDataReceived;
@@ -1768,7 +1767,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.ChannelUpdated         -= OnChannelUpdated;
         hub.ChannelDeleted         -= OnChannelDeleted;
         hub.ForceJoinChannel       -= OnForceJoinChannel;
-        hub.ForceMoveToVoice       -= OnForceMoveToVoice;
         hub.UserJoinedChannel      -= OnUserJoinedChannel;
         hub.UserLeftChannel        -= OnUserLeftChannel;
         hub.VoiceDataReceived      -= OnVoiceDataReceived;
@@ -1833,11 +1831,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     /// <summary>Called from drag/drop code-behind or the right-click menu. Gated to mods/admins
     /// (server re-checks); moving yourself is a no-op.</summary>
-    public async Task MoveUserToVoiceChannel(int targetUserId, int channelId)
+    public async Task MoveUserToChannel(int targetUserId, int channelId)
     {
         if (!IsAdminOrModerator) return;
         if (targetUserId == api.CurrentUserId) return;
-        await hub.MoveUserToVoiceChannelAsync(targetUserId, channelId);
+        await hub.MoveUserToChannelAsync(targetUserId, channelId);
     }
 
     /// <summary>Right-click "Move to Channel…" on a voice occupant: pick a target channel from an
@@ -1852,7 +1850,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (string.IsNullOrEmpty(choice) || choice == "Cancel") return;
         var target = Channels.FirstOrDefault(c => c.Channel.Name == choice);
         if (target is not null)
-            await MoveUserToVoiceChannel(user.Id, target.Channel.Id);
+            await MoveUserToChannel(user.Id, target.Channel.Id);
     }
 
     private async Task JoinVoiceAsync(ChannelDto channel)
@@ -2402,18 +2400,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         var item = Channels.FirstOrDefault(c => c.Channel.Id == channelId);
         if (item is null) return;
         _ = SelectChannelAsync(item);
-    }
-
-    private void OnForceMoveToVoice(int channelId, string mover)
-    {
-        MainThread.BeginInvokeOnMainThread(async () =>
-        {
-            var item = Channels.FirstOrDefault(c => c.Channel.Id == channelId);
-            if (item is null || _voiceChannelId == channelId) return;
-            if (InVoice) await LeaveVoiceAsync();
-            await JoinVoiceAsync(item.Channel);
-            toast.Show("FatGuysSpeak", $"Moved to #{item.Channel.Name} by {mover}");
-        });
     }
 
     private void OnChannelUpdated(ChannelDto dto)
