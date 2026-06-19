@@ -372,6 +372,7 @@
                                                                     CommandParameter="{Binding .}" />
                                                                 <DropGestureRecognizer
                                                                     AllowDrop="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsAdminOrModerator}"
+                                                                    DragOver="OnChannelDragOver"
                                                                     Drop="OnChannelDrop" />
                                                             </Grid.GestureRecognizers>
                                                             <BoxView WidthRequest="3" HorizontalOptions="Start" VerticalOptions="Fill"
@@ -419,6 +420,10 @@
                                                                             <MenuFlyout>
                                                                                 <MenuFlyoutItem Text="🎤 Test My Mic (Loopback)"
                                                                                     Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ToggleMicLoopbackCommand}" />
+                                                                                <MenuFlyoutItem Text="↔ Move to Channel…"
+                                                                                    IsEnabled="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.IsAdminOrModerator}"
+                                                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.PromptMoveUserCommand}"
+                                                                                    CommandParameter="{Binding .}" />
                                                                             </MenuFlyout>
                                                                         </FlyoutBase.ContextFlyout>
                                                                         <HorizontalStackLayout Spacing="6">

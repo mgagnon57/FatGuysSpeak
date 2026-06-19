@@ -1831,13 +1831,28 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private int _voiceChannelId;
 
-    /// <summary>Called from MainPage drag/drop code-behind when a voice occupant is dropped on a
-    /// channel. Gated to mods/admins (server re-checks); dragging yourself is a no-op.</summary>
+    /// <summary>Called from drag/drop code-behind or the right-click menu. Gated to mods/admins
+    /// (server re-checks); moving yourself is a no-op.</summary>
     public async Task MoveUserToVoiceChannel(int targetUserId, int channelId)
     {
         if (!IsAdminOrModerator) return;
         if (targetUserId == api.CurrentUserId) return;
         await hub.MoveUserToVoiceChannelAsync(targetUserId, channelId);
+    }
+
+    /// <summary>Right-click "Move to Channel…" on a voice occupant: pick a target channel from an
+    /// action sheet, then move them. Reliable alternative to drag-and-drop.</summary>
+    [RelayCommand]
+    private async Task PromptMoveUser(FatGuysSpeak.Shared.UserDto user)
+    {
+        if (user is null || !IsAdminOrModerator || user.Id == api.CurrentUserId) return;
+        var names = Channels.Select(c => c.Channel.Name).ToArray();
+        if (names.Length == 0) return;
+        var choice = await Shell.Current.DisplayActionSheet($"Move {user.Username} to…", "Cancel", null, names);
+        if (string.IsNullOrEmpty(choice) || choice == "Cancel") return;
+        var target = Channels.FirstOrDefault(c => c.Channel.Name == choice);
+        if (target is not null)
+            await MoveUserToVoiceChannel(user.Id, target.Channel.Id);
     }
 
     private async Task JoinVoiceAsync(ChannelDto channel)
