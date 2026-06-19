@@ -842,6 +842,7 @@ function actionBadge(action) {
     ChannelCreated:           '#36b864',
     ChannelDeleted:           '#ed4245',
     ChannelPermissionsChanged:'#f04010',
+    VoiceMoved:               '#f04010',
   };
   const col = map[action] || '#756e62';
   return `<span class="badge" style="background:${col}22;color:${col}">${action}</span>`;
