@@ -73,14 +73,14 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
             if (ChannelOccupants.TryGetValue(oldChannelId, out var oldOccupants))
                 oldOccupants.TryRemove(UserId, out _);
             // Broadcast before removing so the leaving user also receives and updates their own sidebar
-            await Clients.Group($"channel-{oldChannelId}").SendAsync("UserLeftChannel", oldChannelId, new UserDto(UserId, Username, UserStatus.Online));
+            await Clients.Group($"server-{channel.ServerId}").SendAsync("UserLeftChannel", oldChannelId, new UserDto(UserId, Username, UserStatus.Online));
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"channel-{oldChannelId}");
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, $"channel-{channelId}");
         UserTextChannelMap[UserId] = channelId;
         ChannelOccupants.GetOrAdd(channelId, _ => new ConcurrentDictionary<int, string>())[UserId] = Username;
-        await Clients.OthersInGroup($"channel-{channelId}").SendAsync("UserJoinedChannel", channelId, new UserDto(UserId, Username, UserStatus.Online));
+        await Clients.OthersInGroup($"server-{channel.ServerId}").SendAsync("UserJoinedChannel", channelId, new UserDto(UserId, Username, UserStatus.Online));
 
         // If someone is already streaming this channel, auto-join the stream group and notify caller
         var streamer = ActiveStreamers.FirstOrDefault(kv => kv.Value.ChannelId == channelId);
@@ -97,8 +97,10 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         if (ChannelOccupants.TryGetValue(channelId, out var occupants))
         {
             occupants.TryRemove(UserId, out _);
-            // Broadcast before removing so the leaving user receives and updates their own sidebar
-            await Clients.Group($"channel-{channelId}").SendAsync("UserLeftChannel", channelId, new UserDto(UserId, Username, UserStatus.Online));
+            // Broadcast to the whole server so everyone's sidebar updates — not just this channel.
+            var sid = await db.Channels.Where(c => c.Id == channelId).Select(c => (int?)c.ServerId).FirstOrDefaultAsync();
+            if (sid is not null)
+                await Clients.Group($"server-{sid}").SendAsync("UserLeftChannel", channelId, new UserDto(UserId, Username, UserStatus.Online));
         }
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"channel-{channelId}");
     }
@@ -336,7 +338,9 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         {
             if (ChannelOccupants.TryGetValue(textChannelId, out var occ))
                 occ.TryRemove(UserId, out _);
-            await Clients.Group($"channel-{textChannelId}").SendAsync("UserLeftChannel", textChannelId, new UserDto(UserId, Username, UserStatus.Offline));
+            var sid = await db.Channels.Where(c => c.Id == textChannelId).Select(c => (int?)c.ServerId).FirstOrDefaultAsync();
+            if (sid is not null)
+                await Clients.Group($"server-{sid}").SendAsync("UserLeftChannel", textChannelId, new UserDto(UserId, Username, UserStatus.Offline));
         }
 
         var addSeconds = onlineTime.Disconnect(UserId);

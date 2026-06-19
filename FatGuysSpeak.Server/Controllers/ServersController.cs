@@ -96,8 +96,18 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
         await db.SaveChangesAsync();
 
         db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = UserId, Role = ServerRole.Admin });
-        db.Channels.Add(new Channel { Name = "lobby", Type = ChannelType.Text, ServerId = server.Id, Position = 0, IsDefault = true });
-        db.Channels.Add(new Channel { Name = "General", Type = ChannelType.Voice, ServerId = server.Id, Position = 1 });
+        var lobby = new Channel { Name = "lobby", Type = ChannelType.Text, ServerId = server.Id, Position = 0, IsDefault = true };
+        var general = new Channel { Name = "General", Type = ChannelType.Voice, ServerId = server.Id, Position = 1 };
+        // Route default channels through the same sequence as CreateChannel so the counter
+        // stays authoritative — otherwise auto-increment climbs past it and the next explicit
+        // id collides (see NextChannelIdAsync).
+        if (db.Database.IsSqlite())
+        {
+            lobby.Id = await NextChannelIdAsync(db);
+            general.Id = await NextChannelIdAsync(db);
+        }
+        db.Channels.Add(lobby);
+        db.Channels.Add(general);
         await db.SaveChangesAsync();
 
         return Ok(new ServerDto(server.Id, server.Name, server.Description, server.OwnerId.ToString(), 1, ServerRole.Admin));
@@ -234,14 +244,21 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
     public static async Task<int> NextChannelIdAsync(AppDbContext db)
     {
         var seq = await db.AppSequences.FindAsync("channel");
+        // High-water mark across every id ever used, including ids that linger only in old
+        // messages (orphans on FK-disabled DBs). Recomputed each call so that if any other
+        // insert path (e.g. auto-increment) advanced the table past our counter, we catch up
+        // and never hand out a colliding id.
+        int hiChannels = await db.Channels.MaxAsync(c => (int?)c.Id) ?? 0;
+        int hiMessages = await db.Messages.MaxAsync(m => (int?)m.ChannelId) ?? 0;
+        int hiWater = Math.Max(hiChannels, hiMessages);
         if (seq is null)
         {
-            // First run on this DB: start the counter past the highest channel id ever seen,
-            // including ids that linger only in old messages (orphans on FK-disabled DBs).
-            int hiChannels = await db.Channels.MaxAsync(c => (int?)c.Id) ?? 0;
-            int hiMessages = await db.Messages.MaxAsync(m => (int?)m.ChannelId) ?? 0;
-            seq = new AppSequence { Name = "channel", Value = Math.Max(hiChannels, hiMessages) };
+            seq = new AppSequence { Name = "channel", Value = hiWater };
             db.AppSequences.Add(seq);
+        }
+        else if (seq.Value < hiWater)
+        {
+            seq.Value = hiWater;
         }
         seq.Value++;
         await db.SaveChangesAsync();
