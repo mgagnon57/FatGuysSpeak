@@ -1843,28 +1843,51 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private int _voiceChannelId;
 
+    // Diagnostics for the move-user feature → %TEMP%\fgs-move.log (the MAUI console isn't captured).
+    private static readonly string MoveLogPath =
+        System.IO.Path.Combine(System.IO.Path.GetTempPath(), "fgs-move.log");
+    private static void MoveLog(string msg)
+    {
+        try { System.IO.File.AppendAllText(MoveLogPath, $"{DateTime.Now:HH:mm:ss.fff}  {msg}{Environment.NewLine}"); }
+        catch { /* never let logging break the UI */ }
+    }
+
     /// <summary>Called from drag/drop code-behind or the right-click menu. Gated to admins
     /// (server re-checks); moving yourself is a no-op.</summary>
     public async Task MoveUserToChannel(int targetUserId, int channelId)
     {
-        if (!IsServerAdmin) return;
-        if (targetUserId == api.CurrentUserId) return;
+        MoveLog($"MoveUserToChannel target={targetUserId} dest={channelId} isAdmin={IsServerAdmin} self={targetUserId == api.CurrentUserId} hubConnected={hub.IsConnected}");
+        if (!IsServerAdmin) { MoveLog("  -> blocked: not admin"); return; }
+        if (targetUserId == api.CurrentUserId) { MoveLog("  -> blocked: moving self"); return; }
         await hub.MoveUserToChannelAsync(targetUserId, channelId);
+        MoveLog("  -> invoked hub.MoveUserToChannelAsync");
     }
 
-    /// <summary>Right-click "Move to Channel…" on a voice occupant: pick a target channel from an
+    /// <summary>Right-click "Move to Channel…" on a channel occupant: pick a target channel from an
     /// action sheet, then move them. Reliable alternative to drag-and-drop.</summary>
     [RelayCommand]
-    private async Task PromptMoveUser(FatGuysSpeak.Shared.UserDto user)
+    private Task PromptMoveUser(FatGuysSpeak.Shared.UserDto user)
+        => user is null ? Task.CompletedTask : PromptMoveByIdAsync(user.Id, user.Username);
+
+    /// <summary>Right-click "Move to Channel…" on a CONNECTED-list member. This list shows every
+    /// online member regardless of which channel they're in (including the lobby), so it's the
+    /// reliable place to move anyone from anywhere.</summary>
+    [RelayCommand]
+    private Task PromptMoveMember(MemberViewItem member)
+        => member is null ? Task.CompletedTask : PromptMoveByIdAsync(member.Id, member.Username);
+
+    private async Task PromptMoveByIdAsync(int userId, string username)
     {
-        if (user is null || !IsServerAdmin || user.Id == api.CurrentUserId) return;
+        MoveLog($"PromptMove user={username}({userId}) isAdmin={IsServerAdmin} channels={Channels.Count}");
+        if (!IsServerAdmin || userId == api.CurrentUserId) { MoveLog("  -> blocked: not admin or self"); return; }
         var names = Channels.Select(c => c.Channel.Name).ToArray();
-        if (names.Length == 0) return;
-        var choice = await Shell.Current.DisplayActionSheet($"Move {user.Username} to…", "Cancel", null, names);
+        if (names.Length == 0) { MoveLog("  -> blocked: no channels"); return; }
+        var choice = await Shell.Current.DisplayActionSheet($"Move {username} to…", "Cancel", null, names);
+        MoveLog($"  picked: '{choice ?? "(null)"}'");
         if (string.IsNullOrEmpty(choice) || choice == "Cancel") return;
         var target = Channels.FirstOrDefault(c => c.Channel.Name == choice);
-        if (target is not null)
-            await MoveUserToChannel(user.Id, target.Channel.Id);
+        if (target is null) { MoveLog($"  -> blocked: no channel matched '{choice}'"); return; }
+        await MoveUserToChannel(userId, target.Channel.Id);
     }
 
     private async Task JoinVoiceAsync(ChannelDto channel)
@@ -2411,9 +2434,16 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private void OnForceJoinChannel(int channelId)
     {
-        var item = Channels.FirstOrDefault(c => c.Channel.Id == channelId);
-        if (item is null) return;
-        _ = SelectChannelAsync(item);
+        // Arrives on the SignalR background thread. SelectChannelAsync mutates UI-bound collections
+        // and properties before it calls the hub, so it MUST run on the UI thread — otherwise the
+        // cross-thread touch can throw, the fire-and-forget task swallows it, and the channel join
+        // never fires (the "first try does nothing, second works" bug). Matches every other handler.
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            var item = Channels.FirstOrDefault(c => c.Channel.Id == channelId);
+            if (item is null) return;
+            _ = SelectChannelAsync(item);
+        });
     }
 
     private void OnChannelUpdated(ChannelDto dto)

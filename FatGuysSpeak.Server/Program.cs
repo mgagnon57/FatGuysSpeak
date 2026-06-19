@@ -757,6 +757,18 @@ using (var scope = app.Services.CreateScope())
     else
         ctx.Database.ExecuteSqlRaw(@"UPDATE ServerMembers SET Role = 0 WHERE Role = 1");
 
+    // Same simplification for channel permissions: a channel restricted to Moderator (1) keeps the
+    // elevated intent by becoming Admin-restricted (2). Without this, an orphaned 1 would block ALL
+    // non-admin members from reading/joining/being moved into that channel. Idempotent.
+    if (isPostgres)
+        ctx.Database.ExecuteSqlRaw(@"UPDATE ""ChannelPermissions"" SET ""MinRoleToRead"" = 2 WHERE ""MinRoleToRead"" = 1;
+                                     UPDATE ""ChannelPermissions"" SET ""MinRoleToWrite"" = 2 WHERE ""MinRoleToWrite"" = 1");
+    else
+    {
+        ctx.Database.ExecuteSqlRaw(@"UPDATE ChannelPermissions SET MinRoleToRead = 2 WHERE MinRoleToRead = 1");
+        ctx.Database.ExecuteSqlRaw(@"UPDATE ChannelPermissions SET MinRoleToWrite = 2 WHERE MinRoleToWrite = 1");
+    }
+
     // Seed bot user
     var botUser = ctx.Users.FirstOrDefault(u => u.Username == FatGuysSpeak.Server.Services.BotService.BotUsername);
     if (botUser is null)
