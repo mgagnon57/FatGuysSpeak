@@ -16,14 +16,11 @@ public class SpeechService : IDisposable
     private readonly SemaphoreSlim _transcribeLock = new(1, 1);
 
     private bool _isSpeaking;
-    private int _silenceFrames;
     private bool _modelReady;
 
     // Whisper expects 16 kHz mono float32
     private const int SampleRate = 16000;
     private const int FrameMs = 20;
-    // ~600 ms of silence ends a speech segment
-    private const int SilenceThreshold = 30;
     private const float SpeechRmsThreshold = 0.015f;
 
     private static readonly string[] Hallucinations =
@@ -49,7 +46,7 @@ public class SpeechService : IDisposable
 
         if (_factory is null) return; // download failed
 
-        lock (_bufferLock) { _buffer.Clear(); _isSpeaking = false; _silenceFrames = 0; }
+        lock (_bufferLock) { _buffer.Clear(); _isSpeaking = false; }
 
         _waveIn = new WaveInEvent
         {
@@ -77,7 +74,6 @@ public class SpeechService : IDisposable
                 chunk = _buffer.ToArray();
             _buffer.Clear();
             _isSpeaking = false;
-            _silenceFrames = 0;
         }
 
         if (chunk is not null)
@@ -130,28 +126,20 @@ public class SpeechService : IDisposable
             if (rms > SpeechRmsThreshold)
             {
                 _isSpeaking = true;
-                _silenceFrames = 0;
                 _buffer.AddRange(floats);
                 HypothesisChanged?.Invoke("Listening…");
             }
             else if (_isSpeaking)
             {
+                // Keep buffering straight through pauses. One push-to-talk hold = one message;
+                // the whole buffer is transcribed when PTT is released (StopAndFlushAsync). We do
+                // NOT split mid-speech on silence — that was what chopped sentences into messages.
                 _buffer.AddRange(floats);
-                _silenceFrames++;
-
-                if (_silenceFrames >= SilenceThreshold)
-                {
-                    var chunk = _buffer.ToArray();
-                    _buffer.Clear();
-                    _isSpeaking = false;
-                    _silenceFrames = 0;
-                    _ = TranscribeAsync(chunk, waitIfBusy: false);
-                }
             }
 
-            // Hard cap: 30 s of buffered audio
-            if (_buffer.Count > SampleRate * 30)
-                _buffer.RemoveRange(0, _buffer.Count - SampleRate * 30);
+            // Hard cap: 120 s of buffered audio per push.
+            if (_buffer.Count > SampleRate * 120)
+                _buffer.RemoveRange(0, _buffer.Count - SampleRate * 120);
         }
     }
 
@@ -232,7 +220,7 @@ public class SpeechService : IDisposable
         _waveIn?.Dispose();
         _waveIn = null;
         IsListening = false;
-        lock (_bufferLock) { _buffer.Clear(); _isSpeaking = false; _silenceFrames = 0; }
+        lock (_bufferLock) { _buffer.Clear(); _isSpeaking = false; }
         HypothesisChanged?.Invoke(string.Empty);
     }
 

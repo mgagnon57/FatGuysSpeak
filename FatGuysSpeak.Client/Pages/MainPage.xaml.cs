@@ -73,7 +73,7 @@ public partial class MainPage : ContentPage
     // drop (a drag with no data package won't register a drop target on WinUI).
     private void OnOccupantDragStarting(object? sender, DragStartingEventArgs e)
     {
-        var user = (sender as Element)?.BindingContext as FatGuysSpeak.Shared.UserDto;
+        var user = (sender as Element)?.BindingContext as ViewModels.OccupantViewModel;
         DndLog($"DragStarting  sender={sender?.GetType().Name}  user={user?.Username}({user?.Id})");
         if (user is not null) e.Data.Text = user.Id.ToString();
     }

@@ -39,27 +39,44 @@
 
         <!-- ═══ TOP BAR ═══ -->
         <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgPanel}" Padding="10,6"
-              ColumnDefinitions="Auto,*,Auto">
+              ColumnDefinitions="Auto,Auto,Auto,*">
+            <!-- Brand lives in its own Auto column so the connection status can never squeeze it -->
             <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
-                <!-- Non-clickable FGS brand mark (replaced the old sidebar-toggle hamburger). -->
                 <Border BackgroundColor="{DynamicResource ThemeAccent}" StrokeThickness="0"
-                        StrokeShape="RoundRectangle 6" Padding="6,2" VerticalOptions="Center"
-                        InputTransparent="True">
+                        StrokeShape="RoundRectangle 6" Padding="6,2" VerticalOptions="Center">
                     <Label Text="FGS" FontFamily="Bebas" CharacterSpacing="1" TextColor="White"
                            FontSize="13" FontAttributes="Bold" VerticalOptions="Center" />
                 </Border>
-                <Label Text="FatGuysSpeak" FontFamily="Bebas" CharacterSpacing="1" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="17" VerticalOptions="Center" />
-                <BoxView WidthRequest="1" HeightRequest="14" BackgroundColor="{DynamicResource ThemeBgElevated}" VerticalOptions="Center" Margin="4,0" />
-                <Ellipse WidthRequest="8" HeightRequest="8"
-                         Fill="{Binding ConnectionDotColor}"
-                         VerticalOptions="Center" />
-                <Label Text="{Binding ConnectionStatusText}"
-                       TextColor="{Binding ConnectionStatusColor}"
-                       FontSize="11" VerticalOptions="Center" />
+                <Label Text="FatGuysSpeak" FontFamily="Bebas" CharacterSpacing="1" TextColor="{DynamicResource ThemeTextPrimary}"
+                       FontSize="17" VerticalOptions="Center" LineBreakMode="NoWrap" />
             </HorizontalStackLayout>
-            <Label Grid.Column="1"
+            <!-- Connection status -->
+            <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center" Margin="8,0,0,0">
+                <BoxView WidthRequest="1" HeightRequest="14" BackgroundColor="{DynamicResource ThemeBgElevated}" VerticalOptions="Center" />
+                <Ellipse WidthRequest="8" HeightRequest="8" Fill="{Binding ConnectionDotColor}" VerticalOptions="Center" />
+                <Label Text="{Binding ConnectionStatusText}" TextColor="{Binding ConnectionStatusColor}"
+                       FontSize="11" VerticalOptions="Center" LineBreakMode="NoWrap" />
+            </HorizontalStackLayout>
+            <!-- Server controls (merged in from the old server-tree header) -->
+            <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="Center" Margin="10,0,0,0">
+                <BoxView WidthRequest="1" HeightRequest="14" BackgroundColor="{DynamicResource ThemeBgElevated}" VerticalOptions="Center" />
+                <Label Text="{Binding Members.Count, StringFormat='{0} online'}"
+                       TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center"
+                       IsVisible="{Binding IsNotDmMode}" />
+                <Button Text="🔗" Command="{Binding CopyInviteLinkCommand}" IsVisible="{Binding IsServerAdmin}"
+                        BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
+                        FontSize="13" HeightRequest="26" WidthRequest="30" Padding="0"
+                        ToolTipProperties.Text="Copy invite link" />
+                <Button Text="💬" Command="{Binding ToggleDmModeCommand}"
+                        BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
+                        FontSize="13" HeightRequest="26" WidthRequest="30" Padding="0"
+                        ToolTipProperties.Text="Direct Messages" />
+            </HorizontalStackLayout>
+            <!-- Current channel — the flexible column that yields/truncates, never the title -->
+            <Label Grid.Column="3"
                    Text="{Binding SelectedChannel.Name, StringFormat='  /  # {0}', FallbackValue=''}"
-                   TextColor="{DynamicResource ThemeTextSecondary}" FontSize="12" VerticalOptions="Center" />
+                   TextColor="{DynamicResource ThemeTextSecondary}" FontSize="12" VerticalOptions="Center"
+                   LineBreakMode="TailTruncation" />
         </Grid>
 
         <!-- ═══ RECONNECT BANNER ═══ -->
@@ -85,36 +102,10 @@
         <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto">
 
             <!-- LEFT: Server tree -->
-            <Grid Grid.Column="0" BackgroundColor="{DynamicResource ThemeBgPanel}" RowDefinitions="Auto,*,Auto"
-                  WidthRequest="216" IsVisible="{Binding IsSidebarOpen}">
+            <Grid Grid.Column="0" BackgroundColor="{DynamicResource ThemeBgPanel}" RowDefinitions="*,Auto"
+                  WidthRequest="216">
 
-                <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,7"
-                      ColumnDefinitions="Auto,*,Auto,Auto,Auto">
-                    <Label Grid.Column="0" Text="▼" TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0"
-                           IsVisible="{Binding IsNotDmMode}" />
-                    <Label Grid.Column="0" Text="💬" TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" VerticalOptions="Center" Margin="0,0,6,0"
-                           IsVisible="{Binding IsDmMode}" />
-                    <Label Grid.Column="1" Text="{Binding SelectedServer.Name, FallbackValue='FatGuysSpeak'}" FontFamily="Bebas" CharacterSpacing="1" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="16" VerticalOptions="Center"
-                           IsVisible="{Binding IsNotDmMode}" />
-                    <Label Grid.Column="1" Text="Direct Messages" TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="12" VerticalOptions="Center"
-                           IsVisible="{Binding IsDmMode}" />
-                    <Label Grid.Column="2" Text="{Binding Members.Count, StringFormat='{0} online'}"
-                           TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center" Margin="0,0,4,0"
-                           IsVisible="{Binding IsNotDmMode}" />
-                    <Button Grid.Column="3" Text="🔗"
-                            Command="{Binding CopyInviteLinkCommand}"
-                            IsVisible="{Binding IsServerAdmin}"
-                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
-                            FontSize="13" HeightRequest="26" WidthRequest="30" Padding="0"
-                            ToolTipProperties.Text="Copy invite link" />
-                    <Button Grid.Column="4" Text="💬"
-                            Command="{Binding ToggleDmModeCommand}"
-                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
-                            FontSize="13" HeightRequest="26" WidthRequest="30" Padding="0"
-                            ToolTipProperties.Text="Direct Messages" />
-                </Grid>
-
-                <ScrollView Grid.Row="1">
+                <ScrollView Grid.Row="0">
                     <VerticalStackLayout Spacing="0">
 
                         <!-- DM conversations list (visible in DM mode) -->
@@ -372,7 +363,7 @@
                                                         <!-- Users in this channel -->
                                                         <StackLayout BindableLayout.ItemsSource="{Binding Occupants}" Spacing="0">
                                                             <BindableLayout.ItemTemplate>
-                                                                <DataTemplate x:DataType="shared:UserDto">
+                                                                <DataTemplate x:DataType="vm:OccupantViewModel">
                                                                     <Grid Padding="28,3,8,3" BackgroundColor="Transparent">
                                                                         <Grid.GestureRecognizers>
                                                                             <DragGestureRecognizer
@@ -388,8 +379,12 @@
                                                                             </MenuFlyout>
                                                                         </FlyoutBase.ContextFlyout>
                                                                         <HorizontalStackLayout Spacing="6">
-                                                                            <Label Text="🎧" FontSize="10" TextColor="{DynamicResource ThemeAccentLight}" VerticalOptions="Center" />
-                                                                            <Label Text="{Binding Username}" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="11" VerticalOptions="Center" />
+                                                                            <Label Text="🎧" FontSize="10" TextColor="{DynamicResource ThemeAccentLight}" VerticalOptions="Center"
+                                                                                   IsVisible="{Binding IsSpeaking, Converter={StaticResource InvertBoolConverter}}" />
+                                                                            <Label Text="🔊" FontSize="10" TextColor="#44ee44" VerticalOptions="Center"
+                                                                                   IsVisible="{Binding IsSpeaking}" />
+                                                                            <Label Text="{Binding Username}" FontSize="11" VerticalOptions="Center"
+                                                                                   TextColor="{DynamicResource ThemeTextSecondary}" />
                                                                         </HorizontalStackLayout>
                                                                     </Grid>
                                                                 </DataTemplate>
@@ -439,7 +434,7 @@
                 </ScrollView>
 
                 <!-- Profile bar -->
-                <Grid Grid.Row="2" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,7"
+                <Grid Grid.Row="1" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,7"
                       ColumnDefinitions="Auto,*,Auto">
                     <Frame Grid.Column="0" CornerRadius="14" WidthRequest="28" HeightRequest="28"
                            BackgroundColor="{DynamicResource ThemeAccent}" Padding="0" Margin="0,0,8,0">

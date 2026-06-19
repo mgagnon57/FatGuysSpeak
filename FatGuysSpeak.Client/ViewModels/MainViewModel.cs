@@ -10,7 +10,7 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService) : ObservableObject
+public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService, ShareBorderOverlay shareBorder) : ObservableObject
 {
     private bool _initialized;
     private string? _versionSyncCheckedFor;   // server version last handled this session
@@ -51,7 +51,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private bool _isCameraOn;
     [ObservableProperty] private bool _isDmMode;
     [ObservableProperty] private DmConversationItem? _selectedDmConversation;
-    [ObservableProperty] private bool _isSidebarOpen = Environment.GetEnvironmentVariable("FATGUYS_PHONE_MODE") != "1";
 
     public ObservableCollection<VideoTileViewModel> VideoTiles { get; } = [];
     public ObservableCollection<DmConversationItem> DmConversations { get; } = [];
@@ -409,6 +408,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         OnPropertyChanged(nameof(StreamTabOpacity));
         OnPropertyChanged(nameof(CanOfferControl));
         OnPropertyChanged(nameof(CanRequestControl));
+
+        // Show the Teams-style red "you're sharing this" outline around the captured region.
+        if (value) shareBorder.Show(() => screen.CurrentCaptureRect);
+        else shareBorder.Hide();
     }
     partial void OnActiveStreamerIdChanged(int value) => OnPropertyChanged(nameof(CanRequestControl));
     partial void OnIsFullScreenChanged(bool value) => OnPropertyChanged(nameof(StreamViewerVisible));
@@ -692,7 +695,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                 MainThread.BeginInvokeOnMainThread(() =>
                 {
                     ch.Occupants.Clear();
-                    foreach (var u in occ) ch.Occupants.Add(u);
+                    foreach (var u in occ) ch.Occupants.Add(new OccupantViewModel(u));
                 });
             }
         }
@@ -755,7 +758,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         {
             item.Occupants.Clear();
             foreach (var u in occupants)
-                item.Occupants.Add(u);
+                item.Occupants.Add(new OccupantViewModel(u));
         });
 
         // If there's an active stream in this channel, start receiving frames and audio now
@@ -840,8 +843,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         });
     }
 
-    [RelayCommand]
-    public void ToggleSidebar() => IsSidebarOpen = !IsSidebarOpen;
 
     [RelayCommand]
     public void ToggleSearch() => IsSearchOpen = !IsSearchOpen;
@@ -1866,8 +1867,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     /// <summary>Right-click "Move to Channel…" on a channel occupant: pick a target channel from an
     /// action sheet, then move them. Reliable alternative to drag-and-drop.</summary>
     [RelayCommand]
-    private Task PromptMoveUser(FatGuysSpeak.Shared.UserDto user)
-        => user is null ? Task.CompletedTask : PromptMoveByIdAsync(user.Id, user.Username);
+    private Task PromptMoveUser(OccupantViewModel occupant)
+        => occupant is null ? Task.CompletedTask : PromptMoveByIdAsync(occupant.Id, occupant.Username);
 
     /// <summary>Right-click "Move to Channel…" on a CONNECTED-list member. This list shows every
     /// online member regardless of which channel they're in (including the lobby), so it's the
@@ -1904,6 +1905,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         _ = hub.SendVoiceDataAsync(data);
         var self = VoiceParticipants.FirstOrDefault(p => p.UserId == api.CurrentUserId);
         self?.SetSpeaking();
+        OnUserSpeaking(api.CurrentUserId);   // also light our own row in the occupant list
     }
 
     private void OnVoiceDataReceived(byte[] data) =>
@@ -2181,6 +2183,17 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         var participant = VoiceParticipants.FirstOrDefault(p => p.UserId == userId);
         participant?.SetSpeaking();
+
+        // Also light up the speaker in the channel occupant list (left tree). A user is an
+        // occupant of one channel, so this lights at most one row.
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            foreach (var ch in Channels)
+            {
+                var occ = ch.Occupants.FirstOrDefault(o => o.Id == userId);
+                if (occ is not null) { occ.SetSpeaking(); break; }
+            }
+        });
     }
 
     [RelayCommand]
@@ -2963,7 +2976,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         MainThread.BeginInvokeOnMainThread(() =>
         {
             if (!item.Occupants.Any(u => u.Id == user.Id))
-                item.Occupants.Add(user);
+                item.Occupants.Add(new OccupantViewModel(user));
             if (SelectedChannel?.Id == channelId)
                 AddToStore(MessageViewItem.CreateSystem($"→ {user.Username} joined the channel", channelId, MessageSource.Text));
         });

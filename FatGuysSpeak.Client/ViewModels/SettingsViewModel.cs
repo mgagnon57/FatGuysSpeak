@@ -22,6 +22,9 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
     [ObservableProperty] private bool _isAdaptiveThresholdEnabled;
     [ObservableProperty] private string _selectedTheme = ThemeService.Dark;
 
+    // All available themes, in display order — drives the Settings picker.
+    public IReadOnlyList<string> ThemeNames => ThemeService.Names;
+
     public string Username => api.CurrentUsername;
     public string AppVersion
     {

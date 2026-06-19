@@ -10,21 +10,21 @@
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- Theme colors (Ember default) — updated at runtime by ThemeService via DynamicResource -->
-            <Color x:Key="ThemeBgPrimary">#101010</Color>
-            <Color x:Key="ThemeBgPanel">#191717</Color>
-            <Color x:Key="ThemeBgHeader">#0a0909</Color>
-            <Color x:Key="ThemeBgElevated">#222020</Color>
-            <Color x:Key="ThemeBgInput">#0a0909</Color>
-            <Color x:Key="ThemeBgActive">#241310</Color>
-            <Color x:Key="ThemeDivider">#292525</Color>
-            <Color x:Key="ThemeAccent">#d42d00</Color>
-            <Color x:Key="ThemeAccentLight">#f04010</Color>
-            <Color x:Key="ThemeAccentMuted">#2a1208</Color>
-            <Color x:Key="ThemeTextPrimary">#e9e4d9</Color>
-            <Color x:Key="ThemeTextSecondary">#756e62</Color>
-            <Color x:Key="ThemeTextMuted">#4a443d</Color>
-            <Color x:Key="ThemeDanger">#d42d00</Color>
+            <!-- Theme colors (Ember default: clean red on near-black) — updated at runtime by ThemeService via DynamicResource -->
+            <Color x:Key="ThemeBgPrimary">#0d0c0c</Color>
+            <Color x:Key="ThemeBgPanel">#161313</Color>
+            <Color x:Key="ThemeBgHeader">#080707</Color>
+            <Color x:Key="ThemeBgElevated">#211c1c</Color>
+            <Color x:Key="ThemeBgInput">#080707</Color>
+            <Color x:Key="ThemeBgActive">#2a0f12</Color>
+            <Color x:Key="ThemeDivider">#2b2323</Color>
+            <Color x:Key="ThemeAccent">#cc1124</Color>
+            <Color x:Key="ThemeAccentLight">#ff2a3d</Color>
+            <Color x:Key="ThemeAccentMuted">#2c0c11</Color>
+            <Color x:Key="ThemeTextPrimary">#ece7e3</Color>
+            <Color x:Key="ThemeTextSecondary">#867d78</Color>
+            <Color x:Key="ThemeTextMuted">#544c49</Color>
+            <Color x:Key="ThemeDanger">#ff2a3d</Color>
             <Color x:Key="ThemeWarning">#e89000</Color>
             <Color x:Key="ThemeSuccess">#36b864</Color>
 
