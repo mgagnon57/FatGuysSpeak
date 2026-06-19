@@ -57,20 +57,12 @@
                 <Label Text="{Binding ConnectionStatusText}" TextColor="{Binding ConnectionStatusColor}"
                        FontSize="11" VerticalOptions="Center" LineBreakMode="NoWrap" />
             </HorizontalStackLayout>
-            <!-- Server controls (merged in from the old server-tree header) -->
+            <!-- Online count (invite + DMs moved to the bottom user bar) -->
             <HorizontalStackLayout Grid.Column="2" Spacing="6" VerticalOptions="Center" Margin="10,0,0,0">
                 <BoxView WidthRequest="1" HeightRequest="14" BackgroundColor="{DynamicResource ThemeBgElevated}" VerticalOptions="Center" />
                 <Label Text="{Binding Members.Count, StringFormat='{0} online'}"
                        TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center"
                        IsVisible="{Binding IsNotDmMode}" />
-                <Button Text="🔗" Command="{Binding CopyInviteLinkCommand}" IsVisible="{Binding IsServerAdmin}"
-                        BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
-                        FontSize="13" HeightRequest="26" WidthRequest="30" Padding="0"
-                        ToolTipProperties.Text="Copy invite link" />
-                <Button Text="💬" Command="{Binding ToggleDmModeCommand}"
-                        BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
-                        FontSize="13" HeightRequest="26" WidthRequest="30" Padding="0"
-                        ToolTipProperties.Text="Direct Messages" />
             </HorizontalStackLayout>
             <!-- Current channel — the flexible column that yields/truncates, never the title -->
             <Label Grid.Column="3"
@@ -435,7 +427,7 @@
 
                 <!-- Profile bar -->
                 <Grid Grid.Row="1" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,7"
-                      ColumnDefinitions="Auto,*,Auto">
+                      ColumnDefinitions="Auto,*,Auto,Auto,Auto">
                     <Frame Grid.Column="0" CornerRadius="14" WidthRequest="28" HeightRequest="28"
                            BackgroundColor="{DynamicResource ThemeAccent}" Padding="0" Margin="0,0,8,0">
                         <Grid>
@@ -450,8 +442,19 @@
                     </Frame>
                     <Label Grid.Column="1" Text="{Binding CurrentUsername}"
                            TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12" FontAttributes="Bold"
-                           VerticalOptions="Center" />
-                    <Button Grid.Column="2" Text="📷"
+                           VerticalOptions="Center" LineBreakMode="TailTruncation" />
+                    <Button Grid.Column="2" Text="💬"
+                            Command="{Binding ToggleDmModeCommand}"
+                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
+                            FontSize="13" HeightRequest="28" WidthRequest="32" Padding="0"
+                            ToolTipProperties.Text="Direct Messages" />
+                    <Button Grid.Column="3" Text="🔗"
+                            Command="{Binding CopyInviteLinkCommand}"
+                            IsVisible="{Binding IsServerAdmin}"
+                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
+                            FontSize="13" HeightRequest="28" WidthRequest="32" Padding="0"
+                            ToolTipProperties.Text="Copy invite link" />
+                    <Button Grid.Column="4" Text="📷"
                             Command="{Binding UploadAvatarCommand}"
                             BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextMuted}"
                             FontSize="13" HeightRequest="28" WidthRequest="32" Padding="0"
@@ -527,20 +530,15 @@
                     </Grid>
                 </Grid>
 
-                <!-- Tab bar -->
-                <Grid Grid.Row="1" ColumnDefinitions="*,*,*" HeightRequest="34" BackgroundColor="{DynamicResource ThemeBgElevated}"
+                <!-- Tab bar (Voice tab removed — transcriptions still post to the server) -->
+                <Grid Grid.Row="1" ColumnDefinitions="*,*" HeightRequest="34" BackgroundColor="{DynamicResource ThemeBgElevated}"
                       IsVisible="{Binding ShowChannelUiElements}">
                     <Button Grid.Column="0" Text="💬 Chat"
                             Command="{Binding SelectTabCommand}" CommandParameter="Text"
                             BackgroundColor="{Binding IsTextTab, Converter={StaticResource TabBgConverter}}"
                             TextColor="White" FontSize="11" CornerRadius="0" BorderWidth="0"
                             Padding="0" Margin="0" />
-                    <Button Grid.Column="1" Text="🎙 Voice"
-                            Command="{Binding SelectTabCommand}" CommandParameter="Voice"
-                            BackgroundColor="{Binding IsVoiceTab, Converter={StaticResource TabBgConverter}}"
-                            TextColor="White" FontSize="11" CornerRadius="0" BorderWidth="0"
-                            Padding="0" Margin="0" />
-                    <Button Grid.Column="2" Text="📺 Stream"
+                    <Button Grid.Column="1" Text="📺 Stream"
                             Command="{Binding SelectTabCommand}" CommandParameter="Stream"
                             BackgroundColor="{Binding IsStreamTab, Converter={StaticResource TabBgConverter}}"
                             TextColor="White" FontSize="11" CornerRadius="0" BorderWidth="0"
