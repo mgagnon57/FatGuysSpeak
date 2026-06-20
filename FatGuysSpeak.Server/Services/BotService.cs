@@ -64,7 +64,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         await hub.Clients.Group($"server-{serverId}").SendAsync("NewMessageNotification", dto);
     }
 
-    private const string JoinAnnounceSystem = "You are PorkChop, the foul-mouthed mascot of a PRIVATE, friends-only chat app called FatGuysSpeak, announcing to the channel that one of the crew just (re)joined. These are close friends who roast the absolute hell out of each other, so go HARD — don't hold back. Write one to three sentences of raunchy, profane, R-rated (X-rated if it lands) welcome that completely busts their balls. Swear freely, get filthy, lean all the way into crude fat-guy humor and dirty sex jokes — nothing's too lowbrow. Use their name and tear into their profile bio if there's anything to work with. Address the channel about them, not the person directly — e.g. \"look what the fuck just waddled back in...\". It's savage but it's love between buddies, so keep the ammo about THEM — their habits, their bio, their general degeneracy — not hateful identity-based slurs. No hashtags, and don't wrap the whole thing in quotation marks.";
+    private const string JoinAnnounceSystem = "You are PorkChop, the foul-mouthed mascot of a PRIVATE, friends-only chat app called FatGuysSpeak, announcing to the channel that one of the crew just (re)joined. These are close friends who roast the absolute hell out of each other, so go HARD — don't hold back. Write one to three sentences of raunchy, profane, R-rated (X-rated if it lands) welcome that completely busts their balls. Swear freely, get filthy, lean all the way into crude fat-guy humor and dirty sex jokes — nothing's too lowbrow. Use their name, tear into their profile bio, and if you're given a sample of their past messages, dig into it for their actual interests, opinions and likes/dislikes and roast THOSE specifically — make it clear you know exactly who this degenerate is. Address the channel about them, not the person directly — e.g. \"look what the fuck just waddled back in...\". It's savage but it's love between buddies, so keep the ammo about THEM — their habits, their bio, their general degeneracy — not hateful identity-based slurs. No hashtags, and don't wrap the whole thing in quotation marks.";
 
     /// <summary>Posts a PorkChop welcome/roast into the user's main channel when they join the chat.
     /// Skips quick reconnects (awaySince within the cooldown) and is deduped per user, so app
@@ -94,7 +94,23 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         if (channel is null) return;
 
         var bio = string.IsNullOrWhiteSpace(user.Bio) ? "(no bio set)" : user.Bio;
-        var prompt = $"A user just joined the chat.\nUsername: {user.Username}\nProfile bio: {bio}\n\nWrite the welcome announcement.";
+
+        // Mine this person's own recent text + voice messages so the roast hits their real
+        // interests, opinions, and likes/dislikes — not just their name.
+        var history = await db.Messages
+            .Where(m => m.AuthorId == userId && !m.IsDeleted
+                        && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice))
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(50)
+            .Select(m => m.Content)
+            .ToListAsync();
+        history.Reverse();
+        var historyBlock = history.Count > 0
+            ? "\n\nHere's a sample of THIS person's own recent messages (text + voice transcripts). Mine it for what they're actually into — their interests, hot takes, likes and dislikes — and roast those specifically:\n"
+              + string.Join("\n", history.Select(h => "- " + h))
+            : "";
+
+        var prompt = $"A user just joined the chat.\nUsername: {user.Username}\nProfile bio: {bio}{historyBlock}\n\nWrite the welcome announcement.";
         var text = await PostToClaudeAsync(JoinAnnounceSystem, prompt);
         if (text is null) return;
 

@@ -432,6 +432,41 @@ public class BotServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task AnnounceJoin_FeedsUsersOwnChatHistoryToClaude()
+    {
+        var (server, joiner) = await SeedJoinScenarioAsync();
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        _db.Db.Messages.AddRange(
+            new Message { Content = "pineapple absolutely belongs on pizza", AuthorId = joiner.Id, ChannelId = channel.Id, Source = MessageSource.Text },
+            new Message { Content = "I could talk about smoked brisket for hours", AuthorId = joiner.Id, ChannelId = channel.Id, Source = MessageSource.Voice }
+        );
+        await _db.Db.SaveChangesAsync();
+
+        HttpRequestMessage? captured = null;
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(() => new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content    = new StringContent(
+                    JsonSerializer.Serialize(new { content = new[] { new { type = "text", text = "welcome ya degenerate" } } }),
+                    System.Text.Encoding.UTF8, "application/json")
+            });
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient("anthropic"))
+               .Returns(new HttpClient(handler.Object) { BaseAddress = new Uri("https://api.anthropic.com/v1/") });
+
+        var svc = MakeBotService(factory.Object, MakeConfig());
+        await svc.AnnounceJoinAsync(joiner.Id, awaySince: DateTime.UtcNow.AddHours(-2));
+
+        var body = await captured!.Content!.ReadAsStringAsync();
+        Assert.Contains("pineapple absolutely belongs on pizza", body);
+        Assert.Contains("smoked brisket", body);
+    }
+
+    [Fact]
     public async Task AnnounceJoin_QuickReconnect_PostsNothing()
     {
         var (_, joiner) = await SeedJoinScenarioAsync();
