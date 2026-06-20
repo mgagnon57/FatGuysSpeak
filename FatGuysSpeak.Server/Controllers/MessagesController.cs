@@ -20,7 +20,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
     private string BaseUrl => $"{Request.Scheme}://{Request.Host}";
 
-    private static MessageDto ToDto(Message m, List<ReactionDto>? reactions = null, bool isPinned = false, int replyCount = 0) => new(
+    private static MessageDto ToDto(Message m, List<ReactionDto>? reactions = null, bool isPinned = false, int replyCount = 0, PollDto? poll = null) => new(
         m.Id, m.Content, m.Author.Username, m.AuthorId, m.CreatedAt, m.ChannelId, m.Source,
         m.AttachmentUrl, m.IsDeleted, m.EditedAt,
         reactions?.Count > 0 ? reactions : null,
@@ -33,7 +33,8 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
         m.AttachmentFileName,
         isPinned,
         m.ThreadId,
-        replyCount);
+        replyCount,
+        poll);
 
     private async Task<(bool isMember, bool hasReadAccess)> CheckChannelAccessAsync(int channelId)
     {
@@ -101,17 +102,25 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
             .Select(g => new { RootId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.RootId, x => x.Count);
 
+        var pollByMsg = new Dictionary<int, PollDto>();
+        foreach (var m in messages.Where(m => m.PollId.HasValue))
+        {
+            var pd = await PollHelper.BuildAsync(db, m.PollId!.Value, UserId);
+            if (pd is not null) pollByMsg[m.Id] = pd;
+        }
+
         return messages.Select(m =>
         {
             var pinned = pinnedIds.Contains(m.Id);
             replyCounts.TryGetValue(m.Id, out var rc);
-            if (!byMsg.TryGetValue(m.Id, out var rs)) return ToDto(m, isPinned: pinned, replyCount: rc);
+            var poll = pollByMsg.GetValueOrDefault(m.Id);
+            if (!byMsg.TryGetValue(m.Id, out var rs)) return ToDto(m, isPinned: pinned, replyCount: rc, poll: poll);
             var reactions = rs
                 .GroupBy(r => r.Emoji)
                 .Select(g => new ReactionDto(g.Key, g.Count(), g.Any(r => r.UserId == UserId)))
                 .OrderBy(r => r.Emoji)
                 .ToList();
-            return ToDto(m, reactions, pinned, rc);
+            return ToDto(m, reactions, pinned, rc, poll);
         }).ToList();
     }
 

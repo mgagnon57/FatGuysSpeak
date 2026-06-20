@@ -933,10 +933,41 @@
                                            Text="✗  This message was deleted."
                                            TextColor="{DynamicResource ThemeTextMuted}" FontSize="12" FontAttributes="Italic"
                                            IsVisible="{Binding IsDeleted}" />
-                                    <!-- Normal content (hidden when deleted) -->
+                                    <!-- Normal content (hidden when deleted or when this is a poll) -->
                                     <controls:MarkdownView Grid.Row="2" Grid.Column="1"
                                            Text="{Binding Message.Content}"
-                                           IsVisible="{Binding IsDeleted, Converter={StaticResource InvertBoolConverter}}" />
+                                           IsVisible="{Binding ShowTextBody}" />
+                                    <!-- Poll card -->
+                                    <Border Grid.Row="2" Grid.Column="1" IsVisible="{Binding IsPoll}"
+                                            BackgroundColor="{DynamicResource ThemeBgElevated}" StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 8" Padding="12,10" Margin="0,2,0,0"
+                                            HorizontalOptions="Start" MinimumWidthRequest="320">
+                                        <VerticalStackLayout BindingContext="{Binding Poll}" Spacing="6">
+                                            <Label Text="{Binding Question, StringFormat='📊  {0}'}"
+                                                   TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="13" />
+                                            <VerticalStackLayout BindableLayout.ItemsSource="{Binding Options}" Spacing="4">
+                                                <BindableLayout.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:PollOptionViewModel">
+                                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" RowSpacing="2"
+                                                              Padding="8,6" BackgroundColor="{Binding IsMyVote, Converter={StaticResource TabBgConverter}}">
+                                                            <Grid.GestureRecognizers>
+                                                                <TapGestureRecognizer
+                                                                    Command="{Binding BindingContext.VotePollCommand, Source={x:Reference RootPage}}"
+                                                                    CommandParameter="{Binding .}" />
+                                                            </Grid.GestureRecognizers>
+                                                            <Label Grid.Row="0" Grid.Column="0" Text="{Binding Text}"
+                                                                   TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12" VerticalOptions="Center" />
+                                                            <Label Grid.Row="0" Grid.Column="1" Text="{Binding VotesLabel}"
+                                                                   TextColor="{DynamicResource ThemeTextMuted}" FontSize="11" VerticalOptions="Center" />
+                                                            <ProgressBar Grid.Row="1" Grid.ColumnSpan="2" Progress="{Binding Fraction}"
+                                                                         ProgressColor="{DynamicResource ThemeAccent}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </BindableLayout.ItemTemplate>
+                                            </VerticalStackLayout>
+                                            <Label Text="{Binding TotalVotesLabel}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" />
+                                        </VerticalStackLayout>
+                                    </Border>
                                     <!-- Static attachment (non-GIF) -->
                                     <Image Grid.Row="3" Grid.Column="1"
                                            Source="{Binding Message.AttachmentUrl}"
@@ -1351,7 +1382,7 @@
                         </Grid>
                     </Border>
                     <!-- Input row -->
-                    <Grid Grid.Row="6" ColumnDefinitions="Auto,Auto,Auto,*,Auto">
+                    <Grid Grid.Row="6" ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto">
                         <Button Grid.Column="0" Text="😊"
                                 Command="{Binding ToggleEmojiPickerCommand}"
                                 BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}"
@@ -1369,11 +1400,16 @@
                                 FontSize="11" FontAttributes="Bold"
                                 HeightRequest="36" WidthRequest="40" Padding="0" Margin="0,0,4,0"
                                 ToolTipProperties.Text="GIF picker" />
-                        <Entry Grid.Column="3"
+                        <Button Grid.Column="3" Text="📊"
+                                Command="{Binding CreatePollCommand}"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="16"
+                                HeightRequest="36" WidthRequest="40" Padding="0" Margin="0,0,4,0"
+                                ToolTipProperties.Text="Create a poll" />
+                        <Entry Grid.Column="4"
                                Placeholder="{Binding MessagePlaceholderText}"
                                BackgroundColor="{DynamicResource ThemeBgPrimary}" PlaceholderColor="#4a443d" TextColor="{DynamicResource ThemeTextPrimary}"
                                Text="{Binding MessageInput}" ReturnCommand="{Binding SendMessageCommand}" />
-                        <Button Grid.Column="4" Text="Send" Command="{Binding SendMessageCommand}"
+                        <Button Grid.Column="5" Text="Send" Command="{Binding SendMessageCommand}"
                                 BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White" CornerRadius="3"
                                 FontSize="12" Margin="8,0,0,0" HeightRequest="36" Padding="14,0"
                                 IsEnabled="{Binding IsCooldownActive, Converter={StaticResource InvertBoolConverter}}" />

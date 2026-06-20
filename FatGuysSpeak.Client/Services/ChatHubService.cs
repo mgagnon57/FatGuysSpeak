@@ -65,6 +65,7 @@ public class ChatHubService
     public event Action<int, string>? MemberRoleChanged;  // (userId, roleName e.g. "Admin")
     public event Action<int, int>? ChannelSlowmodeUpdated; // (channelId, slowmodeSeconds)
     public event Action<MessageDto, int, int>? ThreadReplyReceived; // (reply, rootMessageId, newReplyCount)
+    public event Action<PollDto>? PollUpdated; // shared poll tallies (no per-user vote)
     public event Action<int, DateTime?>? UserMuted;   // (userId, mutedUntil — null means unmuted)
     public event Action<int, DateTime>? UserTempBanned; // (userId, expiresAt)
     public event Action<Exception?>? Reconnecting;
@@ -133,6 +134,7 @@ public class ChatHubService
             (cid, secs) => ChannelSlowmodeUpdated?.Invoke(cid, secs));
         _connection.On<MessageDto, int, int>("ThreadReplyReceived",
             (dto, rootId, count) => ThreadReplyReceived?.Invoke(dto, rootId, count));
+        _connection.On<PollDto>("PollUpdated", dto => PollUpdated?.Invoke(dto));
         _connection.On<int, DateTime?>("UserMuted", (uid, until) => UserMuted?.Invoke(uid, until));
         _connection.On<int, DateTime>("UserTempBanned", (uid, exp) => UserTempBanned?.Invoke(uid, exp));
         _connection.On<int, string>("ControlRequested", (id, n) => ControlRequested?.Invoke(id, n));

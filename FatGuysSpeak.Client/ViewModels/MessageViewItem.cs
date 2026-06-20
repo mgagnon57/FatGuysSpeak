@@ -69,6 +69,12 @@ public partial class MessageViewItem : ObservableObject
     public bool IsBot => Message.Source == MessageSource.AI;
     // PorkChop's posts show an @ prefix so the bot reads as distinct from regular members.
     public string AuthorDisplayName => IsBot ? "@" + Message.AuthorUsername : Message.AuthorUsername;
+
+    // Poll card (set when this message carries a poll). IsPoll gates the poll template; the normal
+    // text body is hidden for poll messages so only the card shows.
+    public PollViewModel? Poll { get; private set; }
+    public bool IsPoll => Poll is not null;
+    public bool ShowTextBody => !IsDeleted && !IsPoll;   // poll messages show the card instead of the text body
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanDelete))] private bool _canModerate;
     public bool CanDelete => IsOwnMessage || CanModerate;
 
@@ -147,6 +153,9 @@ public partial class MessageViewItem : ObservableObject
 
         ToggleReactionCommand = new RelayCommand<string>(emoji =>
             ReactionRequested?.Invoke(this, emoji ?? ""));
+
+        if (message.Poll is not null)
+            Poll = new PollViewModel(message.Poll);
 
         if (message.Reactions is not null)
             ApplyReactionsCore(message.Reactions);

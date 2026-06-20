@@ -562,6 +562,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.MemberRoleChanged += OnMemberRoleChanged;
         hub.ChannelSlowmodeUpdated += OnChannelSlowmodeUpdated;
         hub.ThreadReplyReceived += OnThreadReplyReceived;
+        hub.PollUpdated += OnPollUpdated;
         hub.UserMuted += OnUserMuted;
         hub.UserTempBanned += OnUserTempBanned;
         hub.ControlRequested    += OnControlRequested;
@@ -823,6 +824,37 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         SelectedTab = tab;
         if (tab != "Stream")
             SetGroupedMessages(tab == "Voice" ? _voiceMsgs : _textMsgs);
+    }
+
+    // ── Polls ───────────────────────────────────────────────────────────────────
+    private void OnPollUpdated(PollDto dto) => MainThread.BeginInvokeOnMainThread(() =>
+    {
+        foreach (var mi in _textMsgs.Concat(_voiceMsgs).Concat(_streamMsgs))
+            if (mi.Poll?.PollId == dto.Id) { mi.Poll.ApplyTallies(dto); break; }
+    });
+
+    [RelayCommand]
+    private async Task VotePollAsync(PollOptionViewModel? option)
+    {
+        if (option is null) return;
+        var dto = await api.VotePollAsync(option.PollId, option.Id);
+        if (dto is null) return;
+        foreach (var mi in _textMsgs.Concat(_voiceMsgs).Concat(_streamMsgs))
+            if (mi.Poll?.PollId == dto.Id) { mi.Poll.ApplyMyVote(dto); break; }
+    }
+
+    [RelayCommand]
+    private async Task CreatePollAsync()
+    {
+        if (SelectedChannel is null) return;
+        var question = await Shell.Current.DisplayPromptAsync("New poll", "What's the question?", "Next", "Cancel", maxLength: 200);
+        if (string.IsNullOrWhiteSpace(question)) return;
+        var raw = await Shell.Current.DisplayPromptAsync("New poll", "Options — one per line or comma-separated", "Create", "Cancel", maxLength: 500);
+        if (string.IsNullOrWhiteSpace(raw)) return;
+        var options = raw.Split(['\n', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                         .Distinct().Take(10).ToList();
+        if (options.Count < 2) { await Shell.Current.DisplayAlert("New poll", "Add at least two options.", "OK"); return; }
+        await api.CreatePollAsync(SelectedChannel.Id, question.Trim(), options);   // arrives via ReceiveMessage broadcast
     }
 
     // Ask PorkChop for a personal recap of what was missed since the user was last online.
@@ -2066,6 +2098,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.MemberRoleChanged      -= OnMemberRoleChanged;
         hub.ChannelSlowmodeUpdated -= OnChannelSlowmodeUpdated;
         hub.ThreadReplyReceived    -= OnThreadReplyReceived;
+        hub.PollUpdated            -= OnPollUpdated;
         hub.UserMuted              -= OnUserMuted;
         hub.UserTempBanned         -= OnUserTempBanned;
         hub.ControlRequested       -= OnControlRequested;

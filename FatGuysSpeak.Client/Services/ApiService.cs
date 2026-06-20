@@ -151,6 +151,20 @@ public class ApiService
     public Task<List<MessageDto>?> GetMessagesBeforeAsync(int channelId, int beforeId, int limit = 50) =>
         _http.GetFromJsonAsync<List<MessageDto>>($"api/channels/{channelId}/messages?beforeId={beforeId}&limit={limit}");
 
+    // Create a poll in a channel; returns the posted poll message (or null on failure).
+    public async Task<MessageDto?> CreatePollAsync(int channelId, string question, List<string> options)
+    {
+        var resp = await _http.PostAsJsonAsync($"api/channels/{channelId}/polls", new CreatePollRequest(question, options));
+        return resp.IsSuccessStatusCode ? await resp.Content.ReadFromJsonAsync<MessageDto>() : null;
+    }
+
+    // Cast/change/retract a vote; returns the poll with this user's vote applied.
+    public async Task<PollDto?> VotePollAsync(int pollId, int optionId)
+    {
+        var resp = await _http.PostAsJsonAsync($"api/polls/{pollId}/vote", new PollVoteRequest(optionId));
+        return resp.IsSuccessStatusCode ? await resp.Content.ReadFromJsonAsync<PollDto>() : null;
+    }
+
     // PorkChop's personal "what you missed since last online" recap for the current user and chat source.
     public async Task<CatchupDto?> GetCatchupAsync(MessageSource source)
     {

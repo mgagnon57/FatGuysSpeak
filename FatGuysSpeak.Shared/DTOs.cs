@@ -60,7 +60,13 @@ public record MessageDto(
     string? AttachmentFileName = null,
     bool IsPinned = false,
     int? ThreadId = null,
-    int ReplyCount = 0);
+    int ReplyCount = 0,
+    PollDto? Poll = null);
+
+public record PollDto(int Id, string Question, List<PollOptionDto> Options, int TotalVotes, int? MyVoteOptionId);
+public record PollOptionDto(int Id, string Text, int Votes);
+public record CreatePollRequest(string Question, List<string> Options);
+public record PollVoteRequest(int OptionId);
 
 public record SendMessageRequest(string Content, MessageSource Source = MessageSource.Text, string? AttachmentUrl = null, int? ReplyToMessageId = null, string? AttachmentFileName = null, int? ThreadId = null);
 public record EditMessageRequest(string Content);

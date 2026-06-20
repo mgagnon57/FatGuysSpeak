@@ -124,6 +124,7 @@ public class Message
     public string? AttachmentFileName { get; set; }
     public int? ThreadId { get; set; }
     public Message? Thread { get; set; }
+    public int? PollId { get; set; }   // set when this message is a poll card
 }
 
 public class DirectConversation
@@ -214,6 +215,37 @@ public class WeeklyDigest
     public string Summary { get; set; } = "";
     public int MessageCount { get; set; }
     public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
+}
+
+// A channel poll: a question with a fixed set of options. Posted into the channel as a message
+// (Message.PollId points here) and rendered as an interactive card. Single-choice.
+public class Poll
+{
+    public int Id { get; set; }
+    public int ChannelId { get; set; }
+    public int CreatorId { get; set; }
+    public string Question { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public List<PollOption> Options { get; set; } = [];
+    public List<PollVote> Votes { get; set; } = [];
+}
+
+public class PollOption
+{
+    public int Id { get; set; }
+    public int PollId { get; set; }
+    public Poll Poll { get; set; } = null!;
+    public string Text { get; set; } = "";
+    public int Position { get; set; }
+}
+
+public class PollVote
+{
+    public int Id { get; set; }
+    public int PollId { get; set; }
+    public int OptionId { get; set; }
+    public int UserId { get; set; }   // one vote per (PollId, UserId)
 }
 
 public class AuditLog

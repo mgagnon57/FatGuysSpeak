@@ -314,6 +314,10 @@ using (var scope = app.Services.CreateScope())
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"ThreadId\" INTEGER REFERENCES \"Messages\"(\"Id\")");
 
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Messages' AND column_name='PollId'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Messages\" ADD COLUMN \"PollId\" INTEGER");
+
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='ServerMembers' AND column_name='MutedUntil'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"ServerMembers\" ADD COLUMN \"MutedUntil\" TIMESTAMPTZ");
@@ -399,6 +403,10 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='ThreadId'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN ThreadId INTEGER");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Messages') WHERE name='PollId'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Messages ADD COLUMN PollId INTEGER");
 
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('ServerMembers') WHERE name='MutedUntil'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
@@ -778,6 +786,11 @@ using (var scope = app.Services.CreateScope())
                 ""GeneratedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )");
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_WeeklyDigests_Server_Week"" ON ""WeeklyDigests"" (""ServerId"", ""WeekStart"")");
+
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""Polls"" (""Id"" SERIAL PRIMARY KEY, ""ChannelId"" INTEGER NOT NULL, ""CreatorId"" INTEGER NOT NULL, ""Question"" TEXT NOT NULL DEFAULT '', ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""PollOptions"" (""Id"" SERIAL PRIMARY KEY, ""PollId"" INTEGER NOT NULL, ""Text"" TEXT NOT NULL DEFAULT '', ""Position"" INTEGER NOT NULL DEFAULT 0)");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""PollVotes"" (""Id"" SERIAL PRIMARY KEY, ""PollId"" INTEGER NOT NULL, ""OptionId"" INTEGER NOT NULL, ""UserId"" INTEGER NOT NULL)");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_PollVotes_Poll_User"" ON ""PollVotes"" (""PollId"", ""UserId"")");
     }
     else
     {
@@ -805,6 +818,11 @@ using (var scope = app.Services.CreateScope())
                 GeneratedAt TEXT NOT NULL DEFAULT (datetime('now'))
             )");
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_WeeklyDigests_Server_Week ON WeeklyDigests (ServerId, WeekStart)");
+
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS Polls (Id INTEGER PRIMARY KEY AUTOINCREMENT, ChannelId INTEGER NOT NULL, CreatorId INTEGER NOT NULL, Question TEXT NOT NULL DEFAULT '', CreatedAt TEXT NOT NULL DEFAULT (datetime('now')))");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS PollOptions (Id INTEGER PRIMARY KEY AUTOINCREMENT, PollId INTEGER NOT NULL, Text TEXT NOT NULL DEFAULT '', Position INTEGER NOT NULL DEFAULT 0)");
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS PollVotes (Id INTEGER PRIMARY KEY AUTOINCREMENT, PollId INTEGER NOT NULL, OptionId INTEGER NOT NULL, UserId INTEGER NOT NULL)");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_PollVotes_Poll_User ON PollVotes (PollId, UserId)");
     }
 
     // Role simplification: the Moderator role (1) was removed in favour of a flat Admin/Member

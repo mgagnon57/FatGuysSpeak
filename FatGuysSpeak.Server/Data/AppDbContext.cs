@@ -22,6 +22,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<UserBlock> UserBlocks => Set<UserBlock>();
     public DbSet<DailyChatSummary> DailyChatSummaries => Set<DailyChatSummary>();
     public DbSet<WeeklyDigest> WeeklyDigests => Set<WeeklyDigest>();
+    public DbSet<Poll> Polls => Set<Poll>();
+    public DbSet<PollOption> PollOptions => Set<PollOption>();
+    public DbSet<PollVote> PollVotes => Set<PollVote>();
     public DbSet<TempBan> TempBans => Set<TempBan>();
     public DbSet<WordFilter> WordFilters => Set<WordFilter>();
     public DbSet<UserChannelNotif> UserChannelNotifs => Set<UserChannelNotif>();
