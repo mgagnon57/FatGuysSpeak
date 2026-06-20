@@ -82,22 +82,15 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         var channel = await db.Channels.FindAsync(channelId);
         if (channel is null) return null;
 
-        // Build a per-person dossier from each present user's own recent text + voice messages, so the
-        // roast is specific to who's actually here and what they're into — different crowd, different jokes.
+        // Build a per-person dossier (their own chat + what others say about them) so the roast is
+        // specific to who's actually here and what they're into — different crowd, different jokes.
         var dossiers = new List<string>();
         foreach (var uid in userIds.Take(8))
         {
             var u = await db.Users.FindAsync(uid);
             if (u is null) continue;
-            var history = await db.Messages
-                .Where(m => m.AuthorId == uid && !m.IsDeleted
-                            && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice))
-                .OrderByDescending(m => m.CreatedAt).Take(20)
-                .Select(m => m.Content).ToListAsync();
-            history.Reverse();
-            var bio = string.IsNullOrWhiteSpace(u.Bio) ? "" : $"\n  bio: {u.Bio}";
-            var sample = history.Count > 0 ? "\n  recent messages: " + string.Join(" | ", history) : "\n  (not much on record yet)";
-            dossiers.Add($"- {u.Username}{bio}{sample}");
+            var sIds = await db.ServerMembers.Where(m => m.UserId == uid).Select(m => m.ServerId).ToListAsync();
+            dossiers.Add("- " + (await BuildUserDossierAsync(db, u, sIds)).Replace("\n", "\n  "));
         }
         if (dossiers.Count == 0) return null;
 
@@ -116,6 +109,51 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         await hub.Clients.Group($"channel-{channelId}").SendAsync("ReceiveMessage", dto);
         await hub.Clients.Group($"server-{channel.ServerId}").SendAsync("NewMessageNotification", dto);
         return text;
+    }
+
+    // Everything PorkChop knows about one person, for a roast: their bio, their own recent text/voice
+    // chat, and recent things OTHER people said that mention them by name.
+    private static async Task<string> BuildUserDossierAsync(AppDbContext db, User user, List<int> serverIds)
+    {
+        var own = await db.Messages
+            .Where(m => m.AuthorId == user.Id && !m.IsDeleted
+                        && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice))
+            .OrderByDescending(m => m.CreatedAt).Take(20)
+            .Select(m => m.Content).ToListAsync();
+        own.Reverse();
+
+        var others = await WhatOthersSaidAboutAsync(db, user, serverIds);
+
+        var lines = new List<string> { user.Username };
+        if (!string.IsNullOrWhiteSpace(user.Bio)) lines.Add($"  bio: {user.Bio}");
+        lines.Add(own.Count > 0 ? "  what they talk about: " + string.Join(" | ", own) : "  (not much on record yet)");
+        if (others.Count > 0) lines.Add("  what others say to/about them: " + string.Join(" | ", others));
+        return string.Join("\n", lines);
+    }
+
+    // Recent messages from OTHER people that mention this user by name (whole word, case-insensitive,
+    // matches typed or voice-transcribed names). Skips very short usernames to avoid matching everything.
+    private static async Task<List<string>> WhatOthersSaidAboutAsync(AppDbContext db, User user, List<int> serverIds)
+    {
+        if (user.Username.Length < 3) return [];
+
+        var lower = user.Username.ToLower();
+        var candidates = await db.Messages
+            .Where(m => m.AuthorId != user.Id && !m.IsDeleted
+                        && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice)
+                        && serverIds.Contains(m.Channel.ServerId)
+                        && m.Content.ToLower().Contains(lower))     // cheap, cross-DB prefilter
+            .OrderByDescending(m => m.CreatedAt).Take(60)
+            .Select(m => new { Author = m.Author.Username, m.Content })
+            .ToListAsync();
+
+        var rx = new System.Text.RegularExpressions.Regex(
+            $@"\b{System.Text.RegularExpressions.Regex.Escape(user.Username)}\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var hits = candidates.Where(c => rx.IsMatch(c.Content)).Take(15)
+            .Select(c => $"{c.Author}: {c.Content}").ToList();
+        hits.Reverse();
+        return hits;
     }
 
     /// <summary>Posts a PorkChop welcome/roast into the user's main channel when they join the chat.
@@ -145,24 +183,9 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
             .OrderByDescending(c => c.IsDefault).ThenBy(c => c.Position).FirstOrDefaultAsync();
         if (channel is null) return;
 
-        var bio = string.IsNullOrWhiteSpace(user.Bio) ? "(no bio set)" : user.Bio;
-
-        // Mine this person's own recent text + voice messages so the roast hits their real
-        // interests, opinions, and likes/dislikes — not just their name.
-        var history = await db.Messages
-            .Where(m => m.AuthorId == userId && !m.IsDeleted
-                        && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice))
-            .OrderByDescending(m => m.CreatedAt)
-            .Take(50)
-            .Select(m => m.Content)
-            .ToListAsync();
-        history.Reverse();
-        var historyBlock = history.Count > 0
-            ? "\n\nHere's a sample of THIS person's own recent messages (text + voice transcripts). Mine it for what they're actually into — their interests, hot takes, likes and dislikes — and roast those specifically:\n"
-              + string.Join("\n", history.Select(h => "- " + h))
-            : "";
-
-        var prompt = $"A user just joined the chat.\nUsername: {user.Username}\nProfile bio: {bio}{historyBlock}\n\nWrite the welcome announcement.";
+        // Dossier: their bio, their own recent text/voice chat, and what others say about them.
+        var dossier = await BuildUserDossierAsync(db, user, serverIds);
+        var prompt = $"A user just joined the chat. Here's everything on this degenerate:\n\n{dossier}\n\nWrite the welcome announcement, working in what they're actually into.";
         var text = await PostToClaudeAsync(JoinAnnounceSystem, prompt);
         if (text is null) return;
 
