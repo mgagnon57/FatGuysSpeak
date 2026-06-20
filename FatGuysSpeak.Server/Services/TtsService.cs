@@ -53,23 +53,34 @@ public class TtsService(IHttpClientFactory httpFactory, IConfiguration config, I
         return await res.Content.ReadAsByteArrayAsync();
     }
 
-    // Encode 48 kHz mono PCM to Opus and push it to the voice group one 20 ms frame at a time,
-    // paced in real time so the clients' jitter buffers play it back smoothly.
+    private const int FrameMs = 20;     // each Opus frame is 20 ms of audio
+    private const int LeadMs   = 800;   // keep ~0.8 s buffered on the client so timer jitter can't starve it
+
+    // Encode 48 kHz mono PCM to Opus and push it to the voice group. We burst-fill the client's
+    // playback buffer up to a lead cushion, then pace off a stopwatch so the average rate stays
+    // real-time without accumulating Task.Delay overshoot (which was starving the buffer and making
+    // the voice choppy). The client's BufferedWaveProvider handles final playback timing.
     private async Task StreamOpusAsync(int channelId, short[] samples)
     {
         var encoder = OpusCodecFactory.CreateEncoder(VoiceRate, 1, OpusApplication.OPUS_APPLICATION_VOIP);
         var group = hub.Clients.Group($"voice-{channelId}");
         var buf = new byte[4000];
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var sent = 0;
         for (var off = 0; off + FrameSamples <= samples.Length; off += FrameSamples)
         {
             var frame = new short[FrameSamples];
             Array.Copy(samples, off, frame, 0, FrameSamples);
             var len = encoder.Encode(frame, FrameSamples, buf, buf.Length);
-            if (len > 0)
-            {
-                await group.SendAsync("ReceiveVoiceData", buf[..len]);
-                await Task.Delay(20);
-            }
+            if (len <= 0) continue;
+
+            await group.SendAsync("ReceiveVoiceData", buf[..len]);
+            sent++;
+
+            // How far ahead of real-time we've sent. Only wait once we're past the lead cushion.
+            var aheadMs = (long)sent * FrameMs - clock.ElapsedMilliseconds;
+            if (aheadMs > LeadMs)
+                await Task.Delay((int)(aheadMs - LeadMs));
         }
     }
 
