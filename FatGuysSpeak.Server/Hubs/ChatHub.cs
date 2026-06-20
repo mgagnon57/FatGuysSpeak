@@ -35,10 +35,8 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
                           VoiceLastActivity.TryGetValue(g.Key, out var t) ? t : DateTime.UtcNow))
             .ToList();
 
-    internal static List<string> VoiceParticipantNames(int channelId) =>
-        VoiceChannelMap.Where(kv => kv.Value == channelId)
-            .Select(kv => OnlineUsers.TryGetValue(kv.Key, out var n) ? n : "someone")
-            .ToList();
+    internal static List<int> VoiceParticipantIds(int channelId) =>
+        VoiceChannelMap.Where(kv => kv.Value == channelId).Select(kv => kv.Key).ToList();
 
     // Exposed for the metrics dashboard — read-only snapshots of live state
     internal static int OnlineUserCount       => OnlineUsers.Count;

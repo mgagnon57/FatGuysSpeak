@@ -48,8 +48,8 @@ public class IdleNudgeService(
             if (_lastNudge.TryGetValue(channelId, out var last) && now - last < NudgeCooldown) continue;
 
             _lastNudge[channelId] = now;
-            var names = ChatHub.VoiceParticipantNames(channelId);
-            var line = await bot.GenerateAndPostIdleNudgeAsync(channelId, names);
+            var ids = ChatHub.VoiceParticipantIds(channelId);
+            var line = await bot.GenerateAndPostIdleNudgeAsync(channelId, ids);
             if (line is not null)
                 await tts.SpeakIntoVoiceChannelAsync(channelId, line);   // also say it out loud
         }

@@ -69,10 +69,11 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
     private const string IdleNudgeSystem = "You are PorkChop, the foul-mouthed mascot of a PRIVATE, friends-only chat app called FatGuysSpeak. A bunch of the crew are sitting in a voice channel together but nobody's said a goddamn word in minutes — total dead air. Bust their balls about it: one or two raunchy, profane, R-to-X-rated sentences calling them out for sitting there silent (probably just stuffing their faces, scrolling their phones, or jerking around). Use their names. Same savage-but-loving tone friends bust each other's chops with — crude as hell, but it's love, not hateful identity slurs. No hashtags, and don't wrap the whole thing in quotation marks. This line will be both posted as text AND spoken out loud, so make it land when read OR heard.";
 
-    /// <summary>Generates a raunchy "you're all sitting in voice saying nothing" roast, posts it as a
-    /// PorkChop message in the channel, and returns the line (so it can also be spoken). No-op when
-    /// disabled, keyless, or the bot isn't set up.</summary>
-    public async Task<string?> GenerateAndPostIdleNudgeAsync(int channelId, IReadOnlyList<string> usernames)
+    /// <summary>Generates a raunchy "you're all sitting in voice saying nothing" roast, personalized
+    /// to exactly who's in the channel and what PorkChop has learned about each of them from their own
+    /// chat, posts it, and returns the line (so it can also be spoken). No-op when disabled, keyless,
+    /// or the bot isn't set up.</summary>
+    public async Task<string?> GenerateAndPostIdleNudgeAsync(int channelId, IReadOnlyList<int> userIds)
     {
         if (!_idleNudges || string.IsNullOrEmpty(_apiKey) || BotUserId == 0) return null;
 
@@ -81,8 +82,30 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         var channel = await db.Channels.FindAsync(channelId);
         if (channel is null) return null;
 
-        var who = usernames.Count > 0 ? string.Join(", ", usernames) : "the crew";
-        var text = await PostToClaudeAsync(IdleNudgeSystem, $"In the voice channel right now: {who}. They've gone totally silent. Roast them for it.");
+        // Build a per-person dossier from each present user's own recent text + voice messages, so the
+        // roast is specific to who's actually here and what they're into — different crowd, different jokes.
+        var dossiers = new List<string>();
+        foreach (var uid in userIds.Take(8))
+        {
+            var u = await db.Users.FindAsync(uid);
+            if (u is null) continue;
+            var history = await db.Messages
+                .Where(m => m.AuthorId == uid && !m.IsDeleted
+                            && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice))
+                .OrderByDescending(m => m.CreatedAt).Take(20)
+                .Select(m => m.Content).ToListAsync();
+            history.Reverse();
+            var bio = string.IsNullOrWhiteSpace(u.Bio) ? "" : $"\n  bio: {u.Bio}";
+            var sample = history.Count > 0 ? "\n  recent messages: " + string.Join(" | ", history) : "\n  (not much on record yet)";
+            dossiers.Add($"- {u.Username}{bio}{sample}");
+        }
+        if (dossiers.Count == 0) return null;
+
+        var prompt = "These degenerates are sitting in the voice channel together right now and nobody's said a word. "
+            + "Here's who's here and what each of them is into (from their own chat), so make the roast personal to THIS crowd:\n\n"
+            + string.Join("\n", dossiers)
+            + "\n\nRoast them for sitting there silent — aim it at who's actually present and the shit they're into.";
+        var text = await PostToClaudeAsync(IdleNudgeSystem, prompt);
         if (text is null) return null;
 
         var msg = new Message { Content = text, AuthorId = BotUserId, ChannelId = channelId, Source = MessageSource.AI };

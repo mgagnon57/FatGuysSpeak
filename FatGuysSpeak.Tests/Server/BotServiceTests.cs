@@ -504,35 +504,76 @@ public class BotServiceTests : IDisposable
     [Fact]
     public async Task IdleNudge_PostsRoastAndReturnsLine()
     {
-        var (server, _) = await SeedJoinScenarioAsync();
+        var (server, joiner) = await SeedJoinScenarioAsync();
         var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
         var svc = MakeBotService(MakeHttpFactory("you fat fucks just gonna sit there?"), MakeConfig());
 
-        var line = await svc.GenerateAndPostIdleNudgeAsync(channel.Id, ["m", "b"]);
+        var line = await svc.GenerateAndPostIdleNudgeAsync(channel.Id, [joiner.Id]);
 
         Assert.Equal("you fat fucks just gonna sit there?", line);
         Assert.True(_db.Db.Messages.Any(m => m.Source == MessageSource.AI && m.AuthorId == BotService.BotUserId && m.ChannelId == channel.Id));
     }
 
     [Fact]
+    public async Task IdleNudge_PersonalizesFromEachParticipantsChat()
+    {
+        var (server, joiner) = await SeedJoinScenarioAsync();
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var second = new User { Username = "dave", Email = "dave@test.local", PasswordHash = "!" };
+        _db.Db.Users.Add(second);
+        await _db.Db.SaveChangesAsync();
+        _db.Db.Messages.AddRange(
+            new Message { Content = "I only play Elden Ring anymore", AuthorId = joiner.Id, ChannelId = channel.Id, Source = MessageSource.Text },
+            new Message { Content = "crossfit is my whole personality", AuthorId = second.Id, ChannelId = channel.Id, Source = MessageSource.Voice }
+        );
+        await _db.Db.SaveChangesAsync();
+
+        HttpRequestMessage? captured = null;
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(() => new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content    = new StringContent(
+                    JsonSerializer.Serialize(new { content = new[] { new { type = "text", text = "say something, losers" } } }),
+                    System.Text.Encoding.UTF8, "application/json")
+            });
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient("anthropic"))
+               .Returns(new HttpClient(handler.Object) { BaseAddress = new Uri("https://api.anthropic.com/v1/") });
+
+        var svc = MakeBotService(factory.Object, MakeConfig());
+        await svc.GenerateAndPostIdleNudgeAsync(channel.Id, [joiner.Id, second.Id]);
+
+        var body = await captured!.Content!.ReadAsStringAsync();
+        // Both present users and what each is into are in the prompt — different crowd, different roast.
+        Assert.Contains(joiner.Username, body);
+        Assert.Contains("dave", body);
+        Assert.Contains("Elden Ring", body);
+        Assert.Contains("crossfit is my whole personality", body);
+    }
+
+    [Fact]
     public async Task IdleNudge_Disabled_ReturnsNull()
     {
-        var (server, _) = await SeedJoinScenarioAsync();
+        var (server, joiner) = await SeedJoinScenarioAsync();
         var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
         var svc = MakeBotService(MakeHttpFactory("unused"), MakeConfig(idleNudges: false));
 
-        Assert.Null(await svc.GenerateAndPostIdleNudgeAsync(channel.Id, ["m", "b"]));
+        Assert.Null(await svc.GenerateAndPostIdleNudgeAsync(channel.Id, [joiner.Id]));
         Assert.False(AnyAnnouncement());
     }
 
     [Fact]
     public async Task IdleNudge_NoApiKey_ReturnsNull()
     {
-        var (server, _) = await SeedJoinScenarioAsync();
+        var (server, joiner) = await SeedJoinScenarioAsync();
         var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
         var svc = MakeBotService(MakeHttpFactory("unused"), MakeConfig(apiKey: ""));
 
-        Assert.Null(await svc.GenerateAndPostIdleNudgeAsync(channel.Id, ["m", "b"]));
+        Assert.Null(await svc.GenerateAndPostIdleNudgeAsync(channel.Id, [joiner.Id]));
     }
 
     [Fact]
