@@ -204,6 +204,18 @@ public class DailyChatSummary
     public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
 }
 
+// One PorkChop server-wide digest per completed week (Monday-anchored UTC). Generated once the
+// week is over and posted as a PorkChop message into the server's default channel.
+public class WeeklyDigest
+{
+    public int Id { get; set; }
+    public int ServerId { get; set; }
+    public DateTime WeekStart { get; set; }   // UTC Monday 00:00 that begins the summarized week
+    public string Summary { get; set; } = "";
+    public int MessageCount { get; set; }
+    public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
+}
+
 public class AuditLog
 {
     public int Id { get; set; }

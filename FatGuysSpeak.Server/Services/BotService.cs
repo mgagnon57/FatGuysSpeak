@@ -117,6 +117,69 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         return new DailySummaryDto(date.ToString("yyyy-MM-dd"), summary, lines.Count);
     }
 
+    private const string WeeklyDigestSystem = "You are PorkChop, writing the weekly digest for a whole FatGuysSpeak server. You're given a week of messages from every channel, grouped by channel. In a few short paragraphs, give the crew a friendly big-picture recap of the week: the main things that happened in each active channel, recurring themes across the server, any decisions or plans, and notable moments. Refer to people and channels by name, keep it tight, and don't invent anything that isn't in the transcript.";
+
+    /// <summary>Generates the server-wide digest for a completed week and posts it as a PorkChop
+    /// message into the server's default channel. Idempotent per (server, weekStart). Returns the
+    /// stored digest, or null when there's nothing to summarize / generation isn't possible.</summary>
+    public async Task<WeeklyDigest?> GenerateAndPostWeeklyDigestAsync(int serverId, DateTime weekStartUtc)
+    {
+        var weekStart = weekStartUtc.Date;
+        var weekEnd   = weekStart.AddDays(7);
+        if (weekEnd > DateTime.UtcNow) return null;   // only summarize weeks that are fully over
+
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        if (await db.WeeklyDigests.AnyAsync(w => w.ServerId == serverId && w.WeekStart == weekStart))
+            return null;   // already posted
+
+        var rows = await db.Messages
+            .Where(m => !m.IsDeleted && m.Source != MessageSource.AI
+                        && m.CreatedAt >= weekStart && m.CreatedAt < weekEnd
+                        && m.Channel.ServerId == serverId)
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => new { Channel = m.Channel.Name, User = m.Author.Username, m.Content })
+            .ToListAsync();
+        if (rows.Count == 0) return null;   // quiet week — nothing worth a digest
+
+        if (string.IsNullOrEmpty(_apiKey) || BotUserId == 0)
+        {
+            Console.WriteLine("[PorkChop] cannot post weekly digest — API key set: {0}, bot user id: {1}.", !string.IsNullOrEmpty(_apiKey), BotUserId);
+            return null;
+        }
+
+        var transcript = "Here is the full week of chat across the server, grouped by channel. Write the weekly digest:\n\n"
+            + string.Join("\n\n", rows.GroupBy(r => r.Channel)
+                .Select(g => $"#{g.Key}\n" + string.Join("\n", g.Select(r => $"{r.User}: {r.Content}"))));
+        var text = await PostToClaudeAsync(WeeklyDigestSystem, transcript);
+        if (text is null) return null;   // generation failed — retry next pass
+
+        var digest = new WeeklyDigest { ServerId = serverId, WeekStart = weekStart, Summary = text, MessageCount = rows.Count };
+        db.WeeklyDigests.Add(digest);
+
+        var channel = await db.Channels.Where(c => c.ServerId == serverId)
+            .OrderByDescending(c => c.IsDefault).ThenBy(c => c.Position).FirstOrDefaultAsync();
+        if (channel is null) return null;
+
+        var label = weekStart.ToString("MMM d");
+        var msg = new Message
+        {
+            Content   = $"📅 **Weekly digest — week of {label}**\n\n{text}",
+            AuthorId  = BotUserId,
+            ChannelId = channel.Id,
+            Source    = MessageSource.AI,
+        };
+        db.Messages.Add(msg);
+        try { await db.SaveChangesAsync(); }
+        catch { return null; }   // concurrent generation — another pass won the race
+
+        var dto = new MessageDto(msg.Id, msg.Content, BotUsername, BotUserId, msg.CreatedAt, channel.Id, MessageSource.AI);
+        await hub.Clients.Group($"channel-{channel.Id}").SendAsync("ReceiveMessage", dto);
+        await hub.Clients.Group($"server-{serverId}").SendAsync("NewMessageNotification", dto);
+        return digest;
+    }
+
     private async Task<string?> PostToClaudeAsync(string system, string content)
     {
         try

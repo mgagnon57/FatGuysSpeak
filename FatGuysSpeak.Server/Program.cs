@@ -222,6 +222,7 @@ builder.Services.AddHostedService<FatGuysSpeak.Server.Services.UpdateCheckServic
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.TempBanCleanupService>();
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.AuditLogCleanupService>();
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.RecapPregenService>();
+builder.Services.AddHostedService<FatGuysSpeak.Server.Services.WeeklyDigestService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.SessionBlacklistService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.WebhookDeliveryService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.AutomodService>();
@@ -766,6 +767,17 @@ using (var scope = app.Services.CreateScope())
         try { ctx.Database.ExecuteSqlRaw(@"ALTER TABLE ""DailyChatSummaries"" ADD COLUMN ""Source"" INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
         ctx.Database.ExecuteSqlRaw(@"DROP INDEX IF EXISTS ""IX_DailyChatSummaries_Channel_Date""");
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_DailyChatSummaries_Channel_Date_Source"" ON ""DailyChatSummaries"" (""ChannelId"", ""Date"", ""Source"")");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""WeeklyDigests"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""ServerId"" INTEGER NOT NULL,
+                ""WeekStart"" TIMESTAMP NOT NULL,
+                ""Summary"" TEXT NOT NULL DEFAULT '',
+                ""MessageCount"" INTEGER NOT NULL DEFAULT 0,
+                ""GeneratedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_WeeklyDigests_Server_Week"" ON ""WeeklyDigests"" (""ServerId"", ""WeekStart"")");
     }
     else
     {
@@ -782,6 +794,17 @@ using (var scope = app.Services.CreateScope())
         try { ctx.Database.ExecuteSqlRaw(@"ALTER TABLE DailyChatSummaries ADD COLUMN Source INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
         ctx.Database.ExecuteSqlRaw(@"DROP INDEX IF EXISTS IX_DailyChatSummaries_Channel_Date");
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_DailyChatSummaries_Channel_Date_Source ON DailyChatSummaries (ChannelId, Date, Source)");
+
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS WeeklyDigests (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ServerId INTEGER NOT NULL,
+                WeekStart TEXT NOT NULL,
+                Summary TEXT NOT NULL DEFAULT '',
+                MessageCount INTEGER NOT NULL DEFAULT 0,
+                GeneratedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_WeeklyDigests_Server_Week ON WeeklyDigests (ServerId, WeekStart)");
     }
 
     // Role simplification: the Moderator role (1) was removed in favour of a flat Admin/Member

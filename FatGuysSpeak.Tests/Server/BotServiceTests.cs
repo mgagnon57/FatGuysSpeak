@@ -248,6 +248,56 @@ public class BotServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task WeeklyDigest_GeneratesRow_PostsBotMessage_AndIsIdempotent()
+    {
+        var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+
+        var botUser = new User { Username = BotService.BotUsername, Email = "bot@system.local", PasswordHash = "!" };
+        _db.Db.Users.Add(botUser);
+        await _db.Db.SaveChangesAsync();
+        BotService.BotUserId = botUser.Id;
+
+        var weekStart = FatGuysSpeak.Server.Services.WeeklyDigestService.MondayOf(DateTime.UtcNow).AddDays(-7);
+        _db.Db.Messages.AddRange(
+            new Message { Content = "monday chatter",  AuthorId = owner.Id, ChannelId = channel.Id, CreatedAt = weekStart.AddDays(0).AddHours(10) },
+            new Message { Content = "wednesday plans", AuthorId = owner.Id, ChannelId = channel.Id, CreatedAt = weekStart.AddDays(2).AddHours(14) }
+        );
+        await _db.Db.SaveChangesAsync();
+
+        var svc = MakeBotService(MakeHttpFactory("Big week: lots happened."), MakeConfig());
+        var digest = await svc.GenerateAndPostWeeklyDigestAsync(server.Id, weekStart);
+
+        Assert.NotNull(digest);
+        Assert.Equal(2, digest!.MessageCount);
+        Assert.True(await _db.Db.WeeklyDigests.AnyAsync(w => w.ServerId == server.Id && w.WeekStart == weekStart.Date));
+
+        var posted = _db.Db.Messages.FirstOrDefault(m => m.Source == MessageSource.AI && m.AuthorId == botUser.Id);
+        Assert.NotNull(posted);
+        Assert.Contains("Weekly digest", posted!.Content);
+        Assert.Contains("Big week", posted.Content);
+
+        // Second pass must not post a duplicate digest.
+        var again = await svc.GenerateAndPostWeeklyDigestAsync(server.Id, weekStart);
+        Assert.Null(again);
+        Assert.Equal(1, await _db.Db.WeeklyDigests.CountAsync(w => w.ServerId == server.Id && w.WeekStart == weekStart.Date));
+    }
+
+    [Fact]
+    public async Task WeeklyDigest_QuietWeek_PostsNothing()
+    {
+        var (server, _) = await TestHelpers.SeedServerAsync(_db.Db);
+        BotService.BotUserId = 999;
+        var weekStart = FatGuysSpeak.Server.Services.WeeklyDigestService.MondayOf(DateTime.UtcNow).AddDays(-7);
+
+        var svc = MakeBotService(MakeHttpFactory("unused"), MakeConfig());
+        var digest = await svc.GenerateAndPostWeeklyDigestAsync(server.Id, weekStart);
+
+        Assert.Null(digest);
+        Assert.False(await _db.Db.WeeklyDigests.AnyAsync(w => w.ServerId == server.Id));
+    }
+
+    [Fact]
     public async Task GetOrCreateDailySummary_Today_ReturnsNull()
     {
         var (server, _) = await TestHelpers.SeedServerAsync(_db.Db);
