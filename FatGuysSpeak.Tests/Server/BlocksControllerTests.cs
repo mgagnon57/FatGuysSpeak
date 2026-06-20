@@ -108,6 +108,23 @@ public class BlocksControllerTests : IDisposable
         Assert.Equal(1, _testDb.Db.UserBlocks.Count(b => b.BlockerId == blocker.Id && b.BlockedId == target.Id));
     }
 
+    [Fact]
+    public async Task BlockUser_CannotBlockAnAdmin()
+    {
+        var blocker = await CreateUserAsync("blocker_ac");
+        var admin   = await CreateUserAsync("the_admin");
+        var server  = new GuildServer { Name = "S", OwnerId = admin.Id };
+        _testDb.Db.Servers.Add(server);
+        await _testDb.Db.SaveChangesAsync();
+        _testDb.Db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = admin.Id, Role = ServerRole.Admin });
+        await _testDb.Db.SaveChangesAsync();
+
+        var result = await MakeController(blocker.Id, blocker.Username).BlockUser(admin.Id);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+        Assert.False(_testDb.Db.UserBlocks.Any(b => b.BlockedId == admin.Id));
+    }
+
     // ── UnblockUser ───────────────────────────────────────────────────────────
 
     [Fact]

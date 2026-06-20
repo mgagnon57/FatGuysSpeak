@@ -33,6 +33,9 @@ public class BlocksController(AppDbContext db) : ControllerBase
         if (userId == UserId) return BadRequest("Cannot block yourself.");
         var target = await db.Users.FindAsync(userId);
         if (target is null) return NotFound();
+        // Admins can't be blocked by anyone — not even another admin.
+        if (await db.ServerMembers.AnyAsync(m => m.UserId == userId && m.Role == ServerRole.Admin))
+            return BadRequest("Admins can't be blocked.");
         if (await db.UserBlocks.AnyAsync(b => b.BlockerId == UserId && b.BlockedId == userId))
             return NoContent(); // already blocked — idempotent
         db.UserBlocks.Add(new UserBlock { BlockerId = UserId, BlockedId = userId });

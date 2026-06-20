@@ -1362,7 +1362,11 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         else
         {
             var ok = await api.BlockUserAsync(userId);
-            if (!ok) return;
+            if (!ok)
+            {
+                toast.Show("Block", "Couldn't block that user — admins can't be blocked.");
+                return;
+            }
             _blockedUserIds.Add(userId);
             MainThread.BeginInvokeOnMainThread(() =>
             {
