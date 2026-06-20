@@ -55,16 +55,27 @@ public class BotServiceTests : IDisposable
         return factory.Object;
     }
 
-    private BotService MakeBotService(IHttpClientFactory httpFactory, IConfiguration config)
+    private BotService MakeBotService(IHttpClientFactory httpFactory, IConfiguration config, string? contentRoot = null)
     {
         var services = new ServiceCollection();
         services.AddDbContext<FatGuysSpeak.Server.Data.AppDbContext>(opt =>
             opt.UseSqlite(_db.Db.Database.GetDbConnection()));
+        if (contentRoot is not null)
+            services.AddSingleton<Microsoft.Extensions.Hosting.IHostEnvironment>(new FakeEnv { ContentRootPath = contentRoot });
 
         var sp = services.BuildServiceProvider();
         var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
 
         return new BotService(httpFactory, config, scopeFactory, TestHelpers.MockHub());
+    }
+
+    private sealed class FakeEnv : Microsoft.Extensions.Hosting.IHostEnvironment
+    {
+        public string ApplicationName { get; set; } = "tests";
+        public string EnvironmentName { get; set; } = "Development";
+        public string ContentRootPath { get; set; } = "";
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; }
+            = new Microsoft.Extensions.FileProviders.NullFileProvider();
     }
 
     [Fact]
@@ -325,6 +336,57 @@ public class BotServiceTests : IDisposable
 
         var voiceResult = await svc.GenerateCatchupAsync(owner.Id, MessageSource.Voice);
         Assert.Equal(1, voiceResult.MessageCount);   // only the spoken message
+    }
+
+    [Fact]
+    public async Task RespondAsync_WithImageAttachment_SendsImageBlockToClaude()
+    {
+        var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+
+        var botUser = new User { Username = BotService.BotUsername, Email = "bot@system.local", PasswordHash = "!" };
+        _db.Db.Users.Add(botUser);
+        await _db.Db.SaveChangesAsync();
+        BotService.BotUserId = botUser.Id;
+
+        // Temp content root with an uploads dir + a small "image" file.
+        var root = Path.Combine(Path.GetTempPath(), "fgs-vision-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "uploads"));
+        var pngBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4, 5 };
+        File.WriteAllBytes(Path.Combine(root, "uploads", "pic.png"), pngBytes);
+
+        _db.Db.Messages.Add(new Message
+        {
+            Content = "check this out", AuthorId = owner.Id, ChannelId = channel.Id,
+            AttachmentUrl = "http://localhost:5238/uploads/pic.png", Source = MessageSource.Text
+        });
+        await _db.Db.SaveChangesAsync();
+
+        HttpRequestMessage? captured = null;
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(() => new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content    = new StringContent(
+                    JsonSerializer.Serialize(new { content = new[] { new { type = "text", text = "Looks like a PNG." } } }),
+                    System.Text.Encoding.UTF8, "application/json")
+            });
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient("anthropic"))
+               .Returns(new HttpClient(handler.Object) { BaseAddress = new Uri("https://api.anthropic.com/v1/") });
+
+        var svc = MakeBotService(factory.Object, MakeConfig(), contentRoot: root);
+        await svc.RespondAsync(channel.Id, server.Id, "@PorkChop what's in this image?");
+
+        var body = await captured!.Content!.ReadAsStringAsync();
+        Assert.Contains("\"type\":\"image\"", body);
+        Assert.Contains("image/png", body);
+        Assert.Contains(Convert.ToBase64String(pngBytes), body);
+
+        try { Directory.Delete(root, true); } catch { /* best effort */ }
     }
 
     [Fact]

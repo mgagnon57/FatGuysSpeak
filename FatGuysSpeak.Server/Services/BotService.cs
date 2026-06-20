@@ -38,7 +38,10 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         recent.Reverse();
 
         var contextLines = recent.Select(m => $"{m.Author.Username}: {m.Content}").ToList();
-        var reply = await CallClaudeAsync(triggerContent, contextLines);
+        // Give PorkChop any images shared in the recent context so it can answer about them.
+        var env = scope.ServiceProvider.GetService<IHostEnvironment>();
+        var images = env is null ? [] : ReadRecentImages(recent, env.ContentRootPath);
+        var reply = await CallClaudeAsync(triggerContent, contextLines, images);
         if (reply is null) { Console.WriteLine("[PorkChop] no reply produced (see any Anthropic error above)."); return; }
 
         var msg = new Message
@@ -56,16 +59,16 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         await hub.Clients.Group($"server-{serverId}").SendAsync("NewMessageNotification", dto);
     }
 
-    private const string AdviceSystem = "You are PorkChop, a friendly, down-to-earth advisor in a chat app called FatGuysSpeak. People mention you (@PorkChop) when they have a question or want advice. Read their message and the recent conversation, then give practical, helpful advice or a clear answer. Be concise and conversational, and don't be afraid to have a little personality.";
+    private const string AdviceSystem = "You are PorkChop, a friendly, down-to-earth advisor in a chat app called FatGuysSpeak. People mention you (@PorkChop) when they have a question or want advice. Read their message and the recent conversation, then give practical, helpful advice or a clear answer. If an image has been shared in the conversation, you can see it — describe it or answer questions about it. Be concise and conversational, and don't be afraid to have a little personality.";
 
     private const string SummarySystem = "You are PorkChop. Summarize ONE day of chat in a single channel of FatGuysSpeak. In 2-5 sentences, recap the main topics discussed, any decisions or plans made, and anything notable that was shared (links, files, jokes that landed). Be friendly and concise, refer to people by name, and don't invent anything that isn't in the transcript. If it was just light small talk, say so briefly.";
 
-    private Task<string?> CallClaudeAsync(string userMessage, List<string> contextLines)
+    private Task<string?> CallClaudeAsync(string userMessage, List<string> contextLines, List<ClaudeImage>? images = null)
     {
         var content = contextLines.Count > 0
             ? string.Join("\n", contextLines) + "\n\n" + userMessage
             : userMessage;
-        return PostToClaudeAsync(AdviceSystem, content);
+        return PostToClaudeAsync(AdviceSystem, content, images);
     }
 
     /// <summary>Lazily returns the cached PorkChop recap for a channel's completed (UTC) day and
@@ -232,17 +235,29 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         return new CatchupDto(text ?? "PorkChop couldn't put together a recap right now — try again in a moment.", visible.Count, user?.LastSeenAt);
     }
 
-    private async Task<string?> PostToClaudeAsync(string system, string content)
+    private async Task<string?> PostToClaudeAsync(string system, string content, List<ClaudeImage>? images = null)
     {
         try
         {
             var client = httpFactory.CreateClient("anthropic");
+
+            // With images, the user content must be an array of blocks (text + image); otherwise a
+            // plain string keeps the request simple.
+            object messageContent = images is { Count: > 0 }
+                ? new object[] { new { type = "text", text = content } }
+                    .Concat(images.Select(img => (object)new
+                    {
+                        type = "image",
+                        source = new { type = "base64", media_type = img.MediaType, data = img.Base64 }
+                    })).ToArray()
+                : content;
+
             var payload = new
             {
                 model      = _model,
                 max_tokens = 1024,
                 system,
-                messages   = new[] { new { role = "user", content } }
+                messages   = new[] { new { role = "user", content = messageContent } }
             };
 
             var res = await client.PostAsJsonAsync("messages", payload);
@@ -264,4 +279,41 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
     private record AnthropicResponse(List<ContentBlock>? Content);
     private record ContentBlock(string Type, string? Text);
+
+    private record ClaudeImage(string MediaType, string Base64);
+
+    // Read up to two recent image attachments (local /uploads only) so PorkChop can actually see
+    // images people share. Skips non-images, externally-hosted URLs, path-escape attempts, and
+    // anything over ~4 MB (Anthropic's per-image limit).
+    private static List<ClaudeImage> ReadRecentImages(IEnumerable<Message> recent, string contentRoot)
+    {
+        var uploadsDir = Path.Combine(contentRoot, "uploads");
+        var images = new List<ClaudeImage>();
+        foreach (var m in recent.Reverse())   // newest first
+        {
+            if (images.Count >= 2) break;
+            var url = m.AttachmentUrl;
+            if (string.IsNullOrEmpty(url)) continue;
+            var idx = url.IndexOf("/uploads/", StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) continue;
+            var file = url[(idx + "/uploads/".Length)..];
+            if (file.Contains('/') || file.Contains('\\') || file.Contains("..")) continue;
+            var media = Path.GetExtension(file).ToLowerInvariant() switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png"            => "image/png",
+                ".gif"            => "image/gif",
+                ".webp"           => "image/webp",
+                _                 => null,
+            };
+            if (media is null) continue;
+            var path = Path.Combine(uploadsDir, file);
+            if (!File.Exists(path)) continue;
+            var bytes = File.ReadAllBytes(path);
+            if (bytes.Length == 0 || bytes.Length > 4 * 1024 * 1024) continue;
+            images.Add(new ClaudeImage(media, Convert.ToBase64String(bytes)));
+        }
+        images.Reverse();   // back to chronological order
+        return images;
+    }
 }
