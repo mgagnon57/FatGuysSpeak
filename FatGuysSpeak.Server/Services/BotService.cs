@@ -27,8 +27,10 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        // Include PorkChop's own recent replies (Source == AI) so a back-and-forth stays on topic —
+        // it can see what it just said instead of starting each follow-up half-blind.
         var recent = await db.Messages
-            .Where(m => m.ChannelId == channelId && !m.IsDeleted && m.Source != MessageSource.AI)
+            .Where(m => m.ChannelId == channelId && !m.IsDeleted)
             .Include(m => m.Author)
             .OrderByDescending(m => m.CreatedAt)
             .Take(8)

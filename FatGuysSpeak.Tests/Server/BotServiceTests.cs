@@ -157,7 +157,7 @@ public class BotServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RespondAsync_DoesNotIncludeAIMessagesInContext()
+    public async Task RespondAsync_IncludesItsOwnRepliesInContext()
     {
         var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);
         var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
@@ -196,7 +196,7 @@ public class BotServiceTests : IDisposable
 
         var body = await captured!.Content!.ReadAsStringAsync();
         Assert.Contains("user message", body);
-        Assert.DoesNotContain("previous AI reply", body);
+        Assert.Contains("previous AI reply", body);   // PorkChop now remembers its own side, so follow-ups stay on topic
     }
 
     // ── Daily summaries ─────────────────────────────────────────────────────────
