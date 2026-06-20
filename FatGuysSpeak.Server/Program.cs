@@ -168,6 +168,22 @@ builder.Services.AddRateLimiter(opt =>
         });
     });
 
+    // Tight per-user budget for endpoints that make a live (paid) Claude call, so a scripted loop
+    // can't run up the Anthropic bill. Deliberate human use (a button press) never hits this.
+    opt.AddPolicy("ai", httpContext =>
+    {
+        var userId = httpContext.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                     ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                     ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter($"ai:{userId}", _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = 8,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0,
+        });
+    });
+
     opt.AddPolicy("dashboard", httpContext =>
     {
         var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";

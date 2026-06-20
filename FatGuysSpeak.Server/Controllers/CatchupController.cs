@@ -9,6 +9,7 @@ namespace FatGuysSpeak.Server.Controllers;
 [ApiController]
 [Route("api/catchup")]
 [Authorize]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
 public class CatchupController(BotService bot) : ControllerBase
 {
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);

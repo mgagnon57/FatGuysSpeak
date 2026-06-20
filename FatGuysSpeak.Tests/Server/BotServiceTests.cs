@@ -519,6 +519,53 @@ public class BotServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Dossier_ExcludesReadRestrictedChannelsFromRoast()
+    {
+        var (server, _) = await SeedJoinScenarioAsync();
+        var openChannel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+
+        var marcus = new User { Username = "marcus", Email = "marcus@test.local", PasswordHash = "!" };
+        var alice  = new User { Username = "alice",  Email = "alice@test.local",  PasswordHash = "!" };
+        _db.Db.Users.AddRange(marcus, alice);
+        await _db.Db.SaveChangesAsync();
+        _db.Db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = marcus.Id, Role = ServerRole.Member });
+
+        // A staff-only channel that a plain Member cannot read.
+        var secret = new Channel { ServerId = server.Id, Name = "staff-only", Type = ChannelType.Text };
+        _db.Db.Channels.Add(secret);
+        await _db.Db.SaveChangesAsync();
+        _db.Db.ChannelPermissions.Add(new ChannelPermission { ChannelId = secret.Id, MinRoleToRead = ServerRole.Admin });
+
+        // Same dirt about marcus said in both places. Only the open-channel one may surface.
+        _db.Db.Messages.Add(new Message { Content = "marcus eats cereal with a fork in the open channel", AuthorId = alice.Id, ChannelId = openChannel.Id, Source = MessageSource.Text });
+        _db.Db.Messages.Add(new Message { Content = "marcus got demoted last quarter, keep it quiet", AuthorId = alice.Id, ChannelId = secret.Id, Source = MessageSource.Text });
+        await _db.Db.SaveChangesAsync();
+
+        HttpRequestMessage? captured = null;
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(() => new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content    = new StringContent(
+                    JsonSerializer.Serialize(new { content = new[] { new { type = "text", text = "welcome" } } }),
+                    System.Text.Encoding.UTF8, "application/json")
+            });
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient("anthropic"))
+               .Returns(new HttpClient(handler.Object) { BaseAddress = new Uri("https://api.anthropic.com/v1/") });
+
+        var svc = MakeBotService(factory.Object, MakeConfig());
+        await svc.AnnounceJoinAsync(marcus.Id, awaySince: DateTime.UtcNow.AddHours(-2));
+
+        var body = await captured!.Content!.ReadAsStringAsync();
+        Assert.Contains("cereal with a fork", body);          // open-channel dirt is fair game
+        Assert.DoesNotContain("got demoted last quarter", body); // restricted-channel content stays out
+    }
+
+    [Fact]
     public async Task LearnAliases_StoresInferredAlias()
     {
         var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);

@@ -119,9 +119,12 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
     // OR a learned alias).
     private static async Task<string> BuildUserDossierAsync(AppDbContext db, User user, List<int> serverIds)
     {
+        var restricted = await db.ChannelPermissions
+            .Where(p => p.MinRoleToRead > ServerRole.Member).Select(p => p.ChannelId).ToListAsync();
         var own = await db.Messages
             .Where(m => m.AuthorId == user.Id && !m.IsDeleted
-                        && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice))
+                        && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice)
+                        && !restricted.Contains(m.ChannelId))
             .OrderByDescending(m => m.CreatedAt).Take(20)
             .Select(m => m.Content).ToListAsync();
         own.Reverse();
@@ -147,10 +150,17 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         var match = names.Where(n => n.Length >= 3).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (match.Count == 0) return [];
 
+        // Don't mine read-restricted channels for roast material — a roast is posted to an open
+        // channel, so anything pulled from a channel not everyone can read would leak to people
+        // without access. Only channels readable by a plain Member are fair game.
+        var restricted = await db.ChannelPermissions
+            .Where(p => p.MinRoleToRead > ServerRole.Member).Select(p => p.ChannelId).ToListAsync();
+
         var recent = await db.Messages
             .Where(m => m.AuthorId != user.Id && !m.IsDeleted
                         && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice)
-                        && serverIds.Contains(m.Channel.ServerId))
+                        && serverIds.Contains(m.Channel.ServerId)
+                        && !restricted.Contains(m.ChannelId))
             .OrderByDescending(m => m.CreatedAt).Take(200)
             .Select(m => new { Author = m.Author.Username, m.Content })
             .ToListAsync();

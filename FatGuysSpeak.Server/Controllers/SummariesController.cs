@@ -12,6 +12,7 @@ namespace FatGuysSpeak.Server.Controllers;
 [ApiController]
 [Route("api/channels/{channelId}/summary")]
 [Authorize]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("ai")]
 public class SummariesController(AppDbContext db, BotService bot) : ControllerBase
 {
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);

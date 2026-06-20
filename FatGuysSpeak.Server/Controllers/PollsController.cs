@@ -13,6 +13,7 @@ namespace FatGuysSpeak.Server.Controllers;
 
 [ApiController]
 [Authorize]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("messages")]
 public class PollsController(AppDbContext db, IHubContext<ChatHub> hub) : ControllerBase
 {
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
