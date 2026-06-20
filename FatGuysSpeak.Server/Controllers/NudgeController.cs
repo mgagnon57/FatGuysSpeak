@@ -27,6 +27,9 @@ public class NudgeController(AppDbContext db, BotService bot, TtsService tts) : 
         var member = await db.ServerMembers.FirstOrDefaultAsync(m => m.ServerId == channel.ServerId && m.UserId == UserId);
         if (member is null || member.Role < ServerRole.Admin) return Forbid();
 
+        // Force a fresh alias-learning pass first, so the on-demand roast uses the latest nicknames.
+        await bot.LearnAliasesAsync(channel.ServerId);
+
         var ids = ChatHub.VoiceParticipantIds(channelId);
         if (ids.Count == 0) ids = [UserId];   // solo test: roast the admin who pressed it
 
