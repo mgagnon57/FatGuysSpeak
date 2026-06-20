@@ -28,6 +28,10 @@ public partial class App : Application
                 await hub.DisconnectAsync();
         };
 
+        // Track foreground state so background notifications only fire when the app isn't focused.
+        window.Activated   += (_, _) => AppState.IsWindowActive = true;
+        window.Deactivated += (_, _) => AppState.IsWindowActive = false;
+
         return window;
     }
 }

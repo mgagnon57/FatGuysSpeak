@@ -2203,9 +2203,16 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             if (item.IsMention)
             {
                 var preview = msg.Content.Length > 80 ? msg.Content[..80] + "…" : msg.Content;
-                toast.Show($"@Mention from {msg.AuthorUsername}", preview);
+                NotifyBackground($"@Mention from {msg.AuthorUsername}", preview);
             }
         });
+    }
+
+    // Only raise a desktop toast when the app isn't the foreground window — no notification for a
+    // message the user is already looking at. In-app unread badges still update either way.
+    private void NotifyBackground(string title, string body)
+    {
+        if (!AppState.IsWindowActive) toast.Show(title, body);
     }
 
     private void OnNewMessageNotification(MessageDto msg)
@@ -2243,9 +2250,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         {
             var preview = msg.Content.Length > 80 ? msg.Content[..80] + "…" : msg.Content;
             if (isMention)
-                toast.Show($"@Mention from {msg.AuthorUsername}", preview);
+                NotifyBackground($"@Mention from {msg.AuthorUsername}", preview);
             else
-                toast.Show(msg.AuthorUsername, preview);
+                NotifyBackground(msg.AuthorUsername, preview);
         }
     }
 
@@ -2621,7 +2628,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             if (NotificationRules.ShouldToastDm(dto.AuthorId, api.CurrentUserId, isActiveConvo))
             {
                 var preview = dto.Content.Length > 80 ? dto.Content[..80] + "…" : dto.Content;
-                toast.Show($"DM from {dto.AuthorUsername}", preview);
+                NotifyBackground($"DM from {dto.AuthorUsername}", preview);
             }
         });
     }
