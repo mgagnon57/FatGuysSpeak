@@ -25,6 +25,20 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
     private static readonly ConcurrentDictionary<int, (int ChannelId, string Username)> ActiveCameras = new();
     // streamerUserId → (controllerUserId, channelId). At most one controller per stream.
     private static readonly ConcurrentDictionary<int, (int ControllerId, int ChannelId)> RemoteControlSessions = new();
+    // voice channelId → last time anyone spoke/joined; used to detect "everyone's sitting silent".
+    private static readonly ConcurrentDictionary<int, DateTime> VoiceLastActivity = new();
+
+    // Snapshot of voice channels with their occupant count and last activity — for the idle nudge.
+    internal static List<(int ChannelId, int Count, DateTime LastActivity)> VoiceActivitySnapshot() =>
+        VoiceChannelMap.GroupBy(kv => kv.Value)
+            .Select(g => (g.Key, g.Count(),
+                          VoiceLastActivity.TryGetValue(g.Key, out var t) ? t : DateTime.UtcNow))
+            .ToList();
+
+    internal static List<string> VoiceParticipantNames(int channelId) =>
+        VoiceChannelMap.Where(kv => kv.Value == channelId)
+            .Select(kv => OnlineUsers.TryGetValue(kv.Key, out var n) ? n : "someone")
+            .ToList();
 
     // Exposed for the metrics dashboard — read-only snapshots of live state
     internal static int OnlineUserCount       => OnlineUsers.Count;
@@ -143,6 +157,7 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         }
 
         VoiceChannelMap[UserId] = channelId;
+        VoiceLastActivity[channelId] = DateTime.UtcNow;   // a fresh join counts as activity
         await Groups.AddToGroupAsync(Context.ConnectionId, $"voice-{channelId}");
 
         var state = new VoiceStateDto(UserId, Username, channelId, false, false);
@@ -207,6 +222,7 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
     {
         if (data.Length > MaxVoicePacketBytes) return;
         if (!VoiceChannelMap.TryGetValue(UserId, out var channelId)) return;
+        VoiceLastActivity[channelId] = DateTime.UtcNow;   // someone's talking — reset the idle timer
         var group = Clients.OthersInGroup($"voice-{channelId}");
         await group.SendAsync("ReceiveVoiceData", data);
         await group.SendAsync("UserSpeaking", UserId);

@@ -223,6 +223,13 @@ builder.Services.AddHostedService<FatGuysSpeak.Server.Services.TempBanCleanupSer
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.AuditLogCleanupService>();
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.RecapPregenService>();
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.WeeklyDigestService>();
+builder.Services.AddHttpClient("elevenlabs", c =>
+{
+    c.BaseAddress = new Uri("https://api.elevenlabs.io/");
+    c.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddSingleton<FatGuysSpeak.Server.Services.TtsService>();
+builder.Services.AddHostedService<FatGuysSpeak.Server.Services.IdleNudgeService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.SessionBlacklistService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.WebhookDeliveryService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.AutomodService>();

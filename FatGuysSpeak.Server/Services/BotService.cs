@@ -16,6 +16,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
     private readonly string _apiKey = config["Anthropic:ApiKey"] ?? "";
     private readonly string _model  = config["Anthropic:Model"]  ?? "claude-haiku-4-5-20251001";
 
+    private readonly bool _idleNudges    = config.GetValue("PorkChop:IdleNudges", true);
     // Join announcements: on/off toggle, plus a per-user cooldown so quick reconnects don't spam.
     private readonly bool _announceJoins = config.GetValue("PorkChop:AnnounceJoins", true);
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, DateTime> _lastJoinAnnounce = new();
@@ -65,6 +66,34 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
     }
 
     private const string JoinAnnounceSystem = "You are PorkChop, the foul-mouthed mascot of a PRIVATE, friends-only chat app called FatGuysSpeak, announcing to the channel that one of the crew just (re)joined. These are close friends who roast the absolute hell out of each other, so go HARD — don't hold back. Write one to three sentences of raunchy, profane, R-rated (X-rated if it lands) welcome that completely busts their balls. Swear freely, get filthy, lean all the way into crude fat-guy humor and dirty sex jokes — nothing's too lowbrow. Use their name, tear into their profile bio, and if you're given a sample of their past messages, dig into it for their actual interests, opinions and likes/dislikes and roast THOSE specifically — make it clear you know exactly who this degenerate is. Address the channel about them, not the person directly — e.g. \"look what the fuck just waddled back in...\". It's savage but it's love between buddies, so keep the ammo about THEM — their habits, their bio, their general degeneracy — not hateful identity-based slurs. No hashtags, and don't wrap the whole thing in quotation marks.";
+
+    private const string IdleNudgeSystem = "You are PorkChop, the foul-mouthed mascot of a PRIVATE, friends-only chat app called FatGuysSpeak. A bunch of the crew are sitting in a voice channel together but nobody's said a goddamn word in minutes — total dead air. Bust their balls about it: one or two raunchy, profane, R-to-X-rated sentences calling them out for sitting there silent (probably just stuffing their faces, scrolling their phones, or jerking around). Use their names. Same savage-but-loving tone friends bust each other's chops with — crude as hell, but it's love, not hateful identity slurs. No hashtags, and don't wrap the whole thing in quotation marks. This line will be both posted as text AND spoken out loud, so make it land when read OR heard.";
+
+    /// <summary>Generates a raunchy "you're all sitting in voice saying nothing" roast, posts it as a
+    /// PorkChop message in the channel, and returns the line (so it can also be spoken). No-op when
+    /// disabled, keyless, or the bot isn't set up.</summary>
+    public async Task<string?> GenerateAndPostIdleNudgeAsync(int channelId, IReadOnlyList<string> usernames)
+    {
+        if (!_idleNudges || string.IsNullOrEmpty(_apiKey) || BotUserId == 0) return null;
+
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var channel = await db.Channels.FindAsync(channelId);
+        if (channel is null) return null;
+
+        var who = usernames.Count > 0 ? string.Join(", ", usernames) : "the crew";
+        var text = await PostToClaudeAsync(IdleNudgeSystem, $"In the voice channel right now: {who}. They've gone totally silent. Roast them for it.");
+        if (text is null) return null;
+
+        var msg = new Message { Content = text, AuthorId = BotUserId, ChannelId = channelId, Source = MessageSource.AI };
+        db.Messages.Add(msg);
+        await db.SaveChangesAsync();
+
+        var dto = new MessageDto(msg.Id, text, BotUsername, BotUserId, msg.CreatedAt, channelId, MessageSource.AI);
+        await hub.Clients.Group($"channel-{channelId}").SendAsync("ReceiveMessage", dto);
+        await hub.Clients.Group($"server-{channel.ServerId}").SendAsync("NewMessageNotification", dto);
+        return text;
+    }
 
     /// <summary>Posts a PorkChop welcome/roast into the user's main channel when they join the chat.
     /// Skips quick reconnects (awaySince within the cooldown) and is deduped per user, so app

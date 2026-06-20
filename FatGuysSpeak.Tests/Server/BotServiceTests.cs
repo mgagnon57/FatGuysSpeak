@@ -20,13 +20,14 @@ public class BotServiceTests : IDisposable
     public BotServiceTests() => _db = new TestDb();
     public void Dispose() => _db.Dispose();
 
-    private static IConfiguration MakeConfig(string apiKey = "test-key", bool announceJoins = true) =>
+    private static IConfiguration MakeConfig(string apiKey = "test-key", bool announceJoins = true, bool idleNudges = true) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Anthropic:ApiKey"] = apiKey,
                 ["Anthropic:Model"]  = "claude-haiku-4-5-20251001",
                 ["PorkChop:AnnounceJoins"] = announceJoins ? "true" : "false",
+                ["PorkChop:IdleNudges"]    = idleNudges ? "true" : "false",
             })
             .Build();
 
@@ -498,6 +499,40 @@ public class BotServiceTests : IDisposable
         await svc.AnnounceJoinAsync(joiner.Id, awaySince: DateTime.UtcNow.AddHours(-2));
 
         Assert.False(AnyAnnouncement());
+    }
+
+    [Fact]
+    public async Task IdleNudge_PostsRoastAndReturnsLine()
+    {
+        var (server, _) = await SeedJoinScenarioAsync();
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var svc = MakeBotService(MakeHttpFactory("you fat fucks just gonna sit there?"), MakeConfig());
+
+        var line = await svc.GenerateAndPostIdleNudgeAsync(channel.Id, ["m", "b"]);
+
+        Assert.Equal("you fat fucks just gonna sit there?", line);
+        Assert.True(_db.Db.Messages.Any(m => m.Source == MessageSource.AI && m.AuthorId == BotService.BotUserId && m.ChannelId == channel.Id));
+    }
+
+    [Fact]
+    public async Task IdleNudge_Disabled_ReturnsNull()
+    {
+        var (server, _) = await SeedJoinScenarioAsync();
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var svc = MakeBotService(MakeHttpFactory("unused"), MakeConfig(idleNudges: false));
+
+        Assert.Null(await svc.GenerateAndPostIdleNudgeAsync(channel.Id, ["m", "b"]));
+        Assert.False(AnyAnnouncement());
+    }
+
+    [Fact]
+    public async Task IdleNudge_NoApiKey_ReturnsNull()
+    {
+        var (server, _) = await SeedJoinScenarioAsync();
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var svc = MakeBotService(MakeHttpFactory("unused"), MakeConfig(apiKey: ""));
+
+        Assert.Null(await svc.GenerateAndPostIdleNudgeAsync(channel.Id, ["m", "b"]));
     }
 
     [Fact]
