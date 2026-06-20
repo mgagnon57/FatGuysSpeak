@@ -43,7 +43,14 @@
                             <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}" />
                         </VisualState.Setters>
                     </VisualState>
-                    <VisualState x:Name="PointerOver" />
+                    <!-- Hover feedback for every clickable button/icon: a clear accent outline + pop. -->
+                    <VisualState x:Name="PointerOver">
+                        <VisualState.Setters>
+                            <Setter Property="BorderColor" Value="{DynamicResource ThemeAccentLight}" />
+                            <Setter Property="BorderWidth" Value="2" />
+                            <Setter Property="Scale" Value="1.08" />
+                        </VisualState.Setters>
+                    </VisualState>
                 </VisualStateGroup>
             </VisualStateGroupList>
         </Setter>
