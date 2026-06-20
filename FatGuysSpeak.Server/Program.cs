@@ -769,6 +769,13 @@ using (var scope = app.Services.CreateScope())
         ctx.Database.ExecuteSqlRaw(@"UPDATE ChannelPermissions SET MinRoleToWrite = 2 WHERE MinRoleToWrite = 1");
     }
 
+    // Admins can't be blocked — clear any pre-existing blocks where the blocked user is an Admin.
+    // Idempotent and self-healing: also clears a block if a previously-blocked user later becomes Admin.
+    if (isPostgres)
+        ctx.Database.ExecuteSqlRaw(@"DELETE FROM ""UserBlocks"" WHERE ""BlockedId"" IN (SELECT ""UserId"" FROM ""ServerMembers"" WHERE ""Role"" = 2)");
+    else
+        ctx.Database.ExecuteSqlRaw(@"DELETE FROM UserBlocks WHERE BlockedId IN (SELECT UserId FROM ServerMembers WHERE Role = 2)");
+
     // Bot rebrand: FatBot -> PorkChop. Rename the existing bot user so its id/history carry over
     // instead of orphaning the old account and seeding a fresh one.
     var legacyBot = ctx.Users.FirstOrDefault(u => u.Username == "FatBot");
