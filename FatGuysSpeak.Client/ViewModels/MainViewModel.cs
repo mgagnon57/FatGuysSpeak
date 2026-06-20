@@ -835,9 +835,12 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         IsCatchingUp = true;
         try
         {
-            var dto = await api.GetCatchupAsync();
+            // Summarize the source the user is actually looking at (Text vs Voice tab).
+            var source = SelectedTab == "Voice" ? MessageSource.Voice : MessageSource.Text;
+            var dto = await api.GetCatchupAsync(source);
             var body = dto?.Summary ?? "PorkChop couldn't reach the server right now — try again in a moment.";
-            await Shell.Current.DisplayAlert("🐷 PorkChop — Catch me up", body, "Thanks!");
+            var title = source == MessageSource.Voice ? "🐷 PorkChop — Voice catch-up" : "🐷 PorkChop — Catch me up";
+            await Shell.Current.DisplayAlert(title, body, "Thanks!");
         }
         finally { IsCatchingUp = false; }
     }

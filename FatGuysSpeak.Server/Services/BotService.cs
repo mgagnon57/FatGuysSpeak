@@ -184,10 +184,11 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
     private const string CatchupSystem = "You are PorkChop, giving one person a quick personal catch-up on what they missed in FatGuysSpeak while they were away. You're given the messages posted since they were last online, grouped by channel. In a few short, friendly sentences, tell them what they missed: the main conversations per channel, anything aimed at them or that needs a reply, and any decisions or plans. Refer to people and channels by name, keep it brief, and don't invent anything that isn't in the transcript.";
 
-    /// <summary>Builds a personal "what you missed" recap for one user, covering messages posted since
-    /// they were last online (their LastSeenAt, or the last 24h if never recorded). Excludes the user's
-    /// own messages and respects per-channel read permissions. Ephemeral — not cached.</summary>
-    public async Task<CatchupDto> GenerateCatchupAsync(int userId)
+    /// <summary>Builds a personal "what you missed" recap for one user, for one chat source (the tab
+    /// they're viewing — Text vs Voice are caught up separately), covering messages posted since they
+    /// were last online (LastSeenAt, or the last 24h if never recorded). Excludes the user's own
+    /// messages and respects per-channel read permissions. Ephemeral — not cached.</summary>
+    public async Task<CatchupDto> GenerateCatchupAsync(int userId, MessageSource source)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -200,7 +201,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         var roleByServer = memberships.ToDictionary(m => m.ServerId, m => m.Role);
 
         var rows = await db.Messages
-            .Where(m => !m.IsDeleted && m.Source != MessageSource.AI && m.AuthorId != userId
+            .Where(m => !m.IsDeleted && m.Source == source && m.AuthorId != userId
                         && m.CreatedAt >= since && serverIds.Contains(m.Channel.ServerId))
             .OrderBy(m => m.CreatedAt)
             .Select(m => new { m.ChannelId, ServerId = m.Channel.ServerId, Channel = m.Channel.Name, User = m.Author.Username, m.Content })
@@ -211,16 +212,20 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         var visible = rows.Where(r => !minReadByChannel.TryGetValue(r.ChannelId, out var min)
                                       || (roleByServer.TryGetValue(r.ServerId, out var role) && role >= min)).ToList();
 
+        var kind = source == MessageSource.Voice ? "voice" : "chat";
         if (visible.Count == 0)
-            return new CatchupDto("You're all caught up — nothing new since you were last here. 👍", 0, user?.LastSeenAt);
+            return new CatchupDto($"You're all caught up — nothing new in {kind} since you were last here. 👍", 0, user?.LastSeenAt);
 
         if (string.IsNullOrEmpty(_apiKey))
         {
             Console.WriteLine("[PorkChop] cannot generate catch-up — no Anthropic API key set.");
-            return new CatchupDto($"You missed {visible.Count} message(s), but PorkChop isn't configured to summarize them.", visible.Count, user?.LastSeenAt);
+            return new CatchupDto($"You missed {visible.Count} {kind} message(s), but PorkChop isn't configured to summarize them.", visible.Count, user?.LastSeenAt);
         }
 
-        var transcript = "Here is everything posted since this person was last online, grouped by channel. Give them their personal catch-up:\n\n"
+        var lead = source == MessageSource.Voice
+            ? "Here is the SPOKEN voice conversation (auto-transcribed) posted since this person was last online, grouped by channel. Give them their personal voice catch-up:\n\n"
+            : "Here is everything posted in text chat since this person was last online, grouped by channel. Give them their personal catch-up:\n\n";
+        var transcript = lead
             + string.Join("\n\n", visible.GroupBy(r => r.Channel)
                 .Select(g => $"#{g.Key}\n" + string.Join("\n", g.Select(r => $"{r.User}: {r.Content}"))));
         var text = await PostToClaudeAsync(CatchupSystem, transcript);

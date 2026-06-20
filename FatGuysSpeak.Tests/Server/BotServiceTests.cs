@@ -309,18 +309,22 @@ public class BotServiceTests : IDisposable
         await _db.Db.SaveChangesAsync();
 
         _db.Db.Messages.AddRange(
-            new Message { Content = "you missed this",   AuthorId = buddy.Id, ChannelId = channel.Id, CreatedAt = DateTime.UtcNow.AddHours(-1) },
-            new Message { Content = "and this too",       AuthorId = buddy.Id, ChannelId = channel.Id, CreatedAt = DateTime.UtcNow.AddMinutes(-30) },
-            new Message { Content = "my own message",     AuthorId = owner.Id, ChannelId = channel.Id, CreatedAt = DateTime.UtcNow.AddMinutes(-20) },
-            new Message { Content = "old, before I left", AuthorId = buddy.Id, ChannelId = channel.Id, CreatedAt = DateTime.UtcNow.AddHours(-5) }
+            new Message { Content = "you missed this",   AuthorId = buddy.Id, ChannelId = channel.Id, Source = MessageSource.Text,  CreatedAt = DateTime.UtcNow.AddHours(-1) },
+            new Message { Content = "and this too",       AuthorId = buddy.Id, ChannelId = channel.Id, Source = MessageSource.Text,  CreatedAt = DateTime.UtcNow.AddMinutes(-30) },
+            new Message { Content = "spoken, other tab",  AuthorId = buddy.Id, ChannelId = channel.Id, Source = MessageSource.Voice, CreatedAt = DateTime.UtcNow.AddMinutes(-25) },
+            new Message { Content = "my own message",     AuthorId = owner.Id, ChannelId = channel.Id, Source = MessageSource.Text,  CreatedAt = DateTime.UtcNow.AddMinutes(-20) },
+            new Message { Content = "old, before I left", AuthorId = buddy.Id, ChannelId = channel.Id, Source = MessageSource.Text,  CreatedAt = DateTime.UtcNow.AddHours(-5) }
         );
         await _db.Db.SaveChangesAsync();
 
         var svc = MakeBotService(MakeHttpFactory("Here's what you missed."), MakeConfig());
-        var result = await svc.GenerateCatchupAsync(owner.Id);
+        var result = await svc.GenerateCatchupAsync(owner.Id, MessageSource.Text);
 
-        Assert.Equal(2, result.MessageCount);   // only buddy's two messages after last-seen; own + pre-departure excluded
+        Assert.Equal(2, result.MessageCount);   // only buddy's two TEXT messages after last-seen; own, voice, and pre-departure excluded
         Assert.Equal("Here's what you missed.", result.Summary);
+
+        var voiceResult = await svc.GenerateCatchupAsync(owner.Id, MessageSource.Voice);
+        Assert.Equal(1, voiceResult.MessageCount);   // only the spoken message
     }
 
     [Fact]
@@ -331,7 +335,7 @@ public class BotServiceTests : IDisposable
         await _db.Db.SaveChangesAsync();
 
         var svc = MakeBotService(MakeHttpFactory("should not be called"), MakeConfig());
-        var result = await svc.GenerateCatchupAsync(owner.Id);
+        var result = await svc.GenerateCatchupAsync(owner.Id, MessageSource.Text);
 
         Assert.Equal(0, result.MessageCount);
         Assert.Contains("caught up", result.Summary);
