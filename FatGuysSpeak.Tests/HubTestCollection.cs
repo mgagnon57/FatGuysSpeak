@@ -5,3 +5,8 @@ namespace FatGuysSpeak.Tests;
 
 [CollectionDefinition("HubTests", DisableParallelization = true)]
 public class HubTestCollection;
+
+// Tests that mutate the static BotService.BotUserId must not run in parallel with each
+// other, or one class's value bleeds into another's assertions.
+[CollectionDefinition("BotState", DisableParallelization = true)]
+public class BotStateTestCollection;

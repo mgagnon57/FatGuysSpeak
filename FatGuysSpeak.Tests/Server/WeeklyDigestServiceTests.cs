@@ -14,6 +14,7 @@ using Moq.Protected;
 
 namespace FatGuysSpeak.Tests.Server;
 
+[Collection("BotState")]
 public class WeeklyDigestServiceTests : IDisposable
 {
     private readonly TestDb _db;

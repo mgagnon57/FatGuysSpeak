@@ -117,7 +117,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         return new DailySummaryDto(date.ToString("yyyy-MM-dd"), summary, lines.Count);
     }
 
-    private const string WeeklyDigestSystem = "You are PorkChop, writing the weekly digest for a whole FatGuysSpeak server. You're given a week of messages from every channel, grouped by channel. In a few short paragraphs, give the crew a friendly big-picture recap of the week: the main things that happened in each active channel, recurring themes across the server, any decisions or plans, and notable moments. Refer to people and channels by name, keep it tight, and don't invent anything that isn't in the transcript.";
+    private const string WeeklyDigestSystem = "You are PorkChop, writing the weekly digest for a whole FatGuysSpeak server. You're given a week of messages from every channel, grouped by channel. In a few short paragraphs, give the crew a friendly big-picture recap of the week: the main things that happened in each active channel, recurring themes across the server, any decisions or plans, and notable moments. Refer to people and channels by name, keep it tight, and don't invent anything that isn't in the transcript. Do NOT add your own title or heading line (no \"Weekly Digest\" header) — the message already has one, so start straight into the recap.";
 
     /// <summary>Generates the server-wide digest for a completed week and posts it as a PorkChop
     /// message into the server's default channel. Idempotent per (server, weekStart). Returns the
