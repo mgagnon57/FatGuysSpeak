@@ -58,7 +58,7 @@ public class ChatHubRemoteControlTests : IDisposable
         var ctx = new Mock<HubCallerContext>();
         ctx.Setup(c => c.ConnectionId).Returns(conn);
         ctx.Setup(c => c.User).Returns(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
-        return new ChatHub(_testDb.Db, new FatGuysSpeak.Server.Services.OnlineTimeTracker())
+        return new ChatHub(_testDb.Db, new FatGuysSpeak.Server.Services.OnlineTimeTracker(), TestHelpers.NullBot())
         { Context = ctx.Object, Clients = _mockClients.Object, Groups = _mockGroups.Object };
     }
 

@@ -20,12 +20,13 @@ public class BotServiceTests : IDisposable
     public BotServiceTests() => _db = new TestDb();
     public void Dispose() => _db.Dispose();
 
-    private static IConfiguration MakeConfig(string apiKey = "test-key") =>
+    private static IConfiguration MakeConfig(string apiKey = "test-key", bool announceJoins = true) =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Anthropic:ApiKey"] = apiKey,
                 ["Anthropic:Model"]  = "claude-haiku-4-5-20251001",
+                ["PorkChop:AnnounceJoins"] = announceJoins ? "true" : "false",
             })
             .Build();
 
@@ -401,6 +402,78 @@ public class BotServiceTests : IDisposable
 
         Assert.Equal(0, result.MessageCount);
         Assert.Contains("caught up", result.Summary);
+    }
+
+    // ── Join announcements ──────────────────────────────────────────────────────
+    private async Task<(GuildServer server, User joiner)> SeedJoinScenarioAsync()
+    {
+        var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);
+        var botUser = new User { Username = BotService.BotUsername, Email = "bot@system.local", PasswordHash = "!" };
+        _db.Db.Users.Add(botUser);
+        await _db.Db.SaveChangesAsync();
+        BotService.BotUserId = botUser.Id;
+        owner.Bio = "Always grinding (mostly the snack drawer)";
+        await _db.Db.SaveChangesAsync();
+        return (server, owner);
+    }
+
+    private bool AnyAnnouncement() =>
+        _db.Db.Messages.Any(m => m.Source == MessageSource.AI && m.AuthorId == BotService.BotUserId);
+
+    [Fact]
+    public async Task AnnounceJoin_ReturningUser_PostsWelcome()
+    {
+        var (_, joiner) = await SeedJoinScenarioAsync();
+        var svc = MakeBotService(MakeHttpFactory("Look who waddled back in — welcome back!"), MakeConfig());
+
+        await svc.AnnounceJoinAsync(joiner.Id, awaySince: DateTime.UtcNow.AddHours(-2));
+
+        Assert.True(AnyAnnouncement());
+    }
+
+    [Fact]
+    public async Task AnnounceJoin_QuickReconnect_PostsNothing()
+    {
+        var (_, joiner) = await SeedJoinScenarioAsync();
+        var svc = MakeBotService(MakeHttpFactory("unused"), MakeConfig());
+
+        await svc.AnnounceJoinAsync(joiner.Id, awaySince: DateTime.UtcNow.AddMinutes(-2));   // back within cooldown
+
+        Assert.False(AnyAnnouncement());
+    }
+
+    [Fact]
+    public async Task AnnounceJoin_SecondCallWithinCooldown_PostsOnce()
+    {
+        var (_, joiner) = await SeedJoinScenarioAsync();
+        var svc = MakeBotService(MakeHttpFactory("welcome"), MakeConfig());
+
+        await svc.AnnounceJoinAsync(joiner.Id, awaySince: DateTime.UtcNow.AddHours(-2));
+        await svc.AnnounceJoinAsync(joiner.Id, awaySince: DateTime.UtcNow.AddHours(-2));   // deduped
+
+        Assert.Equal(1, _db.Db.Messages.Count(m => m.Source == MessageSource.AI && m.AuthorId == BotService.BotUserId));
+    }
+
+    [Fact]
+    public async Task AnnounceJoin_NoApiKey_PostsNothing()
+    {
+        var (_, joiner) = await SeedJoinScenarioAsync();
+        var svc = MakeBotService(MakeHttpFactory("unused"), MakeConfig(apiKey: ""));
+
+        await svc.AnnounceJoinAsync(joiner.Id, awaySince: DateTime.UtcNow.AddHours(-2));
+
+        Assert.False(AnyAnnouncement());
+    }
+
+    [Fact]
+    public async Task AnnounceJoin_Disabled_PostsNothing()
+    {
+        var (_, joiner) = await SeedJoinScenarioAsync();
+        var svc = MakeBotService(MakeHttpFactory("unused"), MakeConfig(announceJoins: false));
+
+        await svc.AnnounceJoinAsync(joiner.Id, awaySince: DateTime.UtcNow.AddHours(-2));
+
+        Assert.False(AnyAnnouncement());
     }
 
     [Fact]

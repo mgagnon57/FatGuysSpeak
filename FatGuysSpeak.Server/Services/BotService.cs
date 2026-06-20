@@ -16,6 +16,11 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
     private readonly string _apiKey = config["Anthropic:ApiKey"] ?? "";
     private readonly string _model  = config["Anthropic:Model"]  ?? "claude-haiku-4-5-20251001";
 
+    // Join announcements: on/off toggle, plus a per-user cooldown so quick reconnects don't spam.
+    private readonly bool _announceJoins = config.GetValue("PorkChop:AnnounceJoins", true);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, DateTime> _lastJoinAnnounce = new();
+    private static readonly TimeSpan JoinCooldown = TimeSpan.FromMinutes(30);
+
     public async Task RespondAsync(int channelId, int serverId, string triggerContent)
     {
         if (string.IsNullOrEmpty(_apiKey) || BotUserId == 0)
@@ -57,6 +62,49 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         var dto = new MessageDto(msg.Id, reply, BotUsername, BotUserId, msg.CreatedAt, channelId, MessageSource.AI);
         await hub.Clients.Group($"channel-{channelId}").SendAsync("ReceiveMessage", dto);
         await hub.Clients.Group($"server-{serverId}").SendAsync("NewMessageNotification", dto);
+    }
+
+    private const string JoinAnnounceSystem = "You are PorkChop, the resident mascot of a chat app called FatGuysSpeak, announcing to the channel that someone just (re)joined the chat. Write ONE or TWO short sentences welcoming them to the room, with affectionate fat-guy-themed ribbing in the spirit of a tight-knit crew who jokingly call themselves fat guys. Use their name and play off their profile bio if there's something to work with. Address the channel about them, not the person directly — e.g. \"Look who just waddled back in...\". Keep it playful and good-natured: roast like a buddy, never cruel, no slurs, no harassment, PG-13. Now and then just be warm instead of roasting. No hashtags, and don't wrap the whole thing in quotation marks.";
+
+    /// <summary>Posts a PorkChop welcome/roast into the user's main channel when they join the chat.
+    /// Skips quick reconnects (awaySince within the cooldown) and is deduped per user, so app
+    /// restarts and network blips don't spam. No-op when disabled, keyless, or the bot isn't set up.</summary>
+    public async Task AnnounceJoinAsync(int userId, DateTime? awaySince)
+    {
+        if (!_announceJoins || string.IsNullOrEmpty(_apiKey) || BotUserId == 0 || userId == BotUserId) return;
+
+        // Only greet a real arrival: a brand-new user (never seen) or someone back after a real absence.
+        if (awaySince is DateTime seen && DateTime.UtcNow - seen < JoinCooldown) return;
+
+        // In-memory dedupe so multiple connections / rapid reconnects can't double-announce.
+        var now = DateTime.UtcNow;
+        if (_lastJoinAnnounce.TryGetValue(userId, out var last) && now - last < JoinCooldown) return;
+        _lastJoinAnnounce[userId] = now;
+
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var user = await db.Users.FindAsync(userId);
+        if (user is null) return;
+
+        var serverIds = await db.ServerMembers.Where(m => m.UserId == userId).Select(m => m.ServerId).ToListAsync();
+        if (serverIds.Count == 0) return;
+        var channel = await db.Channels.Where(c => serverIds.Contains(c.ServerId))
+            .OrderByDescending(c => c.IsDefault).ThenBy(c => c.Position).FirstOrDefaultAsync();
+        if (channel is null) return;
+
+        var bio = string.IsNullOrWhiteSpace(user.Bio) ? "(no bio set)" : user.Bio;
+        var prompt = $"A user just joined the chat.\nUsername: {user.Username}\nProfile bio: {bio}\n\nWrite the welcome announcement.";
+        var text = await PostToClaudeAsync(JoinAnnounceSystem, prompt);
+        if (text is null) return;
+
+        var msg = new Message { Content = text, AuthorId = BotUserId, ChannelId = channel.Id, Source = MessageSource.AI };
+        db.Messages.Add(msg);
+        await db.SaveChangesAsync();
+
+        var dto = new MessageDto(msg.Id, text, BotUsername, BotUserId, msg.CreatedAt, channel.Id, MessageSource.AI);
+        await hub.Clients.Group($"channel-{channel.Id}").SendAsync("ReceiveMessage", dto);
+        await hub.Clients.Group($"server-{channel.ServerId}").SendAsync("NewMessageNotification", dto);
     }
 
     private const string AdviceSystem = "You are PorkChop, a friendly, down-to-earth advisor in a chat app called FatGuysSpeak. People mention you (@PorkChop) when they have a question or want advice. Read their message and the recent conversation, then give practical, helpful advice or a clear answer. If an image has been shared in the conversation, you can see it — describe it or answer questions about it. Be concise and conversational, and don't be afraid to have a little personality.";

@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FatGuysSpeak.Server.Hubs;
 
 [Authorize]
-public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTracker onlineTime) : Hub
+public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTracker onlineTime, FatGuysSpeak.Server.Services.BotService bot) : Hub
 {
     // userId -> voice channelId
     private static readonly ConcurrentDictionary<int, int> VoiceChannelMap = new();
@@ -305,11 +305,15 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         onlineTime.Connect(UserId);
 
         var user = await db.Users.FindAsync(UserId);
+        var awaySince = user?.LastSeenAt;   // set on last disconnect; captured before we flip status
         if (user is not null)
         {
             user.Status = UserStatus.Online;
             await db.SaveChangesAsync();
         }
+
+        // PorkChop welcomes real arrivals (fire-and-forget; it gates quick reconnects itself).
+        _ = bot.AnnounceJoinAsync(UserId, awaySince);
 
         var serverIds = await db.ServerMembers
             .Where(sm => sm.UserId == UserId)

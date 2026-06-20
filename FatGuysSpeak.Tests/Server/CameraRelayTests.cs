@@ -84,7 +84,7 @@ public class CameraRelayTests : IDisposable
         mockCtx.Setup(c => c.ConnectionId).Returns(connectionId);
         mockCtx.Setup(c => c.User).Returns(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
 
-        var hub = new ChatHub(_testDb.Db, new FatGuysSpeak.Server.Services.OnlineTimeTracker());
+        var hub = new ChatHub(_testDb.Db, new FatGuysSpeak.Server.Services.OnlineTimeTracker(), TestHelpers.NullBot());
         hub.Context = mockCtx.Object;
         hub.Clients = _mockClients.Object;
         hub.Groups = _mockGroups.Object;
