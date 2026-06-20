@@ -896,7 +896,7 @@
                                     </Frame>
                                     <!-- Author + time + edited badge -->
                                     <HorizontalStackLayout Grid.Row="1" Grid.Column="1" Spacing="8">
-                                        <Label Text="{Binding Message.AuthorUsername}" TextColor="{DynamicResource ThemeAccentLight}"
+                                        <Label Text="{Binding AuthorDisplayName}" TextColor="{DynamicResource ThemeAccentLight}"
                                                FontAttributes="Bold" FontSize="13">
                                             <Label.GestureRecognizers>
                                                 <TapGestureRecognizer

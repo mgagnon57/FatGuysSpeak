@@ -67,6 +67,8 @@ public partial class MessageViewItem : ObservableObject
     public bool IsMention { get; private init; }
     public bool IsOwnMessage { get; private init; }
     public bool IsBot => Message.Source == MessageSource.AI;
+    // PorkChop's posts show an @ prefix so the bot reads as distinct from regular members.
+    public string AuthorDisplayName => IsBot ? "@" + Message.AuthorUsername : Message.AuthorUsername;
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(CanDelete))] private bool _canModerate;
     public bool CanDelete => IsOwnMessage || CanModerate;
 
