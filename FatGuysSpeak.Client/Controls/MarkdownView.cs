@@ -7,7 +7,8 @@ namespace FatGuysSpeak.Client.Controls;
 
 /// <summary>
 /// Renders a markdown string as MAUI views.
-/// Supports: **bold**, *italic*, ~~strikethrough~~, `inline code`, ```code blocks```.
+/// Supports: **bold**, *italic*, ~~strikethrough~~, `inline code`, ```code blocks```,
+/// # headings, and - / 1. lists.
 /// </summary>
 public class MarkdownView : ContentView
 {
@@ -43,6 +44,8 @@ public class MarkdownView : ContentView
             {
                 FencedCodeBlock cb => RenderCodeBlock(cb.Lines.ToString()),
                 CodeBlock        cb => RenderCodeBlock(cb.Lines.ToString()),
+                HeadingBlock     hb => RenderHeading(hb),
+                ListBlock        lb => RenderList(lb),
                 ParagraphBlock   pb => RenderParagraph(pb.Inline),
                 _                   => null,
             };
@@ -77,6 +80,76 @@ public class MarkdownView : ContentView
             LineBreakMode = LineBreakMode.WordWrap,
             HorizontalOptions = LayoutOptions.Fill,
         };
+    }
+
+    private static View RenderHeading(HeadingBlock heading)
+    {
+        var fs = new FormattedString();
+        if (heading.Inline is not null)
+            AppendInlines(fs, heading.Inline, bold: true, italic: false, strike: false);
+        return new Label
+        {
+            FormattedText = fs,
+            FontAttributes = FontAttributes.Bold,
+            LineBreakMode = LineBreakMode.WordWrap,
+            HorizontalOptions = LayoutOptions.Fill,
+            Margin = new Thickness(0, 2, 0, 0),
+        };
+    }
+
+    private static View RenderList(ListBlock list)
+    {
+        var stack = new VerticalStackLayout { Spacing = 2 };
+        var index = 1;
+        if (list.IsOrdered && int.TryParse(list.OrderedStart, out var start)) index = start;
+
+        foreach (var child in list)
+        {
+            if (child is not ListItemBlock item) continue;
+
+            var marker = list.IsOrdered ? $"{index}." : "•";
+            index++;
+
+            // Render the item's paragraph(s) inline; nested lists are flattened one level in.
+            var fs = new FormattedString();
+            foreach (var block in item)
+                if (block is ParagraphBlock pb && pb.Inline is not null)
+                {
+                    if (fs.Spans.Count > 0) fs.Spans.Add(new Span { Text = "\n" });
+                    AppendInlines(fs, pb.Inline, bold: false, italic: false, strike: false);
+                }
+
+            var row = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition { Width = GridLength.Auto },
+                    new ColumnDefinition { Width = GridLength.Star },
+                },
+                ColumnSpacing = 6,
+            };
+            var markerLabel = new Label
+            {
+                Text = marker,
+                TextColor = Color.FromArgb("#c8c8c8"),
+                FontSize = 13,
+                VerticalOptions = LayoutOptions.Start,
+            };
+            var textLabel = new Label
+            {
+                FormattedText = fs,
+                FontSize = 13,
+                LineBreakMode = LineBreakMode.WordWrap,
+                HorizontalOptions = LayoutOptions.Fill,
+            };
+            Grid.SetColumn(markerLabel, 0);
+            Grid.SetColumn(textLabel, 1);
+            row.Children.Add(markerLabel);
+            row.Children.Add(textLabel);
+            stack.Children.Add(row);
+        }
+
+        return stack;
     }
 
     private static void AppendInlines(FormattedString fs, ContainerInline inlines,
