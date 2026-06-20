@@ -51,9 +51,12 @@ public partial class MessageViewItem : ObservableObject
     public bool     IsDayHeader      { get; private init; }
     public DateTime DayDate          { get; private init; }
     public bool     IsDayCollapsed   { get; private init; }
+    public bool     IsTodayHeader    { get; private init; }
     public string   DayLabel         { get; private init; } = "";
     public int      DayMessageCount  { get; private init; }
     public string   DayChevron       => IsDayCollapsed ? "▶" : "▼";
+    // Today is always expanded and can't be collapsed, so it shows no chevron and ignores taps.
+    public bool     ShowDayChevron   => IsDayHeader && !IsTodayHeader;
     public string   DayCountLabel    => DayMessageCount == 1 ? "1 message" : $"{DayMessageCount} messages";
     // PorkChop's recap row, shown when a past day is expanded (instead of its raw messages).
     public bool   IsDaySummary  { get; private init; }
@@ -291,14 +294,14 @@ public partial class MessageViewItem : ObservableObject
         return new MessageViewItem(dto) { IsNewMessageDivider = true };
     }
 
-    public static MessageViewItem CreateDayHeader(DateTime day, string label, int count, bool collapsed)
+    public static MessageViewItem CreateDayHeader(DateTime day, string label, int count, bool collapsed, bool isToday = false)
     {
         var id = Interlocked.Decrement(ref _systemIdCounter);
         var dto = new MessageDto(id, "", string.Empty, 0, DateTime.UtcNow, 0);
         return new MessageViewItem(dto)
         {
             IsDayHeader = true, DayDate = day, DayLabel = label,
-            DayMessageCount = count, IsDayCollapsed = collapsed,
+            DayMessageCount = count, IsDayCollapsed = collapsed, IsTodayHeader = isToday,
         };
     }
 

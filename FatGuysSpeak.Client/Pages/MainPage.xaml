@@ -779,7 +779,7 @@
                                             Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ToggleDayCommand}"
                                             CommandParameter="{Binding .}" />
                                     </Grid.GestureRecognizers>
-                                    <Label Grid.Column="0" Text="{Binding DayChevron}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="9" VerticalOptions="Center" Margin="0,0,6,0" />
+                                    <Label Grid.Column="0" Text="{Binding DayChevron}" IsVisible="{Binding ShowDayChevron}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="9" VerticalOptions="Center" Margin="0,0,6,0" />
                                     <Label Grid.Column="1" Text="{Binding DayLabel}" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="11" FontAttributes="Bold" VerticalOptions="Center" />
                                     <BoxView Grid.Column="2" HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" VerticalOptions="Center" Margin="10,0" />
                                     <Label Grid.Column="3" Text="{Binding DayCountLabel}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center"

@@ -1432,7 +1432,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         {
             bool isToday  = g.Key == today;
             bool expanded = isToday || _expandedDays.Contains(g.Key);
-            yield return MessageViewItem.CreateDayHeader(g.Key, DayHeaderLabel(g.Key, today), g.Count(), collapsed: !expanded);
+            yield return MessageViewItem.CreateDayHeader(g.Key, DayHeaderLabel(g.Key, today), g.Count(), collapsed: !expanded, isToday: isToday);
             if (!expanded) continue;
 
             if (isToday)
@@ -1460,7 +1460,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [RelayCommand]
     private void ToggleDay(MessageViewItem? header)
     {
-        if (header is null || !header.IsDayHeader || _currentMessageSource is null) return;
+        if (header is null || !header.IsDayHeader || header.IsTodayHeader || _currentMessageSource is null) return;
         var day = header.DayDate;
         bool nowExpanded = _expandedDays.Add(day);
         if (!nowExpanded) _expandedDays.Remove(day);   // was expanded → collapse
@@ -1507,7 +1507,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         var dayMsgs   = _currentMessageSource.Where(m => m.Message.CreatedAt.Date == day).ToList();
 
         // Refresh the header (chevron / collapsed count) without moving it.
-        Messages[hi] = MessageViewItem.CreateDayHeader(day, DayHeaderLabel(day, today), dayMsgs.Count, collapsed: !expanded);
+        Messages[hi] = MessageViewItem.CreateDayHeader(day, DayHeaderLabel(day, today), dayMsgs.Count, collapsed: !expanded, isToday: isToday);
 
         // Drop this day's existing content rows (everything after the header up to the next header).
         while (hi + 1 < Messages.Count && !Messages[hi + 1].IsDayHeader)
@@ -1588,7 +1588,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         var today = DateTime.Now.Date;
         if (!Messages.Any(m => m.IsDayHeader && m.DayDate == today))
-            Messages.Add(MessageViewItem.CreateDayHeader(today, "Today", 0, collapsed: false));
+            Messages.Add(MessageViewItem.CreateDayHeader(today, "Today", 0, collapsed: false, isToday: true));
     }
 
     private void AppendToMessages(MessageViewItem item)
