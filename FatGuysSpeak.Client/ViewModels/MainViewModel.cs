@@ -1857,24 +1857,13 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private int _voiceChannelId;
 
-    // Diagnostics for the move-user feature → %TEMP%\fgs-move.log (the MAUI console isn't captured).
-    private static readonly string MoveLogPath =
-        System.IO.Path.Combine(System.IO.Path.GetTempPath(), "fgs-move.log");
-    private static void MoveLog(string msg)
-    {
-        try { System.IO.File.AppendAllText(MoveLogPath, $"{DateTime.Now:HH:mm:ss.fff}  {msg}{Environment.NewLine}"); }
-        catch { /* never let logging break the UI */ }
-    }
-
     /// <summary>Called from drag/drop code-behind or the right-click menu. Gated to admins
     /// (server re-checks); moving yourself is a no-op.</summary>
     public async Task MoveUserToChannel(int targetUserId, int channelId)
     {
-        MoveLog($"MoveUserToChannel target={targetUserId} dest={channelId} isAdmin={IsServerAdmin} self={targetUserId == api.CurrentUserId} hubConnected={hub.IsConnected}");
-        if (!IsServerAdmin) { MoveLog("  -> blocked: not admin"); return; }
-        if (targetUserId == api.CurrentUserId) { MoveLog("  -> blocked: moving self"); return; }
+        if (!IsServerAdmin) return;
+        if (targetUserId == api.CurrentUserId) return;
         await hub.MoveUserToChannelAsync(targetUserId, channelId);
-        MoveLog("  -> invoked hub.MoveUserToChannelAsync");
     }
 
     /// <summary>Right-click "Move to Channel…" on a channel occupant: pick a target channel from an
@@ -1892,15 +1881,13 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private async Task PromptMoveByIdAsync(int userId, string username)
     {
-        MoveLog($"PromptMove user={username}({userId}) isAdmin={IsServerAdmin} channels={Channels.Count}");
-        if (!IsServerAdmin || userId == api.CurrentUserId) { MoveLog("  -> blocked: not admin or self"); return; }
+        if (!IsServerAdmin || userId == api.CurrentUserId) return;
         var names = Channels.Select(c => c.Channel.Name).ToArray();
-        if (names.Length == 0) { MoveLog("  -> blocked: no channels"); return; }
+        if (names.Length == 0) return;
         var choice = await Shell.Current.DisplayActionSheet($"Move {username} to…", "Cancel", null, names);
-        MoveLog($"  picked: '{choice ?? "(null)"}'");
         if (string.IsNullOrEmpty(choice) || choice == "Cancel") return;
         var target = Channels.FirstOrDefault(c => c.Channel.Name == choice);
-        if (target is null) { MoveLog($"  -> blocked: no channel matched '{choice}'"); return; }
+        if (target is null) return;
         await MoveUserToChannel(userId, target.Channel.Id);
     }
 

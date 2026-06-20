@@ -42,6 +42,8 @@ FatGuysSpeak.Server/fatguys.db
 ## SQLite write-ahead-log sidecars
 *.db-shm
 *.db-wal
+## Local DB backups (snapshots of runtime data — never commit)
+*.db.bak*
 
 ## Local uploads (server stores files here at runtime)
 FatGuysSpeak.Server/uploads/

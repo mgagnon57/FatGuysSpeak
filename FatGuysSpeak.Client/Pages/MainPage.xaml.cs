@@ -59,22 +59,11 @@ public partial class MainPage : ContentPage
         _vm.OnScrollPositionChanged(e.LastVisibleItemIndex);
     }
 
-    // ── Drag/drop diagnostics ── appends to %TEMP%\fgs-dnd.log so we can see which events fire
-    // (the MAUI client's console output isn't captured anywhere).
-    private static readonly string DndLogPath =
-        System.IO.Path.Combine(System.IO.Path.GetTempPath(), "fgs-dnd.log");
-    private static void DndLog(string msg)
-    {
-        try { System.IO.File.AppendAllText(DndLogPath, $"{DateTime.Now:HH:mm:ss.fff}  {msg}{Environment.NewLine}"); }
-        catch { /* never let logging break the UI */ }
-    }
-
     // Drag a voice occupant: stamp the user's id into the OS drag payload so Windows accepts the
     // drop (a drag with no data package won't register a drop target on WinUI).
     private void OnOccupantDragStarting(object? sender, DragStartingEventArgs e)
     {
         var user = (sender as Element)?.BindingContext as ViewModels.OccupantViewModel;
-        DndLog($"DragStarting  sender={sender?.GetType().Name}  user={user?.Username}({user?.Id})");
         if (user is not null) e.Data.Text = user.Id.ToString();
     }
 
@@ -91,8 +80,7 @@ public partial class MainPage : ContentPage
     {
         var ch = (sender as Element)?.BindingContext as ChannelViewItem;
         string? text = null;
-        try { text = await e.Data.GetTextAsync(); } catch (Exception ex) { DndLog($"Drop GetTextAsync threw {ex.GetType().Name}"); }
-        DndLog($"Drop  channel={ch?.Channel.Name}  text={text}");
+        try { text = await e.Data.GetTextAsync(); } catch { /* no drag payload */ }
         if (ch is not null && int.TryParse(text, out var userId))
             await _vm.MoveUserToChannel(userId, ch.Channel.Id);
     }

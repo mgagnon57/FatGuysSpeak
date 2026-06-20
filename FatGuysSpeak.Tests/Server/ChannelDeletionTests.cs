@@ -143,6 +143,23 @@ public class ChannelDeletionTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateAfterMiddleDelete_DoesNotCollideOnPosition()
+    {
+        // Reproduces the unstable-sidebar-order bug: Position used to be set from the channel COUNT,
+        // so deleting a channel dropped the count and the next created channel reused a live position.
+        await SeedAsync();
+        var a = await CreateChannelAsync("a");
+        var b = await CreateChannelAsync("b");
+        await _servers.DeleteChannel(_server.Id, a.Id);   // count drops below the max position
+        var c = await CreateChannelAsync("c");
+
+        var positions = _db.Db.Channels.Where(ch => ch.ServerId == _server.Id)
+            .Select(ch => ch.Position).ToList();
+        Assert.Equal(positions.Count, positions.Distinct().Count());  // no two channels share a position
+        Assert.True(c.Position > b.Position);                          // strictly past the current max
+    }
+
+    [Fact]
     public async Task DeleteChannel_DefaultChannel_IsBlocked()
     {
         await SeedAsync();

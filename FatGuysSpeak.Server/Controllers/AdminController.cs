@@ -499,7 +499,8 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         if (string.IsNullOrEmpty(name) || name.Length > 64)
             return BadRequest("Channel name must be 1–64 characters.");
 
-        var pos = await db.Channels.Where(c => c.ServerId == serverId).CountAsync();
+        // One past the MAX position, not the count — count collides after a delete (see ServersController).
+        var pos = (await db.Channels.Where(c => c.ServerId == serverId).MaxAsync(c => (int?)c.Position) ?? -1) + 1;
         var channel = new FatGuysSpeak.Server.Models.Channel
         {
             Name = name, Type = FatGuysSpeak.Shared.ChannelType.Text, ServerId = serverId, Position = pos

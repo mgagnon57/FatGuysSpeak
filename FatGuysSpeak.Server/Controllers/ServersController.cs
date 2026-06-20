@@ -181,7 +181,9 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
         if (member is null) return Forbid();
         if (member.Role < ServerRole.Admin) return Forbid();
 
-        var pos = await db.Channels.Where(c => c.ServerId == serverId).CountAsync();
+        // Position must be one past the current MAX, not the count — using the count collides with
+        // an existing channel's position after any channel has been deleted (unstable sidebar order).
+        var pos = (await db.Channels.Where(c => c.ServerId == serverId).MaxAsync(c => (int?)c.Position) ?? -1) + 1;
         var channel = new Channel { Name = req.Name, Type = req.Type, ServerId = serverId, Position = pos };
         // On SQLite, force a never-before-used id so this channel can't inherit a deleted
         // channel's orphaned messages. PostgreSQL sequences never recycle, so leave it auto.

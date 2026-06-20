@@ -536,15 +536,20 @@
                     </Grid>
                 </Grid>
 
-                <!-- Tab bar (Voice tab removed — transcriptions still post to the server) -->
-                <Grid Grid.Row="1" ColumnDefinitions="*,*" HeightRequest="34" BackgroundColor="{DynamicResource ThemeBgElevated}"
+                <!-- Tab bar -->
+                <Grid Grid.Row="1" ColumnDefinitions="*,*,*" HeightRequest="34" BackgroundColor="{DynamicResource ThemeBgElevated}"
                       IsVisible="{Binding ShowChannelUiElements}">
                     <Button Grid.Column="0" Text="💬 Chat"
                             Command="{Binding SelectTabCommand}" CommandParameter="Text"
                             BackgroundColor="{Binding IsTextTab, Converter={StaticResource TabBgConverter}}"
                             TextColor="White" FontSize="11" CornerRadius="0" BorderWidth="0"
                             Padding="0" Margin="0" />
-                    <Button Grid.Column="1" Text="📺 Stream"
+                    <Button Grid.Column="1" Text="🎙 Voice"
+                            Command="{Binding SelectTabCommand}" CommandParameter="Voice"
+                            BackgroundColor="{Binding IsVoiceTab, Converter={StaticResource TabBgConverter}}"
+                            TextColor="White" FontSize="11" CornerRadius="0" BorderWidth="0"
+                            Padding="0" Margin="0" />
+                    <Button Grid.Column="2" Text="📺 Stream"
                             Command="{Binding SelectTabCommand}" CommandParameter="Stream"
                             BackgroundColor="{Binding IsStreamTab, Converter={StaticResource TabBgConverter}}"
                             TextColor="White" FontSize="11" CornerRadius="0" BorderWidth="0"
