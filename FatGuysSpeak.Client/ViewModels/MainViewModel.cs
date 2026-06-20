@@ -1190,6 +1190,19 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         await api.TempBanUserAsync(SelectedServer.Id, userId, seconds);
     }
 
+    /// <summary>Pop a prompt, then post the question as a normal @PorkChop mention so both the
+    /// question and the bot's reply show in chat — same path as typing @PorkChop yourself.</summary>
+    [RelayCommand]
+    private async Task AskPorkChop()
+    {
+        if (SelectedChannel is null) return;
+        var question = await Shell.Current.DisplayPromptAsync(
+            "Ask PorkChop", "What do you want to ask PorkChop?", "Ask", "Cancel",
+            placeholder: "e.g. how do I cook a ribeye?");
+        if (string.IsNullOrWhiteSpace(question)) return;
+        await PostMessageAsync($"@PorkChop {question.Trim()}", MessageSource.Text);
+    }
+
     private async Task PostMessageAsync(string text, MessageSource source, string? attachmentUrl = null, string? attachmentFileName = null)
     {
         if (SelectedChannel is null) return;
@@ -1719,8 +1732,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             if (!consented)
             {
                 bool accept = await Shell.Current.DisplayAlert(
-                    "Push to Talk — Keyboard Access",
-                    "PTT requires a global keyboard hook that reads key events from all applications, including when FatGuysSpeak is in the background. No keystrokes are logged or transmitted.\n\nAllow this?",
+                    "Push to Talk — Input Access",
+                    "PTT requires global keyboard and mouse hooks that read key and mouse-button events from all applications, including when FatGuysSpeak is in the background, so your chosen PTT button works anywhere. Nothing is logged or transmitted.\n\nAllow this?",
                     "Allow", "Cancel");
                 if (!accept) return;
                 Preferences.Set("PttConsentGiven", true);
@@ -1734,7 +1747,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             }
         }
         await Shell.Current.DisplayAlert("Set Push to Talk Key",
-            "Click OK, then press any key you want to use for Push to Talk.", "OK");
+            "Click OK, then press any key — or a mouse side button (Mouse 4/5) or the middle button — to use for Push to Talk.", "OK");
         IsSettingPttKey = true;
         ptt.BeginLearning();
     }
