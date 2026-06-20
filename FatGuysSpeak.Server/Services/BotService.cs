@@ -66,10 +66,10 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         return PostToClaudeAsync(AdviceSystem, content);
     }
 
-    /// <summary>Lazily returns the cached PorkChop recap for a channel's completed (UTC) day,
-    /// generating and storing it on first request. Returns null for today/future days, or when
-    /// generation isn't possible (no key / API error) so it can be retried later.</summary>
-    public async Task<DailySummaryDto?> GetOrCreateDailySummaryAsync(int channelId, DateTime dayUtc)
+    /// <summary>Lazily returns the cached PorkChop recap for a channel's completed (UTC) day and
+    /// chat source (text vs voice are summarized separately), generating and storing it on first
+    /// request. Returns null for today/future days, or when generation isn't possible.</summary>
+    public async Task<DailySummaryDto?> GetOrCreateDailySummaryAsync(int channelId, DateTime dayUtc, MessageSource source)
     {
         var date = dayUtc.Date;
         if (date >= DateTime.UtcNow.Date) return null;   // only summarize days that are over
@@ -77,13 +77,13 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var cached = await db.DailyChatSummaries.FirstOrDefaultAsync(s => s.ChannelId == channelId && s.Date == date);
+        var cached = await db.DailyChatSummaries.FirstOrDefaultAsync(s => s.ChannelId == channelId && s.Date == date && s.Source == source);
         if (cached is not null)
             return new DailySummaryDto(date.ToString("yyyy-MM-dd"), cached.Summary, cached.MessageCount);
 
         var next = date.AddDays(1);
         var lines = await db.Messages
-            .Where(m => m.ChannelId == channelId && !m.IsDeleted && m.Source != MessageSource.AI
+            .Where(m => m.ChannelId == channelId && !m.IsDeleted && m.Source == source
                         && m.CreatedAt >= date && m.CreatedAt < next)
             .Include(m => m.Author)
             .OrderBy(m => m.CreatedAt)
@@ -92,7 +92,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         string summary;
         if (lines.Count == 0)
-            summary = "Quiet day — no messages in this channel.";
+            summary = source == MessageSource.Voice ? "Quiet day — nobody spoke in this channel." : "Quiet day — no messages in this channel.";
         else
         {
             if (string.IsNullOrEmpty(_apiKey))
@@ -100,16 +100,17 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
                 Console.WriteLine("[PorkChop] cannot summarize — no Anthropic API key set.");
                 return null;
             }
-            var transcript = "Here is the full chat transcript for this day (each line is \"username: message\"). Summarize it:\n\n"
-                             + string.Join("\n", lines);
-            var result = await PostToClaudeAsync(SummarySystem, transcript);
+            var lead = source == MessageSource.Voice
+                ? "Here is a transcript of the SPOKEN voice conversation for this day (auto-transcribed, so wording may be rough; each line is \"speaker: words\"). Summarize what was talked about:\n\n"
+                : "Here is the full text chat transcript for this day (each line is \"username: message\"). Summarize it:\n\n";
+            var result = await PostToClaudeAsync(SummarySystem, lead + string.Join("\n", lines));
             if (result is null) return null;   // generation failed — don't cache, allow a later retry
             summary = result;
         }
 
         db.DailyChatSummaries.Add(new DailyChatSummary
         {
-            ChannelId = channelId, Date = date, Summary = summary,
+            ChannelId = channelId, Date = date, Source = source, Summary = summary,
             MessageCount = lines.Count, GeneratedAt = DateTime.UtcNow,
         });
         try { await db.SaveChangesAsync(); } catch { /* concurrent generation — ignore */ }

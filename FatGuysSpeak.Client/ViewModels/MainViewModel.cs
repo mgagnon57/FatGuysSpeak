@@ -29,7 +29,14 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private List<MessageViewItem>? _currentMessageSource;
     private readonly HashSet<DateTime> _expandedDays = [];
     private readonly HashSet<DateTime> _messagesShownDays = [];
-    private readonly Dictionary<DateTime, string> _summaryCache = [];
+    // Recaps are cached per (UTC day, chat source) so the Text tab and Voice tab summarize independently.
+    private readonly Dictionary<(DateTime Day, MessageSource Source), string> _summaryCache = [];
+
+    // Which chat stream the visible Messages are currently showing — selects the matching recap cache.
+    private MessageSource CurrentSource =>
+        _currentMessageSource == _voiceMsgs  ? MessageSource.Voice
+        : _currentMessageSource == _streamMsgs ? MessageSource.Stream
+        : MessageSource.Text;
 
     [ObservableProperty] private ObservableCollection<ServerViewItem> _servers = [];
     [ObservableProperty] private ObservableCollection<ChannelViewItem> _channels = [];
@@ -1398,6 +1405,12 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         _currentMessageSource = source;
         Messages = new ObservableCollection<MessageViewItem>(BuildDayGroups(source));
+
+        // Any past day already expanded (carried over from another tab) needs this source's recap fetched.
+        var today = DateTime.UtcNow.Date;
+        foreach (var day in source.Select(m => m.Message.CreatedAt.Date).Distinct().ToList())
+            if (day != today && _expandedDays.Contains(day) && !_summaryCache.ContainsKey((day, CurrentSource)))
+                _ = FetchDaySummaryAsync(day);
     }
 
     private IEnumerable<MessageViewItem> BuildDayGroups(IEnumerable<MessageViewItem> source)
@@ -1421,7 +1434,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                 // past day: show PorkChop's recap; raw messages only if the user expanded them
                 bool showMsgs = _messagesShownDays.Contains(g.Key);
                 yield return MessageViewItem.CreateDaySummary(g.Key,
-                    _summaryCache.TryGetValue(g.Key, out var s) ? s : "Summarizing this day…", showMsgs);
+                    _summaryCache.TryGetValue((g.Key, CurrentSource), out var s) ? s : "Summarizing this day…", showMsgs);
                 if (showMsgs)
                     foreach (var m in g) yield return m;
             }
@@ -1438,22 +1451,24 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private void ToggleDay(MessageViewItem? header)
     {
         if (header is null || !header.IsDayHeader || _currentMessageSource is null) return;
-        bool nowExpanded = _expandedDays.Add(header.DayDate);
-        if (!nowExpanded) _expandedDays.Remove(header.DayDate);   // was expanded → collapse
-        _dividerItem = null;   // the live unread divider doesn't survive a rebuild
-        SetGroupedMessages(_currentMessageSource);
-        if (nowExpanded && header.DayDate != DateTime.UtcNow.Date && !_summaryCache.ContainsKey(header.DayDate))
-            _ = FetchDaySummaryAsync(header.DayDate);
+        var day = header.DayDate;
+        bool nowExpanded = _expandedDays.Add(day);
+        if (!nowExpanded) _expandedDays.Remove(day);   // was expanded → collapse
+        RefreshDayInPlace(day);                         // in-place edit keeps the view anchored here
+        if (nowExpanded && day != DateTime.UtcNow.Date && !_summaryCache.ContainsKey((day, CurrentSource)))
+            _ = FetchDaySummaryAsync(day);
     }
 
     private async Task FetchDaySummaryAsync(DateTime day)
     {
         var channelId = SelectedChannel?.Id;
         if (channelId is null) return;
-        var dto = await api.GetDaySummaryAsync(channelId.Value, day.ToString("yyyy-MM-dd"));
-        _summaryCache[day] = dto?.Summary ?? "No recap available for this day.";
-        if (_currentMessageSource is not null && _expandedDays.Contains(day) && SelectedChannel?.Id == channelId)
-            MainThread.BeginInvokeOnMainThread(() => SetGroupedMessages(_currentMessageSource));
+        var source = CurrentSource;   // capture: the active tab may change while this awaits
+        var dto = await api.GetDaySummaryAsync(channelId.Value, day.ToString("yyyy-MM-dd"), source);
+        _summaryCache[(day, source)] = dto?.Summary ?? "No recap available for this day.";
+        if (_currentMessageSource is not null && CurrentSource == source
+            && _expandedDays.Contains(day) && SelectedChannel?.Id == channelId)
+            MainThread.BeginInvokeOnMainThread(() => RefreshDayInPlace(day));
     }
 
     // The "Show full messages" link under a past-day recap: reveal/hide that day's raw messages.
@@ -1462,7 +1477,43 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         if (summary is null || !summary.IsDaySummary || _currentMessageSource is null) return;
         if (!_messagesShownDays.Add(summary.DayDate)) _messagesShownDays.Remove(summary.DayDate);
-        SetGroupedMessages(_currentMessageSource);
+        RefreshDayInPlace(summary.DayDate);
+    }
+
+    // Rebuild ONLY one day's region inside the existing Messages collection (header + recap/messages),
+    // mutating in place so the CollectionView keeps the user's scroll position instead of jumping to
+    // the bottom (which a full Messages reassignment triggers).
+    private void RefreshDayInPlace(DateTime day)
+    {
+        if (_currentMessageSource is null) return;
+        int hi = -1;
+        for (int i = 0; i < Messages.Count; i++)
+            if (Messages[i].IsDayHeader && Messages[i].DayDate == day) { hi = i; break; }
+        if (hi < 0) { SetGroupedMessages(_currentMessageSource); return; }   // header gone — fall back
+
+        var today = DateTime.UtcNow.Date;
+        bool isToday  = day == today;
+        bool expanded = isToday || _expandedDays.Contains(day);
+        var dayMsgs   = _currentMessageSource.Where(m => m.Message.CreatedAt.Date == day).ToList();
+
+        // Refresh the header (chevron / collapsed count) without moving it.
+        Messages[hi] = MessageViewItem.CreateDayHeader(day, DayHeaderLabel(day, today), dayMsgs.Count, collapsed: !expanded);
+
+        // Drop this day's existing content rows (everything after the header up to the next header).
+        while (hi + 1 < Messages.Count && !Messages[hi + 1].IsDayHeader)
+            Messages.RemoveAt(hi + 1);
+        if (!expanded) return;
+
+        int at = hi + 1;
+        if (isToday)
+            foreach (var m in dayMsgs) Messages.Insert(at++, m);
+        else
+        {
+            Messages.Insert(at++, MessageViewItem.CreateDaySummary(day,
+                _summaryCache.TryGetValue((day, CurrentSource), out var s) ? s : "Summarizing this day…", _messagesShownDays.Contains(day)));
+            if (_messagesShownDays.Contains(day))
+                foreach (var m in dayMsgs) Messages.Insert(at++, m);
+        }
     }
 
     // Make sure a "Today" header exists before appending a live message to the bottom.

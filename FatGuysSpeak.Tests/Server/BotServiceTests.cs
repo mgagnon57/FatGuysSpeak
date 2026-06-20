@@ -40,7 +40,9 @@ public class BotServiceTests : IDisposable
             .Setup<Task<HttpResponseMessage>>("SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(new HttpResponseMessage
+            // Build a fresh response per call — the content stream is consumed on read, so a
+            // single shared instance would fail the second request (e.g. text then voice).
+            .ReturnsAsync(() => new HttpResponseMessage
             {
                 StatusCode = HttpStatusCode.OK,
                 Content    = new StringContent(responsePayload, System.Text.Encoding.UTF8, "application/json")
@@ -208,15 +210,41 @@ public class BotServiceTests : IDisposable
         await _db.Db.SaveChangesAsync();
 
         var svc = MakeBotService(MakeHttpFactory("Folks said hi and chatted."), MakeConfig());
-        var result = await svc.GetOrCreateDailySummaryAsync(channel.Id, day);
+        var result = await svc.GetOrCreateDailySummaryAsync(channel.Id, day, MessageSource.Text);
 
         Assert.NotNull(result);
         Assert.Equal("Folks said hi and chatted.", result!.Summary);
         Assert.Equal(1, result.MessageCount);
         Assert.True(await _db.Db.DailyChatSummaries.AnyAsync(s => s.ChannelId == channel.Id && s.Date == day));
 
-        var again = await svc.GetOrCreateDailySummaryAsync(channel.Id, day);
+        var again = await svc.GetOrCreateDailySummaryAsync(channel.Id, day, MessageSource.Text);
         Assert.Equal(result.Summary, again!.Summary);   // served from cache
+    }
+
+    [Fact]
+    public async Task GetOrCreateDailySummary_TextAndVoice_AreSummarizedSeparately()
+    {
+        var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var day = DateTime.UtcNow.Date.AddDays(-1);
+        _db.Db.Messages.AddRange(
+            new Message { Content = "typed one",  AuthorId = owner.Id, ChannelId = channel.Id, Source = MessageSource.Text,  CreatedAt = day.AddHours(9) },
+            new Message { Content = "typed two",  AuthorId = owner.Id, ChannelId = channel.Id, Source = MessageSource.Text,  CreatedAt = day.AddHours(10) },
+            new Message { Content = "spoken one", AuthorId = owner.Id, ChannelId = channel.Id, Source = MessageSource.Voice, CreatedAt = day.AddHours(11) }
+        );
+        await _db.Db.SaveChangesAsync();
+
+        var svc = MakeBotService(MakeHttpFactory("recap"), MakeConfig());
+
+        var text  = await svc.GetOrCreateDailySummaryAsync(channel.Id, day, MessageSource.Text);
+        var voice = await svc.GetOrCreateDailySummaryAsync(channel.Id, day, MessageSource.Voice);
+
+        Assert.Equal(2, text!.MessageCount);    // only the two typed messages
+        Assert.Equal(1, voice!.MessageCount);   // only the one spoken message
+
+        // Two independent cached rows, one per source.
+        Assert.True(await _db.Db.DailyChatSummaries.AnyAsync(s => s.ChannelId == channel.Id && s.Date == day && s.Source == MessageSource.Text));
+        Assert.True(await _db.Db.DailyChatSummaries.AnyAsync(s => s.ChannelId == channel.Id && s.Date == day && s.Source == MessageSource.Voice));
     }
 
     [Fact]
@@ -225,7 +253,7 @@ public class BotServiceTests : IDisposable
         var (server, _) = await TestHelpers.SeedServerAsync(_db.Db);
         var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
         var svc = MakeBotService(MakeHttpFactory("x"), MakeConfig());
-        Assert.Null(await svc.GetOrCreateDailySummaryAsync(channel.Id, DateTime.UtcNow.Date));
+        Assert.Null(await svc.GetOrCreateDailySummaryAsync(channel.Id, DateTime.UtcNow.Date, MessageSource.Text));
     }
 
     [Fact]
@@ -234,7 +262,7 @@ public class BotServiceTests : IDisposable
         var (server, _) = await TestHelpers.SeedServerAsync(_db.Db);
         var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
         var svc = MakeBotService(MakeHttpFactory("should not be used"), MakeConfig());
-        var result = await svc.GetOrCreateDailySummaryAsync(channel.Id, DateTime.UtcNow.Date.AddDays(-2));
+        var result = await svc.GetOrCreateDailySummaryAsync(channel.Id, DateTime.UtcNow.Date.AddDays(-2), MessageSource.Text);
 
         Assert.NotNull(result);
         Assert.Equal(0, result!.MessageCount);

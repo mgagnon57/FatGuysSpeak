@@ -749,7 +749,7 @@ using (var scope = app.Services.CreateScope())
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ExternalLogins_Provider_ProviderUserId ON ExternalLogins (Provider, ProviderUserId)");
     }
 
-    // Daily PorkChop chat summaries (one per channel per completed day).
+    // Daily PorkChop chat summaries — one per channel, per completed day, PER SOURCE.
     if (isPostgres)
     {
         ctx.Database.ExecuteSqlRaw(@"
@@ -757,11 +757,14 @@ using (var scope = app.Services.CreateScope())
                 ""Id"" SERIAL PRIMARY KEY,
                 ""ChannelId"" INTEGER NOT NULL,
                 ""Date"" TIMESTAMP NOT NULL,
+                ""Source"" INTEGER NOT NULL DEFAULT 0,
                 ""Summary"" TEXT NOT NULL DEFAULT '',
                 ""MessageCount"" INTEGER NOT NULL DEFAULT 0,
                 ""GeneratedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )");
-        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_DailyChatSummaries_Channel_Date"" ON ""DailyChatSummaries"" (""ChannelId"", ""Date"")");
+        try { ctx.Database.ExecuteSqlRaw(@"ALTER TABLE ""DailyChatSummaries"" ADD COLUMN ""Source"" INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
+        ctx.Database.ExecuteSqlRaw(@"DROP INDEX IF EXISTS ""IX_DailyChatSummaries_Channel_Date""");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_DailyChatSummaries_Channel_Date_Source"" ON ""DailyChatSummaries"" (""ChannelId"", ""Date"", ""Source"")");
     }
     else
     {
@@ -770,11 +773,14 @@ using (var scope = app.Services.CreateScope())
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 ChannelId INTEGER NOT NULL,
                 Date TEXT NOT NULL,
+                Source INTEGER NOT NULL DEFAULT 0,
                 Summary TEXT NOT NULL DEFAULT '',
                 MessageCount INTEGER NOT NULL DEFAULT 0,
                 GeneratedAt TEXT NOT NULL DEFAULT (datetime('now'))
             )");
-        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_DailyChatSummaries_Channel_Date ON DailyChatSummaries (ChannelId, Date)");
+        try { ctx.Database.ExecuteSqlRaw(@"ALTER TABLE DailyChatSummaries ADD COLUMN Source INTEGER NOT NULL DEFAULT 0"); } catch { /* exists */ }
+        ctx.Database.ExecuteSqlRaw(@"DROP INDEX IF EXISTS IX_DailyChatSummaries_Channel_Date");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_DailyChatSummaries_Channel_Date_Source ON DailyChatSummaries (ChannelId, Date, Source)");
     }
 
     // Role simplification: the Moderator role (1) was removed in favour of a flat Admin/Member
