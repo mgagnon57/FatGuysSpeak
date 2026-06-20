@@ -825,6 +825,23 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             SetGroupedMessages(tab == "Voice" ? _voiceMsgs : _textMsgs);
     }
 
+    // Ask PorkChop for a personal recap of what was missed since the user was last online.
+    [ObservableProperty] private bool _isCatchingUp;
+
+    [RelayCommand]
+    private async Task CatchMeUpAsync()
+    {
+        if (IsCatchingUp) return;
+        IsCatchingUp = true;
+        try
+        {
+            var dto = await api.GetCatchupAsync();
+            var body = dto?.Summary ?? "PorkChop couldn't reach the server right now — try again in a moment.";
+            await Shell.Current.DisplayAlert("🐷 PorkChop — Catch me up", body, "Thanks!");
+        }
+        finally { IsCatchingUp = false; }
+    }
+
     [RelayCommand]
     public async Task ViewProfileAsync(int userId)
     {

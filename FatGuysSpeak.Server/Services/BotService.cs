@@ -182,6 +182,51 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         return digest;
     }
 
+    private const string CatchupSystem = "You are PorkChop, giving one person a quick personal catch-up on what they missed in FatGuysSpeak while they were away. You're given the messages posted since they were last online, grouped by channel. In a few short, friendly sentences, tell them what they missed: the main conversations per channel, anything aimed at them or that needs a reply, and any decisions or plans. Refer to people and channels by name, keep it brief, and don't invent anything that isn't in the transcript.";
+
+    /// <summary>Builds a personal "what you missed" recap for one user, covering messages posted since
+    /// they were last online (their LastSeenAt, or the last 24h if never recorded). Excludes the user's
+    /// own messages and respects per-channel read permissions. Ephemeral — not cached.</summary>
+    public async Task<CatchupDto> GenerateCatchupAsync(int userId)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var user = await db.Users.FindAsync(userId);
+        var since = user?.LastSeenAt ?? DateTime.UtcNow.AddHours(-24);
+
+        var memberships = await db.ServerMembers.Where(m => m.UserId == userId).ToListAsync();
+        var serverIds   = memberships.Select(m => m.ServerId).ToList();
+        var roleByServer = memberships.ToDictionary(m => m.ServerId, m => m.Role);
+
+        var rows = await db.Messages
+            .Where(m => !m.IsDeleted && m.Source != MessageSource.AI && m.AuthorId != userId
+                        && m.CreatedAt >= since && serverIds.Contains(m.Channel.ServerId))
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => new { m.ChannelId, ServerId = m.Channel.ServerId, Channel = m.Channel.Name, User = m.Author.Username, m.Content })
+            .ToListAsync();
+
+        // Respect per-channel read permissions: drop channels the user isn't allowed to read.
+        var minReadByChannel = await db.ChannelPermissions.ToDictionaryAsync(p => p.ChannelId, p => p.MinRoleToRead);
+        var visible = rows.Where(r => !minReadByChannel.TryGetValue(r.ChannelId, out var min)
+                                      || (roleByServer.TryGetValue(r.ServerId, out var role) && role >= min)).ToList();
+
+        if (visible.Count == 0)
+            return new CatchupDto("You're all caught up — nothing new since you were last here. 👍", 0, user?.LastSeenAt);
+
+        if (string.IsNullOrEmpty(_apiKey))
+        {
+            Console.WriteLine("[PorkChop] cannot generate catch-up — no Anthropic API key set.");
+            return new CatchupDto($"You missed {visible.Count} message(s), but PorkChop isn't configured to summarize them.", visible.Count, user?.LastSeenAt);
+        }
+
+        var transcript = "Here is everything posted since this person was last online, grouped by channel. Give them their personal catch-up:\n\n"
+            + string.Join("\n\n", visible.GroupBy(r => r.Channel)
+                .Select(g => $"#{g.Key}\n" + string.Join("\n", g.Select(r => $"{r.User}: {r.Content}"))));
+        var text = await PostToClaudeAsync(CatchupSystem, transcript);
+        return new CatchupDto(text ?? "PorkChop couldn't put together a recap right now — try again in a moment.", visible.Count, user?.LastSeenAt);
+    }
+
     private async Task<string?> PostToClaudeAsync(string system, string content)
     {
         try

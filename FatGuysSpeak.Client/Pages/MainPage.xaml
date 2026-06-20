@@ -468,7 +468,7 @@
                 <!-- Channel header / DM header -->
                 <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgHeader}" RowDefinitions="Auto,Auto">
                     <!-- Channel header (hidden in DM mode) -->
-                    <Grid Grid.Row="0" Padding="14,8" ColumnDefinitions="Auto,*,Auto,Auto,Auto"
+                    <Grid Grid.Row="0" Padding="14,8" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto"
                           IsVisible="{Binding IsNotDmMode}">
                         <Label Grid.Column="0" Text="#" TextColor="{DynamicResource ThemeTextMuted}" FontSize="16" VerticalOptions="Center" />
                         <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center" Margin="6,0,0,0">
@@ -486,13 +486,20 @@
                                 FontSize="12" HeightRequest="34" Padding="8,0"
                                 ToolTipProperties.Text="Ask PorkChop a question"
                                 IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}" />
-                        <Button Grid.Column="3" Text="📌"
+                        <Button Grid.Column="3" Text="🗞"
+                                Command="{Binding CatchMeUpCommand}"
+                                IsEnabled="{Binding IsCatchingUp, Converter={StaticResource InvertBoolConverter}}"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
+                                FontSize="14" HeightRequest="34" WidthRequest="36" Padding="0"
+                                ToolTipProperties.Text="Catch me up — what you missed since last online"
+                                IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}" />
+                        <Button Grid.Column="4" Text="📌"
                                 Command="{Binding TogglePinsCommand}"
                                 BackgroundColor="{Binding IsPinsOpen, Converter={StaticResource TabBgConverter}}"
                                 TextColor="{DynamicResource ThemeTextSecondary}"
                                 FontSize="14" HeightRequest="34" WidthRequest="36" Padding="0"
                                 IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}" />
-                        <Button Grid.Column="4" Text="🔍"
+                        <Button Grid.Column="5" Text="🔍"
                                 Command="{Binding ToggleSearchCommand}"
                                 BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}"
                                 FontSize="14" HeightRequest="34" WidthRequest="36" Padding="0"

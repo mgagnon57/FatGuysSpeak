@@ -72,6 +72,9 @@ public record UpdateStatusDto(string Current, string? Latest, bool UpdateAvailab
 
 // PorkChop's recap of one channel-day. Date is the UTC day as "yyyy-MM-dd".
 public record DailySummaryDto(string Date, string Summary, int MessageCount);
+
+// PorkChop's personal "here's what you missed" recap since the user was last online.
+public record CatchupDto(string Summary, int MessageCount, DateTime? Since);
 // Two roles only: you are an Admin or you are not. Admin keeps numeric value 2 so existing
 // rows in long-lived databases stay valid; the old Moderator (1) is migrated to Member at
 // startup. A finer-grained per-channel permission model is planned for later.

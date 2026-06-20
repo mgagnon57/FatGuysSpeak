@@ -299,6 +299,45 @@ public class BotServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Catchup_SummarizesWhatYouMissed_ExcludingYourOwnMessages()
+    {
+        var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var buddy = new User { Username = "buddy", Email = "buddy@test.local", PasswordHash = "!" };
+        _db.Db.Users.Add(buddy);
+        owner.LastSeenAt = DateTime.UtcNow.AddHours(-2);   // "last online" two hours ago
+        await _db.Db.SaveChangesAsync();
+
+        _db.Db.Messages.AddRange(
+            new Message { Content = "you missed this",   AuthorId = buddy.Id, ChannelId = channel.Id, CreatedAt = DateTime.UtcNow.AddHours(-1) },
+            new Message { Content = "and this too",       AuthorId = buddy.Id, ChannelId = channel.Id, CreatedAt = DateTime.UtcNow.AddMinutes(-30) },
+            new Message { Content = "my own message",     AuthorId = owner.Id, ChannelId = channel.Id, CreatedAt = DateTime.UtcNow.AddMinutes(-20) },
+            new Message { Content = "old, before I left", AuthorId = buddy.Id, ChannelId = channel.Id, CreatedAt = DateTime.UtcNow.AddHours(-5) }
+        );
+        await _db.Db.SaveChangesAsync();
+
+        var svc = MakeBotService(MakeHttpFactory("Here's what you missed."), MakeConfig());
+        var result = await svc.GenerateCatchupAsync(owner.Id);
+
+        Assert.Equal(2, result.MessageCount);   // only buddy's two messages after last-seen; own + pre-departure excluded
+        Assert.Equal("Here's what you missed.", result.Summary);
+    }
+
+    [Fact]
+    public async Task Catchup_NothingNew_ReturnsCaughtUp()
+    {
+        var (_, owner) = await TestHelpers.SeedServerAsync(_db.Db);
+        owner.LastSeenAt = DateTime.UtcNow.AddMinutes(-5);
+        await _db.Db.SaveChangesAsync();
+
+        var svc = MakeBotService(MakeHttpFactory("should not be called"), MakeConfig());
+        var result = await svc.GenerateCatchupAsync(owner.Id);
+
+        Assert.Equal(0, result.MessageCount);
+        Assert.Contains("caught up", result.Summary);
+    }
+
+    [Fact]
     public async Task GetOrCreateDailySummary_Today_ReturnsNull()
     {
         var (server, _) = await TestHelpers.SeedServerAsync(_db.Db);
