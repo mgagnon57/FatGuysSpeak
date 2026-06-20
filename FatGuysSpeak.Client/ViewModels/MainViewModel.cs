@@ -857,6 +857,15 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         await api.CreatePollAsync(SelectedChannel.Id, question.Trim(), options);   // arrives via ReceiveMessage broadcast
     }
 
+    // Admin-only: fire PorkChop's idle roast in the current channel on demand (test/fun).
+    [RelayCommand]
+    private async Task NudgeChannelAsync()
+    {
+        if (SelectedChannel is null) return;
+        var ok = await api.NudgeChannelAsync(SelectedChannel.Id);
+        if (!ok) toast.Show("PorkChop", "Couldn't fire the nudge — need admin and PorkChop configured.");
+    }
+
     // Ask PorkChop for a personal recap of what was missed since the user was last online.
     [ObservableProperty] private bool _isCatchingUp;
 

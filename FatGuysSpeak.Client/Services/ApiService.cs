@@ -165,6 +165,13 @@ public class ApiService
         return resp.IsSuccessStatusCode ? await resp.Content.ReadFromJsonAsync<PollDto>() : null;
     }
 
+    // Admin-only: fire PorkChop's idle roast in a channel on demand (for testing / fun).
+    public async Task<bool> NudgeChannelAsync(int channelId)
+    {
+        try { var r = await _http.PostAsync($"api/channels/{channelId}/nudge", null); return r.IsSuccessStatusCode; }
+        catch { return false; }
+    }
+
     // PorkChop's personal "what you missed since last online" recap for the current user and chat source.
     public async Task<CatchupDto?> GetCatchupAsync(MessageSource source)
     {
