@@ -38,6 +38,13 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         : _currentMessageSource == _streamMsgs ? MessageSource.Stream
         : MessageSource.Text;
 
+    // Older-history paging: track the oldest message id we've loaded so "Load earlier messages"
+    // can fetch the previous page. HasMoreHistory drives a button at the top of the chat.
+    private const int HistoryPageSize = 50;
+    private int? _oldestLoadedId;
+    private bool _isLoadingOlder;
+    [ObservableProperty] private bool _hasMoreHistory;
+
     [ObservableProperty] private ObservableCollection<ServerViewItem> _servers = [];
     [ObservableProperty] private ObservableCollection<ChannelViewItem> _channels = [];
     private List<CategoryDto> _serverCategories = [];
@@ -796,6 +803,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             else if (m.Source == MessageSource.Stream) _streamMsgs.Add(mi);
             else _textMsgs.Add(mi);
         }
+        // Oldest id loaded becomes the cursor; a full first page implies older history exists.
+        _oldestLoadedId = (msgs?.Count > 0) ? msgs.Min(m => m.Id) : null;
+        HasMoreHistory  = (msgs?.Count ?? 0) >= HistoryPageSize;
         SelectedTab = "Text";
         _expandedDays.Clear();   // fresh channel: today expanded, earlier days collapsed
         _messagesShownDays.Clear();
@@ -1515,6 +1525,63 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
                 foreach (var m in dayMsgs) Messages.Insert(at++, m);
         }
     }
+
+    // "Load earlier messages": fetch the previous page of history, prepend it to every source
+    // store, and splice the new (older) day-groups onto the TOP of the current view in place so
+    // the CollectionView keeps the user anchored where they were instead of jumping.
+    [RelayCommand]
+    private async Task LoadOlderMessagesAsync()
+    {
+        if (_isLoadingOlder || !HasMoreHistory || _currentMessageSource is null) return;
+        var channelId = SelectedChannel?.Id;
+        if (channelId is null || _oldestLoadedId is null) return;
+
+        _isLoadingOlder = true;
+        try
+        {
+            var older = await api.GetMessagesBeforeAsync(channelId.Value, _oldestLoadedId.Value, HistoryPageSize);
+            if (older is null || older.Count == 0) { HasMoreHistory = false; return; }
+
+            // Distribute the older page (oldest-first) to the front of each source store.
+            var ordered = older.Where(m => !_blockedUserIds.Contains(m.AuthorId)).OrderBy(m => m.CreatedAt).ToList();
+            var added = new List<MessageViewItem>();
+            void PrependTo(List<MessageViewItem> store, MessageSource src)
+            {
+                var items = ordered.Where(m => Bucket(m.Source) == src)
+                                   .Select(m => Wire(new MessageViewItem(m, api.CurrentUsername, api.CurrentUserId)))
+                                   .ToList();
+                store.InsertRange(0, items);
+                added.AddRange(items);
+            }
+            PrependTo(_voiceMsgs, MessageSource.Voice);
+            PrependTo(_streamMsgs, MessageSource.Stream);
+            PrependTo(_textMsgs, MessageSource.Text);
+
+            _oldestLoadedId = Math.Min(_oldestLoadedId.Value, older.Min(m => m.Id));
+            if (older.Count < HistoryPageSize) HasMoreHistory = false;
+
+            foreach (var mi in added) _ = LoadPreviewAsync(mi);
+
+            // Splice only the newly-revealed leading items onto the top, leaving the rest untouched.
+            var oldTop = Messages.FirstOrDefault();
+            var full = BuildDayGroups(_currentMessageSource).ToList();
+            int split = oldTop is null ? -1 : full.FindIndex(x => SameGroupAnchor(x, oldTop));
+            if (split < 0) { SetGroupedMessages(_currentMessageSource); return; }   // structure changed — safe fallback
+            Messages[0] = full[split];                                  // refresh boundary header (its count may have grown)
+            for (int i = split - 1; i >= 0; i--) Messages.Insert(0, full[i]);
+        }
+        finally { _isLoadingOlder = false; }
+    }
+
+    private static MessageSource Bucket(MessageSource s) =>
+        s == MessageSource.Voice ? MessageSource.Voice
+        : s == MessageSource.Stream ? MessageSource.Stream
+        : MessageSource.Text;
+
+    // Two grouped rows describe the same position if they're the same day header or the same message.
+    private static bool SameGroupAnchor(MessageViewItem a, MessageViewItem b) =>
+        a.IsDayHeader && b.IsDayHeader ? a.DayDate == b.DayDate
+        : !a.IsDayHeader && !b.IsDayHeader && !a.IsDaySummary && !b.IsDaySummary && a.Message.Id == b.Message.Id;
 
     // Make sure a "Today" header exists before appending a live message to the bottom.
     private void EnsureTodayHeader()

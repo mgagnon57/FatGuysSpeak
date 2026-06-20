@@ -60,6 +60,44 @@ public class MessagesControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetMessages_DefaultPage_ReturnsNewestUpToLimit()
+    {
+        await SeedAsync();
+        for (var i = 0; i < 5; i++)
+            _testDb.Db.Messages.Add(new Message { Content = $"m{i}", AuthorId = _user.Id, ChannelId = _textChannel.Id });
+        await _testDb.Db.SaveChangesAsync();
+
+        var result = await _controller.GetMessages(_textChannel.Id, limit: 3);
+
+        var msgs = result.Value ?? (result.Result as OkObjectResult)?.Value as List<MessageDto>;
+        Assert.NotNull(msgs);
+        Assert.Equal(3, msgs.Count);                       // newest 3
+        Assert.Equal(new[] { "m2", "m3", "m4" }, msgs.Select(m => m.Content).ToArray());  // oldest-first
+    }
+
+    [Fact]
+    public async Task GetMessages_BeforeId_ReturnsOlderPage()
+    {
+        await SeedAsync();
+        var ids = new List<int>();
+        for (var i = 0; i < 5; i++)
+        {
+            var m = new Message { Content = $"m{i}", AuthorId = _user.Id, ChannelId = _textChannel.Id };
+            _testDb.Db.Messages.Add(m);
+            await _testDb.Db.SaveChangesAsync();
+            ids.Add(m.Id);
+        }
+
+        // Page older than the 4th message (id of m3) — expect the two before it, oldest-first.
+        var result = await _controller.GetMessages(_textChannel.Id, limit: 2, beforeId: ids[3]);
+
+        var msgs = result.Value ?? (result.Result as OkObjectResult)?.Value as List<MessageDto>;
+        Assert.NotNull(msgs);
+        Assert.Equal(new[] { "m1", "m2" }, msgs.Select(m => m.Content).ToArray());
+        Assert.All(msgs, m => Assert.True(m.Id < ids[3]));
+    }
+
+    [Fact]
     public async Task GetMessages_NonMember_ReturnsForbid()
     {
         await SeedAsync();

@@ -147,6 +147,10 @@ public class ApiService
     public Task<List<MessageDto>?> GetMessagesAfterAsync(int channelId, int afterId) =>
         _http.GetFromJsonAsync<List<MessageDto>>($"api/channels/{channelId}/messages?afterId={afterId}");
 
+    // Older-history page: the newest messages strictly before beforeId, oldest-first.
+    public Task<List<MessageDto>?> GetMessagesBeforeAsync(int channelId, int beforeId, int limit = 50) =>
+        _http.GetFromJsonAsync<List<MessageDto>>($"api/channels/{channelId}/messages?beforeId={beforeId}&limit={limit}");
+
     // PorkChop's recap for a channel's completed (UTC) day and chat source (Text/Voice are
     // summarized separately); null when not available (today, no key, error).
     public async Task<DailySummaryDto?> GetDaySummaryAsync(int channelId, string date, MessageSource source)

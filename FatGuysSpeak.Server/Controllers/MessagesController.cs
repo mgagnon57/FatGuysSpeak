@@ -58,7 +58,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<MessageDto>>> GetMessages(int channelId, [FromQuery] int limit = 50, [FromQuery] int? afterId = null)
+    public async Task<ActionResult<List<MessageDto>>> GetMessages(int channelId, [FromQuery] int limit = 50, [FromQuery] int? afterId = null, [FromQuery] int? beforeId = null)
     {
         var channel = await db.Channels.Include(c => c.Server).ThenInclude(s => s.Members)
             .FirstOrDefaultAsync(c => c.Id == channelId);
@@ -77,9 +77,13 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
             .Include(m => m.Author)
             .Include(m => m.ReplyTo).ThenInclude(r => r!.Author);
 
+        var pageSize = Math.Min(limit, 200);
         var messages = afterId.HasValue
             ? await query.Where(m => m.Id > afterId.Value).OrderBy(m => m.CreatedAt).Take(200).ToListAsync()
-            : await query.OrderByDescending(m => m.CreatedAt).Take(Math.Min(limit, 200)).OrderBy(m => m.CreatedAt).ToListAsync();
+            : beforeId.HasValue
+                // older-history page: the newest messages strictly before the cursor, returned oldest-first
+                ? await query.Where(m => m.Id < beforeId.Value).OrderByDescending(m => m.CreatedAt).Take(pageSize).OrderBy(m => m.CreatedAt).ToListAsync()
+                : await query.OrderByDescending(m => m.CreatedAt).Take(pageSize).OrderBy(m => m.CreatedAt).ToListAsync();
 
         var ids = messages.Select(m => m.Id).ToList();
         var allReactions = await db.MessageReactions

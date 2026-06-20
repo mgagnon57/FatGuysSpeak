@@ -1079,6 +1079,19 @@
                     </CollectionView.ItemTemplate>
                 </CollectionView>
 
+                <!-- Load earlier messages pill (top) -->
+                <Border IsVisible="{Binding HasMoreHistory}"
+                        VerticalOptions="Start" HorizontalOptions="Center"
+                        Margin="0,10,0,0"
+                        BackgroundColor="{DynamicResource ThemeBgElevated}" StrokeThickness="0"
+                        StrokeShape="RoundRectangle 16">
+                    <Button Text="↑  Load earlier messages"
+                            Command="{Binding LoadOlderMessagesCommand}"
+                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextMuted}"
+                            FontSize="11" FontAttributes="Bold"
+                            Padding="16,6" HeightRequest="34" />
+                </Border>
+
                 <!-- New messages pill -->
                 <Border IsVisible="{Binding HasUnreadBelow}"
                         VerticalOptions="End" HorizontalOptions="Center"

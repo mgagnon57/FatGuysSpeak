@@ -221,6 +221,7 @@ builder.Services.AddSingleton<FatGuysSpeak.Server.Services.UpdateStatus>();
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.UpdateCheckService>();
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.TempBanCleanupService>();
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.AuditLogCleanupService>();
+builder.Services.AddHostedService<FatGuysSpeak.Server.Services.RecapPregenService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.SessionBlacklistService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.WebhookDeliveryService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.AutomodService>();
