@@ -195,4 +195,49 @@ public class BotServiceTests : IDisposable
         Assert.Contains("user message", body);
         Assert.DoesNotContain("previous AI reply", body);
     }
+
+    // ── Daily summaries ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetOrCreateDailySummary_PastDayWithMessages_GeneratesAndCaches()
+    {
+        var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var day = DateTime.UtcNow.Date.AddDays(-1);
+        _db.Db.Messages.Add(new Message { Content = "hey everyone", AuthorId = owner.Id, ChannelId = channel.Id, CreatedAt = day.AddHours(10) });
+        await _db.Db.SaveChangesAsync();
+
+        var svc = MakeBotService(MakeHttpFactory("Folks said hi and chatted."), MakeConfig());
+        var result = await svc.GetOrCreateDailySummaryAsync(channel.Id, day);
+
+        Assert.NotNull(result);
+        Assert.Equal("Folks said hi and chatted.", result!.Summary);
+        Assert.Equal(1, result.MessageCount);
+        Assert.True(await _db.Db.DailyChatSummaries.AnyAsync(s => s.ChannelId == channel.Id && s.Date == day));
+
+        var again = await svc.GetOrCreateDailySummaryAsync(channel.Id, day);
+        Assert.Equal(result.Summary, again!.Summary);   // served from cache
+    }
+
+    [Fact]
+    public async Task GetOrCreateDailySummary_Today_ReturnsNull()
+    {
+        var (server, _) = await TestHelpers.SeedServerAsync(_db.Db);
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var svc = MakeBotService(MakeHttpFactory("x"), MakeConfig());
+        Assert.Null(await svc.GetOrCreateDailySummaryAsync(channel.Id, DateTime.UtcNow.Date));
+    }
+
+    [Fact]
+    public async Task GetOrCreateDailySummary_QuietDay_ReturnsQuietWithoutApiText()
+    {
+        var (server, _) = await TestHelpers.SeedServerAsync(_db.Db);
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var svc = MakeBotService(MakeHttpFactory("should not be used"), MakeConfig());
+        var result = await svc.GetOrCreateDailySummaryAsync(channel.Id, DateTime.UtcNow.Date.AddDays(-2));
+
+        Assert.NotNull(result);
+        Assert.Equal(0, result!.MessageCount);
+        Assert.Contains("Quiet day", result.Summary);
+    }
 }

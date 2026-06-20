@@ -20,6 +20,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PinnedMessage> PinnedMessages => Set<PinnedMessage>();
     public DbSet<PinnedDirectMessage> PinnedDirectMessages => Set<PinnedDirectMessage>();
     public DbSet<UserBlock> UserBlocks => Set<UserBlock>();
+    public DbSet<DailyChatSummary> DailyChatSummaries => Set<DailyChatSummary>();
     public DbSet<TempBan> TempBans => Set<TempBan>();
     public DbSet<WordFilter> WordFilters => Set<WordFilter>();
     public DbSet<UserChannelNotif> UserChannelNotifs => Set<UserChannelNotif>();

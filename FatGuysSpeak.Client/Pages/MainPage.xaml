@@ -771,6 +771,40 @@
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="vm:MessageViewItem">
                             <VerticalStackLayout>
+                                <!-- Day header (tap to collapse/expand that day) -->
+                                <Grid IsVisible="{Binding IsDayHeader}" Padding="14,8,14,4"
+                                      ColumnDefinitions="Auto,Auto,*,Auto" BackgroundColor="{DynamicResource ThemeBgPrimary}">
+                                    <Grid.GestureRecognizers>
+                                        <TapGestureRecognizer
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ToggleDayCommand}"
+                                            CommandParameter="{Binding .}" />
+                                    </Grid.GestureRecognizers>
+                                    <Label Grid.Column="0" Text="{Binding DayChevron}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="9" VerticalOptions="Center" Margin="0,0,6,0" />
+                                    <Label Grid.Column="1" Text="{Binding DayLabel}" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="11" FontAttributes="Bold" VerticalOptions="Center" />
+                                    <BoxView Grid.Column="2" HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" VerticalOptions="Center" Margin="10,0" />
+                                    <Label Grid.Column="3" Text="{Binding DayCountLabel}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center"
+                                           IsVisible="{Binding IsDayCollapsed}" />
+                                </Grid>
+                                <!-- Day summary: PorkChop's recap of a past day -->
+                                <Grid IsVisible="{Binding IsDaySummary}" Padding="20,2,20,8" RowDefinitions="Auto,Auto">
+                                    <Border Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgElevated}" StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 8" Padding="12,10">
+                                        <VerticalStackLayout Spacing="6">
+                                            <HorizontalStackLayout Spacing="6">
+                                                <Label Text="🐷" FontSize="13" VerticalOptions="Center" />
+                                                <Label Text="PorkChop's recap" TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" FontAttributes="Bold" VerticalOptions="Center" />
+                                            </HorizontalStackLayout>
+                                            <Label Text="{Binding SummaryText}" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12" LineBreakMode="WordWrap" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                    <Label Grid.Row="1" Text="{Binding ShowMessagesLabel}" TextColor="{DynamicResource ThemeAccentLight}" FontSize="10" Margin="4,5,0,0">
+                                        <Label.GestureRecognizers>
+                                            <TapGestureRecognizer
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ShowDayMessagesCommand}"
+                                                CommandParameter="{Binding .}" />
+                                        </Label.GestureRecognizers>
+                                    </Label>
+                                </Grid>
                                 <!-- New messages divider -->
                                 <Grid IsVisible="{Binding IsNewMessageDivider}" Padding="14,6">
                                     <Grid.ColumnDefinitions>

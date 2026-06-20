@@ -54,20 +54,78 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         await hub.Clients.Group($"server-{serverId}").SendAsync("NewMessageNotification", dto);
     }
 
-    private async Task<string?> CallClaudeAsync(string userMessage, List<string> contextLines)
+    private const string AdviceSystem = "You are PorkChop, a friendly, down-to-earth advisor in a chat app called FatGuysSpeak. People mention you (@PorkChop) when they have a question or want advice. Read their message and the recent conversation, then give practical, helpful advice or a clear answer. Be concise and conversational, and don't be afraid to have a little personality.";
+
+    private const string SummarySystem = "You are PorkChop. Summarize ONE day of chat in a single channel of FatGuysSpeak. In 2-5 sentences, recap the main topics discussed, any decisions or plans made, and anything notable that was shared (links, files, jokes that landed). Be friendly and concise, refer to people by name, and don't invent anything that isn't in the transcript. If it was just light small talk, say so briefly.";
+
+    private Task<string?> CallClaudeAsync(string userMessage, List<string> contextLines)
+    {
+        var content = contextLines.Count > 0
+            ? string.Join("\n", contextLines) + "\n\n" + userMessage
+            : userMessage;
+        return PostToClaudeAsync(AdviceSystem, content);
+    }
+
+    /// <summary>Lazily returns the cached PorkChop recap for a channel's completed (UTC) day,
+    /// generating and storing it on first request. Returns null for today/future days, or when
+    /// generation isn't possible (no key / API error) so it can be retried later.</summary>
+    public async Task<DailySummaryDto?> GetOrCreateDailySummaryAsync(int channelId, DateTime dayUtc)
+    {
+        var date = dayUtc.Date;
+        if (date >= DateTime.UtcNow.Date) return null;   // only summarize days that are over
+
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var cached = await db.DailyChatSummaries.FirstOrDefaultAsync(s => s.ChannelId == channelId && s.Date == date);
+        if (cached is not null)
+            return new DailySummaryDto(date.ToString("yyyy-MM-dd"), cached.Summary, cached.MessageCount);
+
+        var next = date.AddDays(1);
+        var lines = await db.Messages
+            .Where(m => m.ChannelId == channelId && !m.IsDeleted && m.Source != MessageSource.AI
+                        && m.CreatedAt >= date && m.CreatedAt < next)
+            .Include(m => m.Author)
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => m.Author.Username + ": " + m.Content)
+            .ToListAsync();
+
+        string summary;
+        if (lines.Count == 0)
+            summary = "Quiet day — no messages in this channel.";
+        else
+        {
+            if (string.IsNullOrEmpty(_apiKey))
+            {
+                Console.WriteLine("[PorkChop] cannot summarize — no Anthropic API key set.");
+                return null;
+            }
+            var transcript = "Here is the full chat transcript for this day (each line is \"username: message\"). Summarize it:\n\n"
+                             + string.Join("\n", lines);
+            var result = await PostToClaudeAsync(SummarySystem, transcript);
+            if (result is null) return null;   // generation failed — don't cache, allow a later retry
+            summary = result;
+        }
+
+        db.DailyChatSummaries.Add(new DailyChatSummary
+        {
+            ChannelId = channelId, Date = date, Summary = summary,
+            MessageCount = lines.Count, GeneratedAt = DateTime.UtcNow,
+        });
+        try { await db.SaveChangesAsync(); } catch { /* concurrent generation — ignore */ }
+        return new DailySummaryDto(date.ToString("yyyy-MM-dd"), summary, lines.Count);
+    }
+
+    private async Task<string?> PostToClaudeAsync(string system, string content)
     {
         try
         {
             var client = httpFactory.CreateClient("anthropic");
-            var content = contextLines.Count > 0
-                ? string.Join("\n", contextLines) + "\n\n" + userMessage
-                : userMessage;
-
             var payload = new
             {
                 model      = _model,
                 max_tokens = 1024,
-                system     = "You are PorkChop, a friendly, down-to-earth advisor in a chat app called FatGuysSpeak. People mention you (@PorkChop) when they have a question or want advice. Read their message and the recent conversation, then give practical, helpful advice or a clear answer. Be concise and conversational, and don't be afraid to have a little personality.",
+                system,
                 messages   = new[] { new { role = "user", content } }
             };
 

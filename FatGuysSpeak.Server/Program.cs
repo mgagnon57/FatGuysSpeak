@@ -749,6 +749,34 @@ using (var scope = app.Services.CreateScope())
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ExternalLogins_Provider_ProviderUserId ON ExternalLogins (Provider, ProviderUserId)");
     }
 
+    // Daily PorkChop chat summaries (one per channel per completed day).
+    if (isPostgres)
+    {
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""DailyChatSummaries"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""ChannelId"" INTEGER NOT NULL,
+                ""Date"" TIMESTAMP NOT NULL,
+                ""Summary"" TEXT NOT NULL DEFAULT '',
+                ""MessageCount"" INTEGER NOT NULL DEFAULT 0,
+                ""GeneratedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_DailyChatSummaries_Channel_Date"" ON ""DailyChatSummaries"" (""ChannelId"", ""Date"")");
+    }
+    else
+    {
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS DailyChatSummaries (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ChannelId INTEGER NOT NULL,
+                Date TEXT NOT NULL,
+                Summary TEXT NOT NULL DEFAULT '',
+                MessageCount INTEGER NOT NULL DEFAULT 0,
+                GeneratedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_DailyChatSummaries_Channel_Date ON DailyChatSummaries (ChannelId, Date)");
+    }
+
     // Role simplification: the Moderator role (1) was removed in favour of a flat Admin/Member
     // model. Demote any lingering moderators to Member. Idempotent — once no Role=1 rows remain
     // this is a no-op, so it is safe to run on every startup.

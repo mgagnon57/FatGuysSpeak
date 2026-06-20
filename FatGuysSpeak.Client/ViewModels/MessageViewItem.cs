@@ -47,7 +47,20 @@ public partial class MessageViewItem : ObservableObject
 
     public bool IsSystemMessage { get; private init; }
     public bool IsNewMessageDivider { get; private init; }
-    public bool IsRegularMessage => !IsSystemMessage && !IsNewMessageDivider;
+    // Day-grouping header (collapsible). A synthetic, non-message row like the divider above.
+    public bool     IsDayHeader      { get; private init; }
+    public DateTime DayDate          { get; private init; }
+    public bool     IsDayCollapsed   { get; private init; }
+    public string   DayLabel         { get; private init; } = "";
+    public int      DayMessageCount  { get; private init; }
+    public string   DayChevron       => IsDayCollapsed ? "▶" : "▼";
+    public string   DayCountLabel    => DayMessageCount == 1 ? "1 message" : $"{DayMessageCount} messages";
+    // PorkChop's recap row, shown when a past day is expanded (instead of its raw messages).
+    public bool   IsDaySummary  { get; private init; }
+    public string SummaryText   { get; private init; } = "";
+    public bool   MessagesShown { get; private init; }
+    public string ShowMessagesLabel => MessagesShown ? "Hide messages" : "Show full messages";
+    public bool IsRegularMessage => !IsSystemMessage && !IsNewMessageDivider && !IsDayHeader && !IsDaySummary;
     public bool IsMention { get; private init; }
     public bool IsOwnMessage { get; private init; }
     public bool IsBot => Message.Source == MessageSource.AI;
@@ -276,5 +289,26 @@ public partial class MessageViewItem : ObservableObject
         var id = Interlocked.Decrement(ref _systemIdCounter);
         var dto = new MessageDto(id, "", string.Empty, 0, DateTime.UtcNow, channelId);
         return new MessageViewItem(dto) { IsNewMessageDivider = true };
+    }
+
+    public static MessageViewItem CreateDayHeader(DateTime day, string label, int count, bool collapsed)
+    {
+        var id = Interlocked.Decrement(ref _systemIdCounter);
+        var dto = new MessageDto(id, "", string.Empty, 0, DateTime.UtcNow, 0);
+        return new MessageViewItem(dto)
+        {
+            IsDayHeader = true, DayDate = day, DayLabel = label,
+            DayMessageCount = count, IsDayCollapsed = collapsed,
+        };
+    }
+
+    public static MessageViewItem CreateDaySummary(DateTime day, string text, bool messagesShown)
+    {
+        var id = Interlocked.Decrement(ref _systemIdCounter);
+        var dto = new MessageDto(id, "", string.Empty, 0, DateTime.UtcNow, 0);
+        return new MessageViewItem(dto)
+        {
+            IsDaySummary = true, DayDate = day, SummaryText = text, MessagesShown = messagesShown,
+        };
     }
 }

@@ -147,6 +147,13 @@ public class ApiService
     public Task<List<MessageDto>?> GetMessagesAfterAsync(int channelId, int afterId) =>
         _http.GetFromJsonAsync<List<MessageDto>>($"api/channels/{channelId}/messages?afterId={afterId}");
 
+    // PorkChop's recap for a channel's completed (UTC) day; null when not available (today, no key, error).
+    public async Task<DailySummaryDto?> GetDaySummaryAsync(int channelId, string date)
+    {
+        try { return await _http.GetFromJsonAsync<DailySummaryDto>($"api/channels/{channelId}/summary?date={date}"); }
+        catch { return null; }
+    }
+
     public Task<List<MessageDto>?> SearchMessagesAsync(int channelId, string query) =>
         _http.GetFromJsonAsync<List<MessageDto>>(
             $"api/channels/{channelId}/messages/search?q={Uri.EscapeDataString(query)}");

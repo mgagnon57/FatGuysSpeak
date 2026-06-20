@@ -191,6 +191,17 @@ public class UserBlock
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+// One PorkChop recap per channel per completed (UTC) day, generated lazily on first view and cached.
+public class DailyChatSummary
+{
+    public int Id { get; set; }
+    public int ChannelId { get; set; }
+    public DateTime Date { get; set; }            // UTC calendar day (date component) being summarized
+    public string Summary { get; set; } = "";
+    public int MessageCount { get; set; }
+    public DateTime GeneratedAt { get; set; } = DateTime.UtcNow;
+}
+
 public class AuditLog
 {
     public int Id { get; set; }
