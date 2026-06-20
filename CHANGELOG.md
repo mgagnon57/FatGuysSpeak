@@ -18,6 +18,26 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
   and a local release.ps1.
 - Update notifications: the server polls GitHub Releases and shows a dashboard banner when
   behind; the client shows a dismissible "update available" banner via GET /api/update-status.
+- PorkChop, an AI sidekick: mention @PorkChop for an answer or advice. It reads the recent
+  conversation — and any shared image, via vision — for context, stays on topic across a
+  back-and-forth, and posts under the @PorkChop name so it reads as distinct from members.
+- Daily recaps: PorkChop summarizes each completed day per channel, with text chat and voice
+  transcripts summarized as separate streams. Days are collapsible with a drill-in to the
+  original messages, and recaps pre-generate nightly so they open instantly.
+- Load earlier messages: page back through older channel history on demand.
+- Weekly digest: once a week PorkChop posts a cross-channel "what happened this week" recap
+  into the server's main channel.
+- Catch me up: one tap for a personal recap of everything you missed since you were last
+  online, scoped to the chat source you're viewing.
+- In-channel polls: drop a poll with up to ten options; vote, switch, or retract, with live
+  result bars, counts, and percentages for the whole channel.
+- Desktop notifications: native Windows toast pop-ups for @mentions and DMs when the app is
+  minimized or in the background.
+- PorkChop roasts (private, opt-in fun): it welcomes people as they join and calls out voice
+  channels that have gone silent, with personalized ribbing learned from each person's own
+  text and voice chat, what others say about them, and the nicknames they actually go by. It
+  can speak the roast aloud in the voice channel via ElevenLabs text-to-speech, rotating
+  through multiple voices. Tone and the join/idle behaviours are configurable.
 
 ### Changed
 - Roles simplified to a flat Member/Admin model — the Moderator role was removed (a finer-grained
@@ -25,12 +45,21 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
   Member and rewrites any Moderator-restricted channel permission to Admin.
 - The per-server default (Lobby) channel can be renamed but not deleted; the dashboard
   "Kick Voice" action now authoritatively removes the user from voice and bumps them to Lobby.
+- The Voice tab is hidden in the client; voice is still captured and transcribed in the
+  background and feeds PorkChop's recaps and roasts.
+- Buttons and icon controls now highlight on mouse-over.
+- Message rendering now displays Markdown lists and headings (previously dropped silently).
+- Release builds produce a fully self-contained server installer with the .NET runtime bundled
+  (like the client), so target machines need no .NET install.
 
 ### Fixed
 - New channels could collide on a recycled id and surface a deleted channel's messages; channel
   ids are now allocated from a monotonic counter that never reuses a value.
 - Moving a member between channels intermittently did nothing on the first attempt — the target's
   channel switch now runs on the UI thread, so it lands every time.
+- PorkChop's spoken voice no longer stutters — it buffers a short lead on the client instead of
+  pacing each frame with an imprecise timer.
+- Expanding a past day's chat no longer jumps the view to the bottom.
 
 ## [1.1.0] - 2026-06-16
 ### Added
