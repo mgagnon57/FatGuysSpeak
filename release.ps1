@@ -52,16 +52,32 @@ Write-Host "Building $Version..." -ForegroundColor Cyan
 dotnet build (Join-Path $root 'FatGuysSpeak.Server') -c Release --framework net9.0; if ($LASTEXITCODE) { throw 'server net9.0 build failed' }
 dotnet build (Join-Path $root 'FatGuysSpeak.Server') -c Release --framework net9.0-windows10.0.19041.0; if ($LASTEXITCODE) { throw 'server windows build failed' }
 dotnet build (Join-Path $root 'FatGuysSpeak.Client') -c Release --framework net9.0-windows10.0.19041.0; if ($LASTEXITCODE) { throw 'client build failed' }
-dotnet build (Join-Path $root 'FatGuysSpeak.Installer') -c Release --framework net9.0-windows10.0.19041.0; if ($LASTEXITCODE) { throw 'installer build failed' }
+
+# Server installer: publish the server SELF-CONTAINED (bundles the .NET runtime + native SQLite +
+# WebView2 loader, so the target machine needs no .NET install), zip it, then publish the installer
+# single-file/self-contained — which embeds that bundle. A plain 'dotnet build' here would ship an
+# installer with no embedded server, so always go through this publish path.
+Write-Host "Publishing self-contained server + installer..." -ForegroundColor Cyan
+$serverFiles = Join-Path $root 'release-staging\server-files'
+Remove-Item -Recurse -Force $serverFiles -ErrorAction SilentlyContinue
+dotnet publish (Join-Path $root 'FatGuysSpeak.Server') -c Release -f net9.0-windows10.0.19041.0 `
+    -r win-x64 --self-contained true -o $serverFiles --nologo; if ($LASTEXITCODE) { throw 'server publish failed' }
+$bundleZip = Join-Path $root 'FatGuysSpeak.Installer\server-bundle.zip'
+Remove-Item $bundleZip -ErrorAction SilentlyContinue
+Compress-Archive -Path (Join-Path $serverFiles '*') -DestinationPath $bundleZip -CompressionLevel Optimal
+$installerPub = Join-Path $root 'release-output\installer-pub'
+Remove-Item -Recurse -Force $installerPub -ErrorAction SilentlyContinue
+dotnet publish (Join-Path $root 'FatGuysSpeak.Installer') -c Release -f net9.0-windows10.0.19041.0 `
+    -r win-x64 --self-contained true -o $installerPub --nologo; if ($LASTEXITCODE) { throw 'installer publish failed' }
+Remove-Item $bundleZip -ErrorAction SilentlyContinue   # don't leave the bundle lying around
 
 # 7. Collect versioned artifacts into release-output/ (gitignored). Fail loudly if an
 #    expected artifact is missing (the Release build emits into a RID subfolder that
 #    differs per project: installer -> win-x64, client -> win10-x64), so search for it.
 $out = Join-Path $root 'release-output'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
-$setup = Get-ChildItem -Path (Join-Path $root 'FatGuysSpeak.Installer\bin\Release') -Recurse -Filter 'FatGuysSpeak-Server-Setup.exe' -ErrorAction SilentlyContinue |
-    Select-Object -First 1 -ExpandProperty FullName
-if (-not $setup) { throw 'Installer exe not found under FatGuysSpeak.Installer\bin\Release after build.' }
+$setup = Join-Path $installerPub 'FatGuysSpeak-Server-Setup.exe'
+if (-not (Test-Path $setup)) { throw "Self-contained installer exe not found at $setup after publish." }
 Copy-Item $setup (Join-Path $out "FatGuysSpeak-Server-Setup-$Version.exe") -Force
 $clientDir = Join-Path $root 'FatGuysSpeak.Client\bin\Release\net9.0-windows10.0.19041.0\win10-x64'
 if (-not (Test-Path $clientDir)) { throw "Client build output not found at $clientDir." }
