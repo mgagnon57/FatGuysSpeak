@@ -507,6 +507,65 @@ public class BotServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task LearnAliases_StoresInferredAlias()
+    {
+        var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var op = new User { Username = "Operator", Email = "op@test.local", PasswordHash = "!" };
+        _db.Db.Users.Add(op);
+        await _db.Db.SaveChangesAsync();
+        _db.Db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = op.Id, Role = ServerRole.Member });
+        for (var i = 0; i < 12; i++)
+            _db.Db.Messages.Add(new Message { Content = $"medic where you at {i}", AuthorId = owner.Id, ChannelId = channel.Id, Source = MessageSource.Text });
+        await _db.Db.SaveChangesAsync();
+
+        var json = "{\"users\":[{\"username\":\"Operator\",\"aliases\":[\"Medic\"]}]}";
+        var svc = MakeBotService(MakeHttpFactory(json), MakeConfig());
+        await svc.LearnAliasesAsync(server.Id);
+
+        Assert.True(_db.Db.UserAliases.Any(a => a.UserId == op.Id && a.Alias == "Medic"));
+    }
+
+    [Fact]
+    public async Task Dossier_UsesLearnedAliasToAttributeOthersTalk()
+    {
+        var (server, _) = await SeedJoinScenarioAsync();
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var op  = new User { Username = "Operator", Email = "op@test.local", PasswordHash = "!" };
+        var ally = new User { Username = "alice",   Email = "alice2@test.local", PasswordHash = "!" };
+        _db.Db.Users.AddRange(op, ally);
+        await _db.Db.SaveChangesAsync();
+        _db.Db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = op.Id, Role = ServerRole.Member });
+        _db.Db.UserAliases.Add(new UserAlias { UserId = op.Id, Alias = "Medic" });
+        // alice addresses him as Medic — should be attributed to Operator via the learned alias.
+        _db.Db.Messages.Add(new Message { Content = "Medic you patching tonight or what", AuthorId = ally.Id, ChannelId = channel.Id, Source = MessageSource.Text });
+        await _db.Db.SaveChangesAsync();
+
+        HttpRequestMessage? captured = null;
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(() => new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content    = new StringContent(
+                    JsonSerializer.Serialize(new { content = new[] { new { type = "text", text = "welcome" } } }),
+                    System.Text.Encoding.UTF8, "application/json")
+            });
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient("anthropic"))
+               .Returns(new HttpClient(handler.Object) { BaseAddress = new Uri("https://api.anthropic.com/v1/") });
+
+        var svc = MakeBotService(factory.Object, MakeConfig());
+        await svc.AnnounceJoinAsync(op.Id, awaySince: DateTime.UtcNow.AddHours(-2));
+
+        var body = await captured!.Content!.ReadAsStringAsync();
+        Assert.Contains("also goes by", body);                     // alias surfaced in the dossier
+        Assert.Contains("Medic you patching tonight", body);       // others-talk matched via the alias
+    }
+
+    [Fact]
     public async Task AnnounceJoin_QuickReconnect_PostsNothing()
     {
         var (_, joiner) = await SeedJoinScenarioAsync();

@@ -248,6 +248,16 @@ public class PollVote
     public int UserId { get; set; }   // one vote per (PollId, UserId)
 }
 
+// A nickname/alias PorkChop has learned that a user goes by (e.g. username "Operator" but the crew
+// calls them "Medic"). Inferred from conversation; used to attribute "what others say about them".
+public class UserAlias
+{
+    public int Id { get; set; }
+    public int UserId { get; set; }
+    public string Alias { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 public class AuditLog
 {
     public int Id { get; set; }

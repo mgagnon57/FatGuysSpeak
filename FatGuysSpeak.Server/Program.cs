@@ -230,6 +230,7 @@ builder.Services.AddHttpClient("elevenlabs", c =>
 });
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.TtsService>();
 builder.Services.AddHostedService<FatGuysSpeak.Server.Services.IdleNudgeService>();
+builder.Services.AddHostedService<FatGuysSpeak.Server.Services.AliasLearningService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.SessionBlacklistService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.WebhookDeliveryService>();
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.AutomodService>();
@@ -798,6 +799,9 @@ using (var scope = app.Services.CreateScope())
         ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""PollOptions"" (""Id"" SERIAL PRIMARY KEY, ""PollId"" INTEGER NOT NULL, ""Text"" TEXT NOT NULL DEFAULT '', ""Position"" INTEGER NOT NULL DEFAULT 0)");
         ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""PollVotes"" (""Id"" SERIAL PRIMARY KEY, ""PollId"" INTEGER NOT NULL, ""OptionId"" INTEGER NOT NULL, ""UserId"" INTEGER NOT NULL)");
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_PollVotes_Poll_User"" ON ""PollVotes"" (""PollId"", ""UserId"")");
+
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS ""UserAliases"" (""Id"" SERIAL PRIMARY KEY, ""UserId"" INTEGER NOT NULL, ""Alias"" TEXT NOT NULL DEFAULT '', ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW())");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserAliases_User_Alias"" ON ""UserAliases"" (""UserId"", ""Alias"")");
     }
     else
     {
@@ -830,6 +834,9 @@ using (var scope = app.Services.CreateScope())
         ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS PollOptions (Id INTEGER PRIMARY KEY AUTOINCREMENT, PollId INTEGER NOT NULL, Text TEXT NOT NULL DEFAULT '', Position INTEGER NOT NULL DEFAULT 0)");
         ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS PollVotes (Id INTEGER PRIMARY KEY AUTOINCREMENT, PollId INTEGER NOT NULL, OptionId INTEGER NOT NULL, UserId INTEGER NOT NULL)");
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_PollVotes_Poll_User ON PollVotes (PollId, UserId)");
+
+        ctx.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS UserAliases (Id INTEGER PRIMARY KEY AUTOINCREMENT, UserId INTEGER NOT NULL, Alias TEXT NOT NULL DEFAULT '', CreatedAt TEXT NOT NULL DEFAULT (datetime('now')))");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_UserAliases_User_Alias ON UserAliases (UserId, Alias)");
     }
 
     // Role simplification: the Moderator role (1) was removed in favour of a flat Admin/Member

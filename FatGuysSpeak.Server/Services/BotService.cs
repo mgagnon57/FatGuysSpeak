@@ -112,7 +112,8 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
     }
 
     // Everything PorkChop knows about one person, for a roast: their bio, their own recent text/voice
-    // chat, and recent things OTHER people said that mention them by name.
+    // chat, the aliases they go by, and recent things OTHER people said that mention them (by username
+    // OR a learned alias).
     private static async Task<string> BuildUserDossierAsync(AppDbContext db, User user, List<int> serverIds)
     {
         var own = await db.Messages
@@ -122,38 +123,107 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
             .Select(m => m.Content).ToListAsync();
         own.Reverse();
 
-        var others = await WhatOthersSaidAboutAsync(db, user, serverIds);
+        var aliases = await db.UserAliases.Where(a => a.UserId == user.Id).Select(a => a.Alias).ToListAsync();
+        var names = new List<string> { user.Username };
+        names.AddRange(aliases);
+        var others = await WhatOthersSaidAboutAsync(db, user, names, serverIds);
 
         var lines = new List<string> { user.Username };
+        if (aliases.Count > 0) lines.Add("  also goes by: " + string.Join(", ", aliases));
         if (!string.IsNullOrWhiteSpace(user.Bio)) lines.Add($"  bio: {user.Bio}");
         lines.Add(own.Count > 0 ? "  what they talk about: " + string.Join(" | ", own) : "  (not much on record yet)");
         if (others.Count > 0) lines.Add("  what others say to/about them: " + string.Join(" | ", others));
         return string.Join("\n", lines);
     }
 
-    // Recent messages from OTHER people that mention this user by name (whole word, case-insensitive,
-    // matches typed or voice-transcribed names). Skips very short usernames to avoid matching everything.
-    private static async Task<List<string>> WhatOthersSaidAboutAsync(AppDbContext db, User user, List<int> serverIds)
+    // Recent messages from OTHER people that mention this user by any of their names (username +
+    // learned aliases), whole-word and case-insensitive so it catches them typed or voice-transcribed.
+    // Names shorter than 3 chars are skipped to avoid matching basically everything.
+    private static async Task<List<string>> WhatOthersSaidAboutAsync(AppDbContext db, User user, List<string> names, List<int> serverIds)
     {
-        if (user.Username.Length < 3) return [];
+        var match = names.Where(n => n.Length >= 3).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (match.Count == 0) return [];
 
-        var lower = user.Username.ToLower();
-        var candidates = await db.Messages
+        var recent = await db.Messages
             .Where(m => m.AuthorId != user.Id && !m.IsDeleted
                         && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice)
-                        && serverIds.Contains(m.Channel.ServerId)
-                        && m.Content.ToLower().Contains(lower))     // cheap, cross-DB prefilter
-            .OrderByDescending(m => m.CreatedAt).Take(60)
+                        && serverIds.Contains(m.Channel.ServerId))
+            .OrderByDescending(m => m.CreatedAt).Take(200)
             .Select(m => new { Author = m.Author.Username, m.Content })
             .ToListAsync();
 
-        var rx = new System.Text.RegularExpressions.Regex(
-            $@"\b{System.Text.RegularExpressions.Regex.Escape(user.Username)}\b",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        var hits = candidates.Where(c => rx.IsMatch(c.Content)).Take(15)
+        var rxs = match.Select(n => new System.Text.RegularExpressions.Regex(
+            $@"\b{System.Text.RegularExpressions.Regex.Escape(n)}\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase)).ToList();
+        var hits = recent.Where(c => rxs.Any(r => r.IsMatch(c.Content))).Take(15)
             .Select(c => $"{c.Author}: {c.Content}").ToList();
         hits.Reverse();
         return hits;
+    }
+
+    private const string AliasSystem = "You extract nicknames/aliases from a group chat. You're given the real usernames and a transcript. Find cases where someone is clearly referred to by a name that is NOT their username — a nickname they respond to, or that context makes clearly about a specific real user. Be conservative: only include aliases you're confident map to one specific real user. Output ONLY JSON (no prose, no code fences): {\"users\":[{\"username\":\"<real username>\",\"aliases\":[\"<alias>\"]}]}. Use only usernames from the provided list, and don't list a username's own name as an alias.";
+
+    private record AliasMap(List<AliasEntry>? Users);
+    private record AliasEntry(string? Username, List<string>? Aliases);
+    private static readonly System.Text.Json.JsonSerializerOptions AliasJsonOpts = new() { PropertyNameCaseInsensitive = true };
+
+    /// <summary>Reads a server's recent chat and asks Claude which nicknames/aliases people go by,
+    /// storing any new ones. Conservative and idempotent. No-op without an API key or enough chat.</summary>
+    public async Task LearnAliasesAsync(int serverId)
+    {
+        if (string.IsNullOrEmpty(_apiKey)) return;
+
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var since = DateTime.UtcNow.AddDays(-30);
+        var lines = await db.Messages
+            .Where(m => !m.IsDeleted && m.Source != MessageSource.AI && m.Channel.ServerId == serverId && m.CreatedAt >= since)
+            .OrderByDescending(m => m.CreatedAt).Take(150)
+            .Select(m => new { User = m.Author.Username, m.Content })
+            .ToListAsync();
+        if (lines.Count < 10) return;   // not enough conversation to infer reliably
+        lines.Reverse();
+
+        var members = await (from sm in db.ServerMembers where sm.ServerId == serverId select sm.User).ToListAsync();
+        var idByName = members.ToDictionary(u => u.Username, u => u.Id, StringComparer.OrdinalIgnoreCase);
+        var usernames = new HashSet<string>(members.Select(u => u.Username), StringComparer.OrdinalIgnoreCase);
+
+        var transcript = string.Join("\n", lines.Select(l => $"{l.User}: {l.Content}"));
+        var prompt = "Real usernames: " + string.Join(", ", usernames) + "\n\nTranscript:\n" + transcript;
+        var reply = await PostToClaudeAsync(AliasSystem, prompt);
+        if (reply is null) return;
+
+        AliasMap? map;
+        try { map = System.Text.Json.JsonSerializer.Deserialize<AliasMap>(ExtractJson(reply), AliasJsonOpts); }
+        catch { return; }
+        if (map?.Users is null) return;
+
+        var added = 0;
+        foreach (var entry in map.Users)
+        {
+            if (entry.Username is null || entry.Aliases is null) continue;
+            if (!idByName.TryGetValue(entry.Username, out var uid)) continue;
+            foreach (var raw in entry.Aliases)
+            {
+                var alias = raw?.Trim() ?? "";
+                if (alias.Length < 3) continue;
+                if (usernames.Contains(alias)) continue;   // alias collides with a real username — skip
+                if (await db.UserAliases.AnyAsync(a => a.UserId == uid && a.Alias.ToLower() == alias.ToLower())) continue;
+                db.UserAliases.Add(new UserAlias { UserId = uid, Alias = alias });
+                added++;
+            }
+        }
+        if (added > 0)
+            try { await db.SaveChangesAsync(); } catch { /* unique race — ignore */ }
+    }
+
+    // Pull the JSON object out of a model reply, tolerating stray prose or code fences around it.
+    private static string ExtractJson(string s)
+    {
+        var start = s.IndexOf('{');
+        var end = s.LastIndexOf('}');
+        return start >= 0 && end > start ? s[start..(end + 1)] : s;
     }
 
     /// <summary>Posts a PorkChop welcome/roast into the user's main channel when they join the chat.
