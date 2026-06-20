@@ -12,15 +12,24 @@ namespace FatGuysSpeak.Server.Services;
 /// </summary>
 public class TtsService(IHttpClientFactory httpFactory, IConfiguration config, IHubContext<ChatHub> hub, ILogger<TtsService> logger)
 {
-    private readonly string _apiKey  = config["ElevenLabs:ApiKey"]  ?? "";
-    private readonly string _voiceId = config["ElevenLabs:VoiceId"] ?? "";
-    private readonly string _model   = config["ElevenLabs:Model"]   ?? "eleven_turbo_v2_5";
+    private readonly string   _apiKey   = config["ElevenLabs:ApiKey"] ?? "";
+    private readonly string[] _voiceIds = ResolveVoiceIds(config);   // PorkChop picks one at random per line
+    private readonly string   _model    = config["ElevenLabs:Model"] ?? "eleven_turbo_v2_5";
 
     private const int ElevenRate   = 24000;   // request PCM from ElevenLabs at 24 kHz
     private const int VoiceRate    = 48000;   // FatGuysSpeak voice pipeline sample rate
     private const int FrameSamples = 960;     // 20 ms @ 48 kHz, matching the client
 
-    public bool Enabled => !string.IsNullOrEmpty(_apiKey) && !string.IsNullOrEmpty(_voiceId);
+    public bool Enabled => !string.IsNullOrEmpty(_apiKey) && _voiceIds.Length > 0;
+
+    // Combine the VoiceIds array and the single VoiceId (backward compat), deduped, non-empty.
+    public static string[] ResolveVoiceIds(IConfiguration config)
+    {
+        var ids = config.GetSection("ElevenLabs:VoiceIds").Get<string[]>()?.ToList() ?? [];
+        var single = config["ElevenLabs:VoiceId"];
+        if (!string.IsNullOrWhiteSpace(single)) ids.Add(single);
+        return ids.Select(v => v?.Trim() ?? "").Where(v => v.Length > 0).Distinct().ToArray();
+    }
 
     public async Task SpeakIntoVoiceChannelAsync(int channelId, string text)
     {
@@ -38,7 +47,8 @@ public class TtsService(IHttpClientFactory httpFactory, IConfiguration config, I
     private async Task<byte[]?> SynthesizeAsync(string text)
     {
         var client = httpFactory.CreateClient("elevenlabs");
-        var req = new HttpRequestMessage(HttpMethod.Post, $"v1/text-to-speech/{_voiceId}?output_format=pcm_{ElevenRate}")
+        var voiceId = _voiceIds[Random.Shared.Next(_voiceIds.Length)];   // different voice each time
+        var req = new HttpRequestMessage(HttpMethod.Post, $"v1/text-to-speech/{voiceId}?output_format=pcm_{ElevenRate}")
         {
             Content = JsonContent.Create(new { text, model_id = _model }),
         };

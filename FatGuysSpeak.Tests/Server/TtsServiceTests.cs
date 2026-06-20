@@ -1,9 +1,41 @@
 using FatGuysSpeak.Server.Services;
+using Microsoft.Extensions.Configuration;
 
 namespace FatGuysSpeak.Tests.Server;
 
 public class TtsServiceTests
 {
+    private static IConfiguration Config(Dictionary<string, string?> kv) =>
+        new ConfigurationBuilder().AddInMemoryCollection(kv).Build();
+
+    [Fact]
+    public void ResolveVoiceIds_CombinesArrayAndSingle_Deduped()
+    {
+        var cfg = Config(new()
+        {
+            ["ElevenLabs:VoiceIds:0"] = "voiceA",
+            ["ElevenLabs:VoiceIds:1"] = "voiceB",
+            ["ElevenLabs:VoiceId"]    = "voiceA",   // duplicate of the array entry
+        });
+
+        var ids = TtsService.ResolveVoiceIds(cfg);
+
+        Assert.Equal(new[] { "voiceA", "voiceB" }, ids);   // deduped, single folded in
+    }
+
+    [Fact]
+    public void ResolveVoiceIds_FallsBackToSingleVoiceId()
+    {
+        var ids = TtsService.ResolveVoiceIds(Config(new() { ["ElevenLabs:VoiceId"] = "only-one" }));
+        Assert.Equal(new[] { "only-one" }, ids);
+    }
+
+    [Fact]
+    public void ResolveVoiceIds_NoneConfigured_ReturnsEmpty()
+    {
+        Assert.Empty(TtsService.ResolveVoiceIds(Config(new())));
+    }
+
     [Fact]
     public void Resample_24kTo48k_DoublesLengthAndKeepsKeyframes()
     {
