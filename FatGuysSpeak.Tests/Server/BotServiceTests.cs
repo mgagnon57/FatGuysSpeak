@@ -433,6 +433,18 @@ public class BotServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task AnnounceJoin_DropsRefusalInsteadOfPosting()
+    {
+        var (_, joiner) = await SeedJoinScenarioAsync();
+        // If the model wimps out, PorkChop stays silent rather than posting the refusal.
+        var svc = MakeBotService(MakeHttpFactory("I'm not comfortable writing that kind of roast."), MakeConfig());
+
+        await svc.AnnounceJoinAsync(joiner.Id, awaySince: DateTime.UtcNow.AddHours(-2));
+
+        Assert.False(AnyAnnouncement());
+    }
+
+    [Fact]
     public async Task AnnounceJoin_FeedsUsersOwnChatHistoryToClaude()
     {
         var (server, joiner) = await SeedJoinScenarioAsync();
