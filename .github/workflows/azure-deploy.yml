@@ -1,35 +1,17 @@
-name: Deploy server to Azure App Service
-
-# Manual trigger only — deploys are intentional, never a surprise prod push on a commit.
-# Run from the Actions tab once AZURE_WEBAPP_NAME below and the publish-profile secret are set.
+name: deploy-server-azure
 on:
-  workflow_dispatch:
-
-env:
-  AZURE_WEBAPP_NAME: fatguysspeak-server        # <-- set to your App Service name
-  DOTNET_VERSION: '9.0.x'
-
+  workflow_dispatch: {}
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      # Headless Linux build. The project multi-targets net9.0 and net9.0-windows; -f net9.0
-      # builds only the Linux target (the Windows/WPF target can't and shouldn't build here).
-      # EnableWindowsTargeting lets the Linux SDK resolve the project's net9.0-windows target's
-      # references during restore without building it (we build only net9.0). Without it the SDK
-      # errors NETSDK1100 on Linux.
-      - name: Publish (headless net9.0)
-        run: dotnet publish FatGuysSpeak.Server/FatGuysSpeak.Server.csproj -c Release -f net9.0 -p:EnableWindowsTargeting=true -o "${{ github.workspace }}/publish"
-
-      - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
+          dotnet-version: '9.0.x'
+      - run: dotnet publish FatGuysSpeak.Server/FatGuysSpeak.Server.csproj -c Release -f net9.0 -p:EnableWindowsTargeting=true -o ${{ github.workspace }}/publish
+      - uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          app-name: fatguysspeak-server
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ${{ github.workspace }}/publish
