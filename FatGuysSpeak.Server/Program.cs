@@ -1069,10 +1069,18 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseAuthentication();
 app.Use(async (ctx, next) =>
 {
-    var isAdmin = ctx.Request.Path.StartsWithSegments("/api/admin");
+    if (ctx.Request.Path.StartsWithSegments("/api/admin"))
+    {
+        var cookiePresent = ctx.Request.Cookies.ContainsKey(".FatGuysSpeak.Dashboard");
+        ctx.Response.OnStarting(() =>
+        {
+            ctx.Response.Headers["X-Dbg-Cookie"] = cookiePresent.ToString();
+            ctx.Response.Headers["X-Dbg-UserAuthed"] = (ctx.User?.Identity?.IsAuthenticated ?? false).ToString();
+            ctx.Response.Headers["X-Dbg-AuthType"] = ctx.User?.Identity?.AuthenticationType ?? "none";
+            return Task.CompletedTask;
+        });
+    }
     await next();
-    if (isAdmin)
-        Console.WriteLine($"[DBG] status={ctx.Response.StatusCode} userAuthed={ctx.User?.Identity?.IsAuthenticated} authType={ctx.User?.Identity?.AuthenticationType} cookie={ctx.Request.Cookies.ContainsKey(".FatGuysSpeak.Dashboard")}");
 });
 app.UseAuthorization();
 app.MapControllers();
