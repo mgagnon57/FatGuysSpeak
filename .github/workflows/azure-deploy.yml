@@ -1,0 +1,33 @@
+name: Deploy server to Azure App Service
+
+# Manual trigger only — deploys are intentional, never a surprise prod push on a commit.
+# Run from the Actions tab once AZURE_WEBAPP_NAME below and the publish-profile secret are set.
+on:
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: fatguysspeak-server        # <-- set to your App Service name
+  DOTNET_VERSION: '9.0.x'
+  PUBLISH_DIR: ${{ github.workspace }}/publish
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Headless Linux build. The project multi-targets net9.0 and net9.0-windows; -f net9.0
+      # builds only the Linux target (the Windows/WPF target can't and shouldn't build here).
+      - name: Publish (headless net9.0)
+        run: dotnet publish FatGuysSpeak.Server/FatGuysSpeak.Server.csproj -c Release -f net9.0 -o "${{ env.PUBLISH_DIR }}"
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ env.PUBLISH_DIR }}

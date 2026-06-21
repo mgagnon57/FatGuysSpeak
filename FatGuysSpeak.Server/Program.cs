@@ -997,11 +997,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-// Forward proxy headers ONLY when actually behind a cloud proxy (Railway sets DATABASE_URL,
-// and strips/overwrites client-supplied X-Forwarded-For at its edge). When running directly
-// (local/self-hosted), do NOT trust forwarded headers — otherwise any client could spoof its
-// IP, defeating per-IP rate limits and the dashboard's loopback (IsLocal) check.
-if (!string.IsNullOrEmpty(databaseUrl))
+// Forward proxy headers ONLY when actually behind a cloud proxy that strips/overwrites
+// client-supplied X-Forwarded-For at its edge: Railway (sets DATABASE_URL), Azure App Service
+// (sets WEBSITE_SITE_NAME), or any other proxied host via an explicit opt-in. When running
+// directly (local/self-hosted), do NOT trust forwarded headers — otherwise any client could
+// spoof its IP, defeating per-IP rate limits and the dashboard's loopback (IsLocal) check.
+// Without this, an Azure deploy using SQLite (no DATABASE_URL) would see every request as the
+// proxy's IP and the auth rate limiter would throttle all users together.
+var trustForwarded = Environment.GetEnvironmentVariable("TRUST_FORWARDED_HEADERS");
+var behindProxy = !string.IsNullOrEmpty(databaseUrl)
+    || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"))
+    || trustForwarded is "1" or "true" or "TRUE";
+if (behindProxy)
 {
     var forwardedOptions = new ForwardedHeadersOptions
     {

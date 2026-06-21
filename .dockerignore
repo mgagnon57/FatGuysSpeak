@@ -1,0 +1,16 @@
+**/bin
+**/obj
+release-output
+release-staging
+release-zips
+FatGuysSpeak.Client
+FatGuysSpeak.Tests
+FatGuysSpeak.Installer
+*.db
+*.db-shm
+*.db-wal
+**/appsettings.Development.json
+.git
+.github
+docs
+website
