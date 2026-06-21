@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using FatGuysSpeak.Server.Data;
 using FatGuysSpeak.Server.Hubs;
 using FatGuysSpeak.Server.Services;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -1066,6 +1067,13 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 app.UseAuthentication();
+app.Use(async (ctx, next) =>
+{
+    var isAdmin = ctx.Request.Path.StartsWithSegments("/api/admin");
+    await next();
+    if (isAdmin)
+        Console.WriteLine($"[DBG] status={ctx.Response.StatusCode} userAuthed={ctx.User?.Identity?.IsAuthenticated} authType={ctx.User?.Identity?.AuthenticationType} cookie={ctx.Request.Cookies.ContainsKey(".FatGuysSpeak.Dashboard")}");
+});
 app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/api/version", () =>
