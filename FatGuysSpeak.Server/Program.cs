@@ -226,8 +226,15 @@ builder.Services.AddRateLimiter(opt =>
 builder.Services.AddAuthorization(opt =>
 {
     opt.AddPolicy("DashboardAdmin", policy =>
-        policy.AddAuthenticationSchemes("Dashboard")
-              .RequireAuthenticatedUser());
+        // Authorize off the principal UseAuthentication already resolved (the SmartBearer scheme routes
+        // the dashboard cookie to the "Dashboard" handler), and require it specifically be a Dashboard
+        // identity — not just any authenticated user, so a regular JWT user can't reach admin endpoints.
+        // We deliberately do NOT AddAuthenticationSchemes("Dashboard") here: that makes the authorization
+        // middleware re-authenticate the cookie a second time, which intermittently failed on Azure and
+        // returned 403 even though the user was correctly authenticated.
+        policy.RequireAssertion(ctx =>
+            ctx.User.Identity?.IsAuthenticated == true &&
+            ctx.User.Identity.AuthenticationType == "Dashboard"));
 });
 builder.Services.AddControllers();
 builder.Services.AddHttpClient("preview", c =>
