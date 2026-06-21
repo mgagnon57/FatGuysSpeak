@@ -4,6 +4,12 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) and the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ## [Unreleased]
+### Added
+- PorkChop voice toggle: a speaker button next to "Ask PorkChop" turns his spoken
+  voice replies on or off. Default on; when off, @PorkChop answers in text only.
+- "Remember me" on the login page: saves your username and password (the password
+  in encrypted storage) and pre-fills them on the next launch. Unchecking it wipes
+  the saved credentials.
 
 ## [0.9.0] - 2026-06-21
 ### Added

@@ -515,12 +515,19 @@
                                    VerticalOptions="Center"
                                    IsVisible="{Binding CurrentChannelHasSlowmode}" />
                         </HorizontalStackLayout>
-                        <Button Grid.Column="2" Text="🐷 Ask PorkChop"
-                                Command="{Binding AskPorkChopCommand}"
-                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
-                                FontSize="12" HeightRequest="34" Padding="8,0"
-                                ToolTipProperties.Text="Ask PorkChop a question"
-                                IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}" />
+                        <HorizontalStackLayout Grid.Column="2" Spacing="0" VerticalOptions="Center"
+                                IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}">
+                            <Button Text="{Binding PorkChopVoiceIcon}"
+                                    Command="{Binding TogglePorkChopVoiceCommand}"
+                                    BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
+                                    FontSize="14" HeightRequest="34" WidthRequest="34" Padding="0"
+                                    ToolTipProperties.Text="PorkChop voice on/off (off = text replies only)" />
+                            <Button Text="🐷 Ask PorkChop"
+                                    Command="{Binding AskPorkChopCommand}"
+                                    BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
+                                    FontSize="12" HeightRequest="34" Padding="8,0"
+                                    ToolTipProperties.Text="Ask PorkChop a question" />
+                        </HorizontalStackLayout>
                         <Button Grid.Column="3" Text="🗞"
                                 Command="{Binding CatchMeUpCommand}"
                                 IsEnabled="{Binding IsCatchingUp, Converter={StaticResource InvertBoolConverter}}"

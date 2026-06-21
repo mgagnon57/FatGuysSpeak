@@ -45,6 +45,16 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private bool _isLoadingOlder;
     [ObservableProperty] private bool _hasMoreHistory;
 
+    // When off, @PorkChop answers in text only (no spoken voice reply). Defaults on; persisted.
+    [ObservableProperty] private bool _porkChopVoice = Preferences.Get("porkchop_voice", true);
+    public string PorkChopVoiceIcon => PorkChopVoice ? "🔊" : "🔇";
+    partial void OnPorkChopVoiceChanged(bool value)
+    {
+        Preferences.Set("porkchop_voice", value);
+        OnPropertyChanged(nameof(PorkChopVoiceIcon));
+    }
+    [RelayCommand] private void TogglePorkChopVoice() => PorkChopVoice = !PorkChopVoice;
+
     [ObservableProperty] private ObservableCollection<ServerViewItem> _servers = [];
     [ObservableProperty] private ObservableCollection<ChannelViewItem> _channels = [];
     private List<CategoryDto> _serverCategories = [];
@@ -1351,7 +1361,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         }
         var replyToId = _replyingToItem?.Message.Id;
         CancelReply();
-        var (msg, err) = await api.SendMessageAsync(SelectedChannel.Id, text, source, attachmentUrl, replyToId, attachmentFileName);
+        var (msg, err) = await api.SendMessageAsync(SelectedChannel.Id, text, source, attachmentUrl, replyToId, attachmentFileName, speakReply: PorkChopVoice);
         if (msg is not null)
         {
             var item = Wire(new MessageViewItem(msg, api.CurrentUsername, api.CurrentUserId));

@@ -25,7 +25,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
     // How long a user must have been gone before a (re)join is roasted, and the per-user dedupe window.
     private readonly TimeSpan _joinCooldown = TimeSpan.FromMinutes(config.GetValue("PorkChop:JoinCooldownMinutes", 10));
 
-    public async Task RespondAsync(int channelId, int serverId, string triggerContent, int? speakerUserId = null)
+    public async Task RespondAsync(int channelId, int serverId, string triggerContent, int? speakerUserId = null, bool speak = true)
     {
         if (string.IsNullOrEmpty(_apiKey) || BotUserId == 0)
         {
@@ -80,7 +80,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         // If the person who asked is sitting in this channel's voice, talk back out loud too — this is
         // what makes "@PorkChop" said over voice (transcribed to text) get an audible answer.
-        if (_speakReplies && tts.Enabled && speakerUserId is int sid
+        if (speak && _speakReplies && tts.Enabled && speakerUserId is int sid
             && ChatHub.VoiceChannelSnapshot.TryGetValue(sid, out var vc) && vc == channelId)
             _ = tts.SpeakIntoVoiceChannelAsync(channelId, reply);
     }

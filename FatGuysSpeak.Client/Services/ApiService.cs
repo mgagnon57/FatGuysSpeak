@@ -193,9 +193,9 @@ public class ApiService
         _http.GetFromJsonAsync<List<MessageDto>>(
             $"api/channels/{channelId}/messages/search?q={Uri.EscapeDataString(query)}");
 
-    public async Task<(MessageDto? Dto, string? Error)> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text, string? attachmentUrl = null, int? replyToId = null, string? attachmentFileName = null, int? threadId = null)
+    public async Task<(MessageDto? Dto, string? Error)> SendMessageAsync(int channelId, string content, MessageSource source = MessageSource.Text, string? attachmentUrl = null, int? replyToId = null, string? attachmentFileName = null, int? threadId = null, bool speakReply = true)
     {
-        var resp = await _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source, attachmentUrl, replyToId, attachmentFileName, threadId));
+        var resp = await _http.PostAsJsonAsync($"api/channels/{channelId}/messages", new SendMessageRequest(content, source, attachmentUrl, replyToId, attachmentFileName, threadId, speakReply));
         if (resp.IsSuccessStatusCode)
             return (await resp.Content.ReadFromJsonAsync<MessageDto>(), null);
         return (null, await resp.Content.ReadAsStringAsync());

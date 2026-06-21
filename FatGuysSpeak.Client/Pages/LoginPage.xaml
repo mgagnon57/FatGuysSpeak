@@ -26,6 +26,11 @@
                    PlaceholderColor="{DynamicResource ThemeTextMuted}" TextColor="{DynamicResource ThemeTextPrimary}" BackgroundColor="{DynamicResource ThemeBgInput}"
                    IsPassword="True" Text="{Binding Password}" />
 
+            <HorizontalStackLayout Spacing="8" Margin="0,4,0,0">
+                <Switch IsToggled="{Binding RememberMe}" OnColor="{DynamicResource ThemeAccent}" VerticalOptions="Center" />
+                <Label Text="Remember me" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="13" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
             <Label Text="SERVER" FontSize="10" TextColor="{DynamicResource ThemeTextMuted}"
                    FontAttributes="Bold" Margin="0,8,0,0" />
             <Picker ItemsSource="{Binding ServerPickerItems}"
@@ -33,7 +38,7 @@
                     IsVisible="{Binding HasSavedServers}"
                     Title="Select or add a server..." TitleColor="{DynamicResource ThemeTextMuted}"
                     TextColor="{DynamicResource ThemeTextMuted}" BackgroundColor="{DynamicResource ThemeBgInput}" />
-            <Entry Placeholder="http://localhost:5238"
+            <Entry Placeholder="https://fatguysspeak-server.azurewebsites.net"
                    Text="{Binding ServerUrl}"
                    IsVisible="{Binding IsEnteringNewServer}"
                    TextColor="{DynamicResource ThemeTextMuted}" BackgroundColor="{DynamicResource ThemeBgInput}"

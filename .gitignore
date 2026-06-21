@@ -56,3 +56,6 @@ release-zips/
 # server log files
 logs/
 **/logs/
+
+# ASP.NET Data Protection keys (local) — sensitive, never commit
+FatGuysSpeak.Server/dp-keys/

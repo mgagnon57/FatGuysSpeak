@@ -68,7 +68,7 @@ public record PollOptionDto(int Id, string Text, int Votes);
 public record CreatePollRequest(string Question, List<string> Options);
 public record PollVoteRequest(int OptionId);
 
-public record SendMessageRequest(string Content, MessageSource Source = MessageSource.Text, string? AttachmentUrl = null, int? ReplyToMessageId = null, string? AttachmentFileName = null, int? ThreadId = null);
+public record SendMessageRequest(string Content, MessageSource Source = MessageSource.Text, string? AttachmentUrl = null, int? ReplyToMessageId = null, string? AttachmentFileName = null, int? ThreadId = null, bool SpeakReply = true);
 public record EditMessageRequest(string Content);
 public record AttachmentDto(string Url, string? OriginalFileName = null, string? ContentType = null);
 

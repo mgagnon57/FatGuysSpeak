@@ -14,7 +14,10 @@ public partial class LoginPage : ContentPage
     {
         base.OnAppearing();
         if (BindingContext is AuthViewModel vm)
+        {
+            await vm.LoadSavedCredentialsAsync();
             await vm.CheckGoogleAvailabilityAsync();
+        }
     }
 
     private async void OnRegisterTapped(object sender, EventArgs e)

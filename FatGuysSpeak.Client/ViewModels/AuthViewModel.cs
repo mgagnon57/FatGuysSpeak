@@ -13,7 +13,42 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
     [ObservableProperty] private string _errorMessage = "";
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private bool _isGoogleAvailable;
+    [ObservableProperty] private bool _rememberMe = Preferences.Get("remember_me", false);
     [ObservableProperty] private string _serverUrl = Preferences.Get("server_url", ApiService.DefaultServerUrl);
+
+    // Toggling "remember me" off immediately wipes any stored credentials.
+    partial void OnRememberMeChanged(bool value)
+    {
+        Preferences.Set("remember_me", value);
+        if (!value)
+        {
+            Preferences.Remove("saved_username");
+            SecureStorage.Remove("saved_password");
+        }
+    }
+
+    // Called from LoginPage.OnAppearing: pre-fill the saved username/password when remember-me is on.
+    public async Task LoadSavedCredentialsAsync()
+    {
+        if (!RememberMe) return;
+        Username = Preferences.Get("saved_username", "");
+        try { Password = await SecureStorage.GetAsync("saved_password") ?? ""; } catch { /* keychain unavailable */ }
+    }
+
+    // Persist or clear credentials after a successful sign-in, per the remember-me toggle.
+    private async Task RememberCredentialsAsync()
+    {
+        if (RememberMe)
+        {
+            Preferences.Set("saved_username", Username);
+            try { await SecureStorage.SetAsync("saved_password", Password); } catch { /* keychain unavailable */ }
+        }
+        else
+        {
+            Preferences.Remove("saved_username");
+            SecureStorage.Remove("saved_password");
+        }
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasSavedServers))]
@@ -78,6 +113,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
             api.SetToken(result.Token);
             api.SetCurrentUser(result.UserId, result.Username, result.AvatarUrl);
             PersistServer(ServerUrl);
+            await RememberCredentialsAsync();
             ptt.LoadForUser(result.UserId);
             await hub.ConnectAsync(result.Token, api.ServerUrl);
             await Shell.Current.GoToAsync("//main");
