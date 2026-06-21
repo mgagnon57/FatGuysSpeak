@@ -107,8 +107,8 @@ public class NudgeControllerTests : IDisposable
         services.AddDbContext<FatGuysSpeak.Server.Data.AppDbContext>(o => o.UseSqlite(_db.Db.Database.GetDbConnection()));
         var scopeFactory = services.BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
-        var bot = new BotService(factory.Object, config, scopeFactory, TestHelpers.MockHub());
         var tts = new TtsService(factory.Object, new ConfigurationBuilder().Build(), TestHelpers.MockHub(), NullLogger<TtsService>.Instance);
+        var bot = new BotService(factory.Object, config, scopeFactory, TestHelpers.MockHub(), tts);
         return (bot, tts);
     }
 }

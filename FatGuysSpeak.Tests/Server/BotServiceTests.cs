@@ -68,7 +68,7 @@ public class BotServiceTests : IDisposable
         var sp = services.BuildServiceProvider();
         var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
 
-        return new BotService(httpFactory, config, scopeFactory, TestHelpers.MockHub());
+        return new BotService(httpFactory, config, scopeFactory, TestHelpers.MockHub(), TestHelpers.NullTts());
     }
 
     private sealed class FakeEnv : Microsoft.Extensions.Hosting.IHostEnvironment

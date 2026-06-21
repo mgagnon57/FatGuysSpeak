@@ -54,7 +54,7 @@ public class RecapPregenServiceTests : IDisposable
         var sp = services.BuildServiceProvider();
         var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
 
-        var bot = new BotService(MakeHttpFactory("recap"), MakeConfig(), scopeFactory, TestHelpers.MockHub());
+        var bot = new BotService(MakeHttpFactory("recap"), MakeConfig(), scopeFactory, TestHelpers.MockHub(), TestHelpers.NullTts());
         var svc = new RecapPregenService(scopeFactory, bot, NullLogger<RecapPregenService>.Instance);
         return (svc, bot);
     }

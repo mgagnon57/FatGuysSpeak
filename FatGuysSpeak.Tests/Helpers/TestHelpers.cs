@@ -74,7 +74,16 @@ public static class TestHelpers
         var config = new ConfigurationBuilder().Build(); // ApiKey empty → RespondAsync returns immediately
         var httpFactory = new Mock<IHttpClientFactory>().Object;
         var scopeFactory = new Mock<IServiceScopeFactory>().Object;
-        return new FatGuysSpeak.Server.Services.BotService(httpFactory, config, scopeFactory, MockHub());
+        return new FatGuysSpeak.Server.Services.BotService(httpFactory, config, scopeFactory, MockHub(), NullTts());
+    }
+
+    // A TtsService with no ElevenLabs key configured, so Enabled is false and it never tries to speak.
+    public static FatGuysSpeak.Server.Services.TtsService NullTts()
+    {
+        var config = new ConfigurationBuilder().Build();
+        var httpFactory = new Mock<IHttpClientFactory>().Object;
+        var logger = new Mock<Microsoft.Extensions.Logging.ILogger<FatGuysSpeak.Server.Services.TtsService>>();
+        return new FatGuysSpeak.Server.Services.TtsService(httpFactory, config, MockHub(), logger.Object);
     }
 
     public static FatGuysSpeak.Server.Services.AutomodService NullAutomod() =>

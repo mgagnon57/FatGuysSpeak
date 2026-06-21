@@ -54,7 +54,7 @@ public class WeeklyDigestServiceTests : IDisposable
         services.AddDbContext<AppDbContext>(opt => opt.UseSqlite(_db.Db.Database.GetDbConnection()));
         var sp = services.BuildServiceProvider();
         var scopeFactory = sp.GetRequiredService<IServiceScopeFactory>();
-        var bot = new BotService(MakeHttpFactory("Weekly recap."), MakeConfig(), scopeFactory, TestHelpers.MockHub());
+        var bot = new BotService(MakeHttpFactory("Weekly recap."), MakeConfig(), scopeFactory, TestHelpers.MockHub(), TestHelpers.NullTts());
         return new WeeklyDigestService(scopeFactory, bot, NullLogger<WeeklyDigestService>.Instance);
     }
 

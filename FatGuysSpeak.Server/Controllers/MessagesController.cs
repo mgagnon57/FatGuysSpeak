@@ -249,7 +249,7 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
         }
 
         if (message.Content.Contains($"@{BotService.BotUsername}", StringComparison.OrdinalIgnoreCase))
-            _ = bot.RespondAsync(channelId, channel.ServerId, message.Content);
+            _ = bot.RespondAsync(channelId, channel.ServerId, message.Content, UserId);
 
         _ = DeliverMessageWebhooksAsync(channel.ServerId, channelId, message.Id, user!.Username, filteredContent);
 
