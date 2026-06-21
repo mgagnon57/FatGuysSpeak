@@ -4,6 +4,8 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) and the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ## [Unreleased]
+
+## [0.10.1] - 2026-06-21
 ### Fixed
 - Client auto-update now rolls out minor and patch releases, not just major ones. The
   connect-time version sync previously treated any same-major server as "compatible, no
