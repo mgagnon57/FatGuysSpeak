@@ -4,6 +4,8 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) and the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ## [Unreleased]
+
+## [0.9.0] - 2026-06-21
 ### Added
 - Soundboard: upload short .wav clips per server and fire them into your current
   voice channel with a tap; right-click to delete. Clips are decoded and streamed
