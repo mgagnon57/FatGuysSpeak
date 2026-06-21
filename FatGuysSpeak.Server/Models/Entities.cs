@@ -9,6 +9,7 @@ public class User
     public string Email { get; set; } = "";
     public string PasswordHash { get; set; } = "";
     public UserStatus Status { get; set; } = UserStatus.Offline;
+    public string? StatusText { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public string? AvatarUrl { get; set; }
     public string? Bio { get; set; }

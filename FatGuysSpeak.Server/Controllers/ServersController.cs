@@ -300,7 +300,7 @@ public class ServersController(AppDbContext db, IHubContext<ChatHub> hub, Webhoo
         return await db.ServerMembers
             .Where(sm => sm.ServerId == serverId)
             .Include(sm => sm.User)
-            .Select(sm => new UserDto(sm.User.Id, sm.User.Username, sm.User.Status, sm.User.AvatarUrl))
+            .Select(sm => new UserDto(sm.User.Id, sm.User.Username, sm.User.Status, sm.User.AvatarUrl, sm.User.StatusText))
             .ToListAsync();
     }
 

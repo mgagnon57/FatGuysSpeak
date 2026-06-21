@@ -2283,13 +2283,14 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         });
     }
 
-    private void OnUserStatusChanged(int userId, UserStatus status)
+    private void OnUserStatusChanged(int userId, UserStatus status, string? statusText)
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
             var existing = Members.FirstOrDefault(m => m.Id == userId);
             if (existing is null) return;
             existing.Status = status;
+            existing.StatusText = statusText;
         });
     }
 

@@ -23,6 +23,10 @@ public partial class UserProfileViewModel : ObservableObject
     [ObservableProperty] private string _bioInput = "";
     [ObservableProperty] private string _bioError = "";
     [ObservableProperty] private bool _isBlocked;
+    [ObservableProperty] private string _customStatusInput = "";
+
+    public string CustomStatus => Profile?.StatusText ?? "";
+    public bool HasCustomStatus => !string.IsNullOrWhiteSpace(Profile?.StatusText);
 
     public string AvatarText => Profile is null ? "?"
         : Profile.Username.Length >= 2
@@ -86,6 +90,7 @@ public partial class UserProfileViewModel : ObservableObject
         IsLoading = true;
         Profile = await _api.GetUserProfileAsync(userId, _serverId);
         BioInput = Profile?.Bio ?? "";
+        CustomStatusInput = Profile?.StatusText ?? "";
         IsLoading = false;
         NotifyAll();
     }
@@ -94,13 +99,25 @@ public partial class UserProfileViewModel : ObservableObject
     public async Task SetStatus(string statusStr)
     {
         if (!Enum.TryParse<UserStatus>(statusStr, out var status)) return;
-        await _api.UpdateStatusAsync(status);
+        await _api.UpdateStatusAsync(status, Profile?.StatusText);   // preserve custom text on presence change
         if (Profile is not null)
         {
             Profile = Profile with { Status = status };
             OnPropertyChanged(nameof(StatusText));
             OnPropertyChanged(nameof(StatusColor));
         }
+    }
+
+    [RelayCommand]
+    public async Task SaveStatusAsync()
+    {
+        if (Profile is null) return;
+        var text = CustomStatusInput.Trim();
+        if (text.Length > 100) text = text[..100];
+        await _api.UpdateStatusAsync(Profile.Status, text);
+        Profile = Profile with { StatusText = string.IsNullOrEmpty(text) ? null : text };
+        OnPropertyChanged(nameof(CustomStatus));
+        OnPropertyChanged(nameof(HasCustomStatus));
     }
 
     [RelayCommand]
@@ -177,5 +194,7 @@ public partial class UserProfileViewModel : ObservableObject
         OnPropertyChanged(nameof(IsOwnProfile));
         OnPropertyChanged(nameof(HasBio));
         OnPropertyChanged(nameof(BlockButtonText));
+        OnPropertyChanged(nameof(CustomStatus));
+        OnPropertyChanged(nameof(HasCustomStatus));
     }
 }

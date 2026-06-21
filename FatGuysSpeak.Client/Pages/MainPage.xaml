@@ -203,13 +203,17 @@
                                                      BackgroundColor="{Binding Status, Converter={StaticResource StatusDotColorConverter}}" />
                                             <Label Text="{Binding RoleIcon}" FontSize="11" VerticalOptions="Center"
                                                    IsVisible="{Binding HasRoleIcon}" />
-                                            <Label Text="{Binding Username}" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12" VerticalOptions="Center">
-                                                <Label.GestureRecognizers>
-                                                    <TapGestureRecognizer
-                                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ViewProfileCommand}"
-                                                        CommandParameter="{Binding Id}" />
-                                                </Label.GestureRecognizers>
-                                            </Label>
+                                            <VerticalStackLayout Spacing="0" VerticalOptions="Center">
+                                                <Label Text="{Binding Username}" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12" VerticalOptions="Center">
+                                                    <Label.GestureRecognizers>
+                                                        <TapGestureRecognizer
+                                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.ViewProfileCommand}"
+                                                            CommandParameter="{Binding Id}" />
+                                                    </Label.GestureRecognizers>
+                                                </Label>
+                                                <Label Text="{Binding StatusText}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10"
+                                                       LineBreakMode="TailTruncation" MaxLines="1" IsVisible="{Binding HasStatusText}" />
+                                            </VerticalStackLayout>
                                         </HorizontalStackLayout>
                                     </Grid>
                                 </DataTemplate>

@@ -46,6 +46,11 @@
                 <Label Text="{Binding StatusText}" TextColor="#a0a0a0" FontSize="13" VerticalOptions="Center" />
             </HorizontalStackLayout>
 
+            <!-- Custom status text -->
+            <Label Text="{Binding CustomStatus}" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="13"
+                   FontAttributes="Italic" HorizontalOptions="Center" HorizontalTextAlignment="Center"
+                   LineBreakMode="WordWrap" IsVisible="{Binding HasCustomStatus}" Margin="0,0,0,6" />
+
             <!-- Last seen -->
             <Label Text="{Binding LastSeenText}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="11"
                    HorizontalOptions="Center" IsVisible="{Binding HasLastSeen}" Margin="0,0,0,4" />
@@ -137,6 +142,20 @@
                             Command="{Binding SetStatusCommand}" CommandParameter="Offline"
                             BackgroundColor="#1a1a1a" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
                             CornerRadius="6" HeightRequest="36" />
+                </Grid>
+
+                <!-- Custom status message -->
+                <Label Text="CUSTOM STATUS" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" FontAttributes="Bold"
+                       HorizontalOptions="Center" Margin="0,12,0,2" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Entry Grid.Column="0" Text="{Binding CustomStatusInput}" MaxLength="100"
+                           Placeholder="What are you up to?  (e.g. 🎮 Halo Infinite)"
+                           BackgroundColor="{DynamicResource ThemeBgInput}" TextColor="{DynamicResource ThemeTextPrimary}"
+                           PlaceholderColor="#4a443d" FontSize="13" />
+                    <Button Grid.Column="1" Text="Set"
+                            Command="{Binding SaveStatusCommand}"
+                            BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
+                            FontSize="12" CornerRadius="6" HeightRequest="40" Padding="16,0" />
                 </Grid>
             </VerticalStackLayout>
 

@@ -34,7 +34,7 @@ public class ChatHubService
     public event Action<int, int>? MessageDeleted;           // (messageId, channelId)
     public event Action<MessageDto>? NewMessageNotification; // server-wide, for unread badge tracking
     public event Action<ReactionsUpdatedDto>? ReactionsUpdated;
-    public event Action<int, UserStatus>? UserStatusChanged;  // (userId, newStatus)
+    public event Action<int, UserStatus, string?>? UserStatusChanged;  // (userId, newStatus, statusText)
     public event Action? KickedFromVoice;
     public event Action<int>? KickedFromServer;  // serverId
     public event Action<int>? UserSpeaking;  // userId
@@ -108,7 +108,7 @@ public class ChatHubService
         _connection.On<int, int>("MessageDeleted", (mid, cid) => MessageDeleted?.Invoke(mid, cid));
         _connection.On<MessageDto>("NewMessageNotification", dto => NewMessageNotification?.Invoke(dto));
         _connection.On<ReactionsUpdatedDto>("ReactionsUpdated", dto => ReactionsUpdated?.Invoke(dto));
-        _connection.On<int, UserStatus>("UserStatusChanged", (uid, s) => UserStatusChanged?.Invoke(uid, s));
+        _connection.On<int, UserStatus, string?>("UserStatusChanged", (uid, s, txt) => UserStatusChanged?.Invoke(uid, s, txt));
         _connection.On("KickFromVoice", () => KickedFromVoice?.Invoke());
         _connection.On<int>("KickedFromServer", sid => KickedFromServer?.Invoke(sid));
         _connection.On<int>("UserSpeaking", uid => UserSpeaking?.Invoke(uid));

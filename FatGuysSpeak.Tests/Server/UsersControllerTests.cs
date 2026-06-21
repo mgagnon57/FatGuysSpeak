@@ -119,6 +119,57 @@ public class UsersControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateStatus_PersistsCustomStatusText()
+    {
+        await SeedAsync();
+        TestHelpers.SetUser(_controller, _owner.Id, _owner.Username);
+
+        await _controller.UpdateStatus(new UpdateStatusRequest(UserStatus.Online, "🎮 Halo Infinite"), TestHelpers.MockHub());
+
+        var user = await _testDb.Db.Users.FindAsync(_owner.Id);
+        Assert.Equal("🎮 Halo Infinite", user!.StatusText);
+    }
+
+    [Fact]
+    public async Task UpdateStatus_BlankStatusText_StoresNull()
+    {
+        await SeedAsync();
+        TestHelpers.SetUser(_controller, _owner.Id, _owner.Username);
+        // first set something, then clear it with whitespace
+        await _controller.UpdateStatus(new UpdateStatusRequest(UserStatus.Online, "busy"), TestHelpers.MockHub());
+
+        await _controller.UpdateStatus(new UpdateStatusRequest(UserStatus.Online, "   "), TestHelpers.MockHub());
+
+        var user = await _testDb.Db.Users.FindAsync(_owner.Id);
+        Assert.Null(user!.StatusText);
+    }
+
+    [Fact]
+    public async Task UpdateStatus_OverlongStatusText_IsTruncatedTo100()
+    {
+        await SeedAsync();
+        TestHelpers.SetUser(_controller, _owner.Id, _owner.Username);
+
+        await _controller.UpdateStatus(new UpdateStatusRequest(UserStatus.Online, new string('x', 250)), TestHelpers.MockHub());
+
+        var user = await _testDb.Db.Users.FindAsync(_owner.Id);
+        Assert.Equal(100, user!.StatusText!.Length);
+    }
+
+    [Fact]
+    public async Task GetProfile_ReturnsCustomStatusText()
+    {
+        await SeedAsync();
+        _other.StatusText = "afk — snack run";
+        await _testDb.Db.SaveChangesAsync();
+        TestHelpers.SetUser(_controller, _owner.Id, _owner.Username);
+
+        var result = await _controller.GetProfile(_other.Id, _server.Id);
+
+        Assert.Equal("afk — snack run", result.Value!.StatusText);
+    }
+
+    [Fact]
     public async Task GetProfile_WhenLastSeenSet_ReturnsLastSeenAt()
     {
         await SeedAsync();

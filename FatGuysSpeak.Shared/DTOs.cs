@@ -96,14 +96,15 @@ public record UserProfileDto(
     bool IsCurrentUser,
     string? AvatarUrl = null,
     string? Bio = null,
-    DateTime? LastSeenAt = null);
+    DateTime? LastSeenAt = null,
+    string? StatusText = null);
 
-public record UpdateStatusRequest(UserStatus Status);
+public record UpdateStatusRequest(UserStatus Status, string? StatusText = null);
 public record UpdateBioRequest(string? Bio);
 public record UpdateUsernameRequest(string Username);
 public record BlockedUserDto(int UserId, string Username, DateTime BlockedAt);
 
-public record UserDto(int Id, string Username, UserStatus Status, string? AvatarUrl = null);
+public record UserDto(int Id, string Username, UserStatus Status, string? AvatarUrl = null, string? StatusText = null);
 
 public enum ChannelType { Text, Voice }
 public enum UserStatus { Offline, Online, Away, DoNotDisturb }

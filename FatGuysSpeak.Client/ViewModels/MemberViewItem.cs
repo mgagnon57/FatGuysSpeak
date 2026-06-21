@@ -11,6 +11,12 @@ public partial class MemberViewItem : ObservableObject
 
     [ObservableProperty] private UserStatus _status;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasStatusText))]
+    private string? _statusText;
+
+    public bool HasStatusText => !string.IsNullOrWhiteSpace(StatusText);
+
     public int Id { get; }
     public string Username { get; }
     public string? AvatarUrl { get; }
@@ -30,5 +36,6 @@ public partial class MemberViewItem : ObservableObject
         AvatarUrl = user.AvatarUrl;
         _role = role;
         _status = user.Status;
+        _statusText = user.StatusText;
     }
 }

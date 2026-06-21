@@ -300,9 +300,9 @@ public class ApiService
     public Task<UserProfileDto?> GetUserProfileAsync(int userId, int serverId) =>
         _http.GetFromJsonAsync<UserProfileDto>($"api/users/{userId}/profile?serverId={serverId}");
 
-    public async Task UpdateStatusAsync(UserStatus status)
+    public async Task UpdateStatusAsync(UserStatus status, string? statusText = null)
     {
-        await _http.PutAsJsonAsync("api/users/me/status", new UpdateStatusRequest(status));
+        await _http.PutAsJsonAsync("api/users/me/status", new UpdateStatusRequest(status, statusText));
     }
 
     public async Task<bool> UpdateBioAsync(string? bio)

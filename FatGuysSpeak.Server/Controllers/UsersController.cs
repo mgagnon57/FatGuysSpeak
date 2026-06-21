@@ -38,7 +38,7 @@ public class UsersController(AppDbContext db) : ControllerBase
             }
         }
 
-        return new UserProfileDto(user.Id, user.Username, user.Status, user.CreatedAt, role, joinedAt, user.Id == UserId, user.AvatarUrl, user.Bio, user.LastSeenAt);
+        return new UserProfileDto(user.Id, user.Username, user.Status, user.CreatedAt, role, joinedAt, user.Id == UserId, user.AvatarUrl, user.Bio, user.LastSeenAt, user.StatusText);
     }
 
     [HttpPost("me/avatar")]
@@ -111,6 +111,10 @@ public class UsersController(AppDbContext db) : ControllerBase
         var user = await db.Users.FindAsync(UserId);
         if (user is null) return NotFound();
         user.Status = req.Status;
+        var text = req.StatusText?.Trim();
+        if (string.IsNullOrEmpty(text)) text = null;
+        else if (text.Length > 100) text = text[..100];
+        user.StatusText = text;
         await db.SaveChangesAsync();
 
         var serverIds = await db.ServerMembers
@@ -119,7 +123,7 @@ public class UsersController(AppDbContext db) : ControllerBase
             .ToListAsync();
 
         foreach (var sid in serverIds)
-            await hub.Clients.Group($"server-{sid}").SendAsync("UserStatusChanged", UserId, req.Status);
+            await hub.Clients.Group($"server-{sid}").SendAsync("UserStatusChanged", UserId, req.Status, text);
 
         return NoContent();
     }

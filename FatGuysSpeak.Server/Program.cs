@@ -376,6 +376,9 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='TotalOnlineSeconds'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"TotalOnlineSeconds\" BIGINT NOT NULL DEFAULT 0");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='StatusText'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"StatusText\" TEXT");
     }
     else
     {
@@ -466,6 +469,9 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='TotalOnlineSeconds'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN TotalOnlineSeconds INTEGER NOT NULL DEFAULT 0");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='StatusText'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN StatusText TEXT");
     }
 
     // MessageReactions table (added for reactions feature)
