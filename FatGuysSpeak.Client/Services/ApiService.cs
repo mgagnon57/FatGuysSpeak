@@ -10,7 +10,9 @@ public class ApiService
     private HttpClient _http;
     private string? _token;
 
-    public const string DefaultServerUrl = "http://localhost:5238";
+    // Beta default: the hosted Azure server, so a fresh install connects with no configuration.
+    // Users can still point at any server (e.g. http://localhost:5238 for local dev) in Settings.
+    public const string DefaultServerUrl = "https://fatguysspeak-server.azurewebsites.net";
 
     public string ServerUrl { get; private set; }
 
