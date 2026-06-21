@@ -259,6 +259,44 @@ public class ApiService
         return await resp.Content.ReadFromJsonAsync<AttachmentDto>();
     }
 
+    // ── Soundboard ──────────────────────────────────────────────────────────────
+    public async Task<List<SoundClipDto>> GetSoundsAsync(int serverId)
+    {
+        try { return await _http.GetFromJsonAsync<List<SoundClipDto>>($"api/servers/{serverId}/sounds") ?? []; }
+        catch { return []; }
+    }
+
+    public async Task<SoundClipDto?> UploadSoundAsync(int serverId, string name, string? emoji, Stream wav, string fileName)
+    {
+        using var content = new MultipartFormDataContent
+        {
+            { new StringContent(name), "name" },
+        };
+        if (!string.IsNullOrWhiteSpace(emoji)) content.Add(new StringContent(emoji), "emoji");
+        var fileContent = new StreamContent(wav);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
+        content.Add(fileContent, "file", Path.GetFileName(fileName));
+        var resp = await _http.PostAsync($"api/servers/{serverId}/sounds", content);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var err = await resp.Content.ReadAsStringAsync();
+            throw new Exception(err.Trim('"'));
+        }
+        return await resp.Content.ReadFromJsonAsync<SoundClipDto>();
+    }
+
+    public async Task<bool> PlaySoundAsync(int soundId)
+    {
+        var resp = await _http.PostAsync($"api/sounds/{soundId}/play", null);
+        return resp.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> DeleteSoundAsync(int soundId)
+    {
+        var resp = await _http.DeleteAsync($"api/sounds/{soundId}");
+        return resp.IsSuccessStatusCode;
+    }
+
     public async Task<MessageDto?> EditMessageAsync(int channelId, int messageId, string newContent)
     {
         var resp = await _http.PutAsJsonAsync($"api/channels/{channelId}/messages/{messageId}", new EditMessageRequest(newContent));

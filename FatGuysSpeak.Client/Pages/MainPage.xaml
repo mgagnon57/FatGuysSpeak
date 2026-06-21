@@ -222,6 +222,37 @@
 
                         <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" Margin="0,4" />
 
+                        <!-- Soundboard -->
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,2,4,2">
+                            <Label Grid.Column="0" Text="  SOUNDBOARD" TextColor="{DynamicResource ThemeTextMuted}"
+                                   FontSize="10" FontAttributes="Bold" VerticalOptions="Center" />
+                            <Button Grid.Column="1" Text="＋" Command="{Binding AddSoundCommand}" Padding="0"
+                                    WidthRequest="26" HeightRequest="26" FontSize="14"
+                                    BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}" />
+                        </Grid>
+                        <FlexLayout BindableLayout.ItemsSource="{Binding Sounds}" Wrap="Wrap" Direction="Row" Margin="6,0,6,4">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="shared:SoundClipDto">
+                                    <Button Text="{Binding Name}"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.PlaySoundCommand}"
+                                            CommandParameter="{Binding Id}"
+                                            FontSize="11" Padding="8,4" Margin="2"
+                                            BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="{DynamicResource ThemeTextPrimary}"
+                                            CornerRadius="6">
+                                        <FlyoutBase.ContextFlyout>
+                                            <MenuFlyout>
+                                                <MenuFlyoutItem Text="🗑 Delete"
+                                                    Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.DeleteSoundCommand}"
+                                                    CommandParameter="{Binding Id}" />
+                                            </MenuFlyout>
+                                        </FlyoutBase.ContextFlyout>
+                                    </Button>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </FlexLayout>
+
+                        <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" Margin="0,4" />
+
                         <!-- Channels grouped by category -->
                         <StackLayout BindableLayout.ItemsSource="{Binding CategorizedChannels}" Spacing="0">
                             <FlyoutBase.ContextFlyout>

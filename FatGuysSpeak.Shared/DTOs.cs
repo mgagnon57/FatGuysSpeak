@@ -106,6 +106,8 @@ public record BlockedUserDto(int UserId, string Username, DateTime BlockedAt);
 
 public record UserDto(int Id, string Username, UserStatus Status, string? AvatarUrl = null, string? StatusText = null);
 
+public record SoundClipDto(int Id, int ServerId, string Name, string? Emoji);
+
 public enum ChannelType { Text, Voice }
 public enum UserStatus { Offline, Online, Away, DoNotDisturb }
 public enum NotifLevel { All = 0, OnlyMentions = 1, Muted = 2 }

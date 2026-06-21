@@ -789,6 +789,34 @@ using (var scope = app.Services.CreateScope())
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ExternalLogins_Provider_ProviderUserId ON ExternalLogins (Provider, ProviderUserId)");
     }
 
+    // Soundboard clips (per server).
+    if (isPostgres)
+    {
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS ""SoundClips"" (
+                ""Id"" SERIAL PRIMARY KEY,
+                ""ServerId"" INTEGER NOT NULL,
+                ""Name"" TEXT NOT NULL DEFAULT '',
+                ""Emoji"" TEXT,
+                ""UploadedById"" INTEGER NOT NULL,
+                ""FileName"" TEXT NOT NULL DEFAULT '',
+                ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )");
+    }
+    else
+    {
+        ctx.Database.ExecuteSqlRaw(@"
+            CREATE TABLE IF NOT EXISTS SoundClips (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ServerId INTEGER NOT NULL,
+                Name TEXT NOT NULL DEFAULT '',
+                Emoji TEXT,
+                UploadedById INTEGER NOT NULL,
+                FileName TEXT NOT NULL DEFAULT '',
+                CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+            )");
+    }
+
     // Daily PorkChop chat summaries — one per channel, per completed day, PER SOURCE.
     if (isPostgres)
     {

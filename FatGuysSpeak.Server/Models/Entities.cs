@@ -30,6 +30,17 @@ public class ExternalLogin
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+public class SoundClip
+{
+    public int Id { get; set; }
+    public int ServerId { get; set; }
+    public string Name { get; set; } = "";
+    public string? Emoji { get; set; }
+    public int UploadedById { get; set; }
+    public string FileName { get; set; } = "";   // stored 16-bit PCM WAV under /uploads
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
 public class GuildServer
 {
     public int Id { get; set; }

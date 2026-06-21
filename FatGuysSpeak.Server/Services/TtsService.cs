@@ -70,6 +70,11 @@ public class TtsService(IHttpClientFactory httpFactory, IConfiguration config, I
     // playback buffer up to a lead cushion, then pace off a stopwatch so the average rate stays
     // real-time without accumulating Task.Delay overshoot (which was starving the buffer and making
     // the voice choppy). The client's BufferedWaveProvider handles final playback timing.
+    public const int VoiceSampleRate = VoiceRate;   // so callers (soundboard) can resample to match
+
+    /// <summary>Stream already-48kHz-mono PCM into a voice channel as Opus (used by the soundboard).</summary>
+    public Task PlaySamples48Async(int channelId, short[] samples48) => StreamOpusAsync(channelId, samples48);
+
     private async Task StreamOpusAsync(int channelId, short[] samples)
     {
         var encoder = OpusCodecFactory.CreateEncoder(VoiceRate, 1, OpusApplication.OPUS_APPLICATION_VOIP);

@@ -39,6 +39,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<GroupMessage> GroupMessages => Set<GroupMessage>();
     public DbSet<AppSequence> AppSequences => Set<AppSequence>();
     public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
+    public DbSet<SoundClip> SoundClips => Set<SoundClip>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

@@ -51,6 +51,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public ObservableCollection<CategoryViewItem> CategorizedChannels { get; } = [];
     [ObservableProperty] private ObservableCollection<MessageViewItem> _messages = [];
     [ObservableProperty] private ObservableCollection<MemberViewItem> _members = [];
+    [ObservableProperty] private ObservableCollection<SoundClipDto> _sounds = [];
     [ObservableProperty] private string _selectedTab = "Text";
     [ObservableProperty] private ObservableCollection<VoiceParticipantViewModel> _voiceParticipants = [];
 
@@ -739,6 +740,53 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             onlineList.Select(u => new MemberViewItem(u, _memberRoles.GetValueOrDefault(u.Id))));
         SelectedChannel = null;
         Messages.Clear();
+        await LoadSoundsAsync();
+    }
+
+    public async Task LoadSoundsAsync()
+    {
+        if (SelectedServer is null) { Sounds = []; return; }
+        var list = await api.GetSoundsAsync(SelectedServer.Id);
+        Sounds = new ObservableCollection<SoundClipDto>(list);
+    }
+
+    [RelayCommand]
+    public async Task PlaySoundAsync(int soundId)
+    {
+        if (soundId == 0) return;
+        var ok = await api.PlaySoundAsync(soundId);
+        if (!ok) await Shell.Current.DisplayAlert("Soundboard", "Join a voice channel to play sounds.", "OK");
+    }
+
+    [RelayCommand]
+    public async Task AddSoundAsync()
+    {
+        if (SelectedServer is null) return;
+        try
+        {
+            var file = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Pick a .wav sound clip",
+                FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    [DevicePlatform.WinUI] = [".wav"],
+                }),
+            });
+            if (file is null) return;
+            var name = Path.GetFileNameWithoutExtension(file.FileName);
+            if (name.Length > 40) name = name[..40];
+            using var stream = await file.OpenReadAsync();
+            await api.UploadSoundAsync(SelectedServer.Id, name, null, stream, file.FileName);
+            await LoadSoundsAsync();
+        }
+        catch (Exception ex) { await Shell.Current.DisplayAlert("Soundboard", $"Sound upload failed: {ex.Message}", "OK"); }
+    }
+
+    [RelayCommand]
+    public async Task DeleteSoundAsync(int soundId)
+    {
+        if (soundId == 0) return;
+        if (await api.DeleteSoundAsync(soundId)) await LoadSoundsAsync();
     }
 
     [RelayCommand]
