@@ -33,18 +33,22 @@ if ($dirty) { throw "Working tree is dirty. Commit or stash before releasing.`n$
     Set-Content $propsPath -NoNewline -Encoding utf8
 
 # 4. Roll CHANGELOG [Unreleased] into [X.Y.Z] - date
-$cl = Get-Content $changelogPath -Raw
+# Read/write as UTF-8 explicitly. Windows PowerShell's Get-Content/Set-Content default to the
+# system ANSI codepage, which mangles em-dashes/emoji on round-trip; use .NET with UTF-8 (no BOM).
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$cl = [System.IO.File]::ReadAllText($changelogPath)
 if ($cl -notmatch '(?ms)^## \[Unreleased\]\s*(.*?)(?=^## \[|\z)') { throw 'No [Unreleased] section in CHANGELOG.md.' }
 $unreleased = $Matches[1].Trim()
 if (-not $unreleased) { throw 'CHANGELOG [Unreleased] is empty - add entries before releasing.' }
 $today = (Get-Date).ToString('yyyy-MM-dd')
 $cl = $cl -replace '(?m)^## \[Unreleased\].*$', "## [Unreleased]`r`n`r`n## [$Version] - $today"
-Set-Content $changelogPath $cl -NoNewline -Encoding utf8
+[System.IO.File]::WriteAllText($changelogPath, $cl, $utf8NoBom)
 
 # 5. Stamp the landing-page version label (both copies)
 foreach ($p in @('website/index.html', 'docs/index.html')) {
     $fp = Join-Path $root $p
-    (Get-Content $fp -Raw) -replace 'v\d+\.\d+\.\d+', "v$Version" | Set-Content $fp -NoNewline -Encoding utf8
+    $txt = [System.IO.File]::ReadAllText($fp) -replace 'v\d+\.\d+\.\d+', "v$Version"
+    [System.IO.File]::WriteAllText($fp, $txt, $utf8NoBom)
 }
 
 # 6. Build (Release). Abort on any failure.
