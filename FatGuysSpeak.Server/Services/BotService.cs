@@ -45,12 +45,82 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         recent.Reverse();
 
         var contextLines = recent.Select(m => $"{m.Author.Username}: {m.Content}").ToList();
-        // Give PorkChop any images shared in the recent context so it can answer about them.
-        var env = scope.ServiceProvider.GetService<IHostEnvironment>();
-        var images = env is null ? [] : ReadRecentImages(recent, env.ContentRootPath);
-        var reply = await CallClaudeAsync(triggerContent, contextLines, images);
-        if (reply is null) { Console.WriteLine("[PorkChop] no reply produced (see any Anthropic error above)."); return; }
 
+        // A mention can also kick off a game — "@PorkChop trivia", "would you rather", "settle this",
+        // "roast battle @a @b". Those route to dedicated prompts; anything else is the normal advice path.
+        var game = DetectGame(StripBotMention(triggerContent));
+        string? reply = game switch
+        {
+            Game.Trivia         => await PostToClaudeAsync(TriviaSystem, "Fire one off now."),
+            Game.WouldYouRather => await PostToClaudeAsync(WouldYouRatherSystem, "Give them one now."),
+            Game.Settle         => await PostToClaudeAsync(SettleSystem,
+                                       "Here's the recent conversation:\n" + string.Join("\n", contextLines) + "\n\nDeliver your verdict."),
+            Game.RoastBattle    => await RunRoastBattleAsync(db, triggerContent, recent),
+            _                   => await CallClaudeAsync(triggerContent, contextLines,
+                                       scope.ServiceProvider.GetService<IHostEnvironment>() is { } env
+                                           ? ReadRecentImages(recent, env.ContentRootPath) : []),
+        };
+        if (reply is null) { Console.WriteLine("[PorkChop] no reply produced (see any Anthropic error above)."); return; }
+        if (game is not null && LooksLikeRefusal(reply)) return;   // a game shouldn't post a wet-blanket refusal
+
+        await PostBotReplyAsync(db, channelId, serverId, reply);
+    }
+
+    private enum Game { Trivia, WouldYouRather, Settle, RoastBattle }
+
+    private static string StripBotMention(string s) =>
+        System.Text.RegularExpressions.Regex.Replace(s, "@" + BotUsername, "",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+
+    private static Game? DetectGame(string bare)
+    {
+        var t = bare.TrimStart().ToLowerInvariant();
+        if (t.StartsWith("trivia")) return Game.Trivia;
+        if (t.StartsWith("would you rather") || t.StartsWith("wyr")) return Game.WouldYouRather;
+        if (t.StartsWith("roast battle") || t.StartsWith("battle")) return Game.RoastBattle;
+        if (t.StartsWith("settle")) return Game.Settle;
+        return null;
+    }
+
+    // Resolve two combatants (from @mentions, else the two most recent human speakers), build a dossier
+    // for each, and have PorkChop stage a head-to-head roast battle. Returns null if it can't find two.
+    private async Task<string?> RunRoastBattleAsync(AppDbContext db, string triggerContent, List<Message> recent)
+    {
+        var mentioned = System.Text.RegularExpressions.Regex.Matches(triggerContent, @"@(\w+)")
+            .Select(m => m.Groups[1].Value)
+            .Where(n => !n.Equals(BotUsername, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        var combatants = new List<User>();
+        foreach (var n in mentioned)
+        {
+            var u = await db.Users.FirstOrDefaultAsync(x => x.Username.ToLower() == n.ToLower());
+            if (u is not null && combatants.All(c => c.Id != u.Id)) combatants.Add(u);
+            if (combatants.Count == 2) break;
+        }
+        if (combatants.Count < 2)
+            foreach (var m in ((IEnumerable<Message>)recent).Reverse())
+            {
+                if (m.AuthorId == BotUserId || m.Author is null) continue;
+                if (combatants.Any(c => c.Id == m.AuthorId)) continue;
+                combatants.Add(m.Author);
+                if (combatants.Count == 2) break;
+            }
+        if (combatants.Count < 2) return null;
+
+        var dossiers = new List<string>();
+        foreach (var u in combatants)
+        {
+            var sIds = await db.ServerMembers.Where(mm => mm.UserId == u.Id).Select(mm => mm.ServerId).ToListAsync();
+            dossiers.Add(await BuildUserDossierAsync(db, u, sIds));
+        }
+
+        var prompt = $"FIGHTER 1:\n{dossiers[0]}\n\nFIGHTER 2:\n{dossiers[1]}\n\nRing the bell and start the battle.";
+        return await PostToClaudeAsync(RoastBattleSystem, prompt);
+    }
+
+    private async Task PostBotReplyAsync(AppDbContext db, int channelId, int serverId, string reply)
+    {
         var msg = new Message
         {
             Content   = reply,
@@ -294,6 +364,14 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         await hub.Clients.Group($"channel-{channel.Id}").SendAsync("ReceiveMessage", dto);
         await hub.Clients.Group($"server-{channel.ServerId}").SendAsync("NewMessageNotification", dto);
     }
+
+    private const string TriviaSystem = "You are PorkChop, the cocky AI sidekick of a private friends' chat. Pose exactly ONE fun, slightly tricky trivia question to the whole channel — an interesting category, not a googleable freebie. One or two sentences with a dash of your usual swagger. Do NOT reveal or hint at the answer; the crew will guess and @ you to check. No preamble like 'Sure!' — just fire the question.";
+
+    private const string WouldYouRatherSystem = "You are PorkChop, the chaotic AI sidekick of a private friends' chat. Pose exactly ONE spicy, funny 'would you rather' dilemma to the channel — two genuinely hard or ridiculous options that'll start an argument. One or two sentences with your usual attitude. No preamble — just hit them with the dilemma.";
+
+    private const string SettleSystem = RoastContext + "Right now the crew wants you to SETTLE an argument. Read the recent conversation, pick a definitive winner, and explain why the loser is an idiot — brutal, funny, and decisive, two to four sentences. Never cop out with 'it depends' or 'you're both right'; somebody is wrong and it's your job to say who.";
+
+    private const string RoastBattleSystem = RoastContext + "Right now: stage a head-to-head ROAST BATTLE between the two fighters described below. Give two or three alternating rounds — start each line with the name of the fighter THROWING the punch — weaponizing their real bios, chat history, and what others say about them, then crown a winner at the end. Make every line land.";
 
     private const string AdviceSystem = "You are PorkChop, a friendly, down-to-earth advisor in a chat app called FatGuysSpeak. People mention you (@PorkChop) when they have a question or want advice. Read their message and the recent conversation, then give practical, helpful advice or a clear answer. If an image has been shared in the conversation, you can see it — describe it or answer questions about it. Be concise and conversational, and don't be afraid to have a little personality.";
 

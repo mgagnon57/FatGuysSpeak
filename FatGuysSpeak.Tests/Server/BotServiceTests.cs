@@ -212,6 +212,106 @@ public class BotServiceTests : IDisposable
         Assert.Contains("previous AI reply", body);   // PorkChop now remembers its own side, so follow-ups stay on topic
     }
 
+    // ── PorkChop games ──────────────────────────────────────────────────────────
+
+    // A capturing anthropic factory: returns `reply` for every call and exposes the last request body.
+    private static (IHttpClientFactory factory, Func<string> body) CapturingFactory(string reply)
+    {
+        HttpRequestMessage? captured = null;
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
+            .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
+            .ReturnsAsync(() => new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK,
+                Content    = new StringContent(
+                    JsonSerializer.Serialize(new { content = new[] { new { type = "text", text = reply } } }),
+                    System.Text.Encoding.UTF8, "application/json")
+            });
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient("anthropic"))
+               .Returns(new HttpClient(handler.Object) { BaseAddress = new Uri("https://api.anthropic.com/v1/") });
+        return (factory.Object, () => captured!.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+    }
+
+    private async Task<(GuildServer server, Channel channel)> SeedBotChannelAsync()
+    {
+        var (server, _) = await TestHelpers.SeedServerAsync(_db.Db);
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+        var botUser = new User { Username = BotService.BotUsername, Email = "bot@system.local", PasswordHash = "!" };
+        _db.Db.Users.Add(botUser);
+        await _db.Db.SaveChangesAsync();
+        BotService.BotUserId = botUser.Id;
+        return (server, channel);
+    }
+
+    [Fact]
+    public async Task RespondAsync_TriviaCommand_PostsQuestionUsingTriviaPrompt()
+    {
+        var (server, channel) = await SeedBotChannelAsync();
+        var (factory, body) = CapturingFactory("What year did the first email get sent?");
+
+        var svc = MakeBotService(factory, MakeConfig());
+        await svc.RespondAsync(channel.Id, server.Id, "@PorkChop trivia");
+
+        var ai = _db.Db.Messages.FirstOrDefault(m => m.Source == MessageSource.AI);
+        Assert.NotNull(ai);
+        Assert.Contains("trivia question", body());   // the trivia system prompt drove the call
+    }
+
+    [Fact]
+    public async Task RespondAsync_WouldYouRatherCommand_UsesDilemmaPrompt()
+    {
+        var (server, channel) = await SeedBotChannelAsync();
+        var (factory, body) = CapturingFactory("Would you rather fight one horse-sized duck or...");
+
+        var svc = MakeBotService(factory, MakeConfig());
+        await svc.RespondAsync(channel.Id, server.Id, "@PorkChop wyr");
+
+        Assert.True(_db.Db.Messages.Any(m => m.Source == MessageSource.AI));
+        Assert.Contains("would you rather", body());
+    }
+
+    [Fact]
+    public async Task RespondAsync_SettleCommand_IncludesRecentConversation()
+    {
+        var (server, channel) = await SeedBotChannelAsync();
+        var owner = _db.Db.Users.First(u => u.Username != BotService.BotUsername);
+        _db.Db.Messages.Add(new Message { Content = "pineapple absolutely belongs on pizza", AuthorId = owner.Id, ChannelId = channel.Id, Source = MessageSource.Text });
+        await _db.Db.SaveChangesAsync();
+        var (factory, body) = CapturingFactory("Verdict: pineapple stays, you animals.");
+
+        var svc = MakeBotService(factory, MakeConfig());
+        await svc.RespondAsync(channel.Id, server.Id, "@PorkChop settle this");
+
+        Assert.True(_db.Db.Messages.Any(m => m.Source == MessageSource.AI));
+        Assert.Contains("pineapple absolutely belongs on pizza", body());   // the argument was fed to the judge
+    }
+
+    [Fact]
+    public async Task RespondAsync_RoastBattle_BuildsDossiersForBothMentionedUsers()
+    {
+        var (server, channel) = await SeedBotChannelAsync();
+        var fighterA = new User { Username = "tank",  Email = "tank@test.local",  PasswordHash = "!", Bio = "benches more than he reads" };
+        var fighterB = new User { Username = "gizmo", Email = "gizmo@test.local", PasswordHash = "!", Bio = "owns 9 mechanical keyboards" };
+        _db.Db.Users.AddRange(fighterA, fighterB);
+        await _db.Db.SaveChangesAsync();
+        _db.Db.ServerMembers.AddRange(
+            new ServerMember { ServerId = server.Id, UserId = fighterA.Id, Role = ServerRole.Member },
+            new ServerMember { ServerId = server.Id, UserId = fighterB.Id, Role = ServerRole.Member });
+        await _db.Db.SaveChangesAsync();
+        var (factory, body) = CapturingFactory("tank: ...\ngizmo: ...\nWinner: the audience.");
+
+        var svc = MakeBotService(factory, MakeConfig());
+        await svc.RespondAsync(channel.Id, server.Id, "@PorkChop roast battle @tank @gizmo");
+
+        Assert.True(_db.Db.Messages.Any(m => m.Source == MessageSource.AI));
+        var b = body();
+        Assert.Contains("benches more than he reads", b);   // fighter 1 dossier
+        Assert.Contains("owns 9 mechanical keyboards", b);  // fighter 2 dossier
+    }
+
     // ── Daily summaries ─────────────────────────────────────────────────────────
 
     [Fact]
