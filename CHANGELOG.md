@@ -5,6 +5,16 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 
 ## [Unreleased]
 ### Added
+- Soundboard: upload short .wav clips per server and fire them into your current
+  voice channel with a tap; right-click to delete. Clips are decoded and streamed
+  through the existing voice pipeline (no extra dependencies, works headless).
+- PorkChop games: mention @PorkChop with "trivia", "wyr"/"would you rather",
+  "settle this", or "roast battle @a @b" to kick off a game in the channel.
+- PorkChop voice talk-back: when you @-mention PorkChop while sitting in a voice
+  channel — including by saying it aloud (transcribed) — it now also speaks its
+  reply into the channel, not just posts text.
+- Custom status: set a free-text "what are you up to" status that shows on your
+  profile and as a subtitle under your name in the connected list.
 - Move members between channels: admins can right-click anyone in the connected list (or drag
   an occupant) and drop them into another channel; the moved user's client follows automatically.
 - Cross-channel presence: the sidebar shows who is in every channel — including channels you are
