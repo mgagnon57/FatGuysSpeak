@@ -1067,21 +1067,6 @@ app.UseStaticFiles(new StaticFileOptions
     }
 });
 app.UseAuthentication();
-app.Use(async (ctx, next) =>
-{
-    if (ctx.Request.Path.StartsWithSegments("/api/admin"))
-    {
-        var cookiePresent = ctx.Request.Cookies.ContainsKey(".FatGuysSpeak.Dashboard");
-        ctx.Response.OnStarting(() =>
-        {
-            ctx.Response.Headers["X-Dbg-Cookie"] = cookiePresent.ToString();
-            ctx.Response.Headers["X-Dbg-UserAuthed"] = (ctx.User?.Identity?.IsAuthenticated ?? false).ToString();
-            ctx.Response.Headers["X-Dbg-AuthType"] = ctx.User?.Identity?.AuthenticationType ?? "none";
-            return Task.CompletedTask;
-        });
-    }
-    await next();
-});
 app.UseAuthorization();
 app.MapControllers();
 app.MapGet("/api/version", () =>
