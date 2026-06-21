@@ -4,6 +4,8 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) and the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ## [Unreleased]
+
+## [0.10.0] - 2026-06-21
 ### Added
 - PorkChop voice toggle: a speaker button next to "Ask PorkChop" turns his spoken
   voice replies on or off. Default on; when off, @PorkChop answers in text only.
