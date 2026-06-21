@@ -109,12 +109,20 @@ foreach ($ch in @('win', $verChannel)) {
 }
 
 if ($env:GITHUB_TOKEN) {
-    foreach ($ch in @('win', $verChannel)) {
-        vpk upload github --repoUrl $repoUrl --token $env:GITHUB_TOKEN --channel $ch `
-            --tag "v$Version" --releaseName "FatGuysSpeak $Version" --publish -o (Join-Path $vpkOut $ch)
-        if ($LASTEXITCODE) { throw "vpk upload github ($ch) failed" }
-    }
-    Write-Host "Velopack assets uploaded to release v$Version (channels: win, $verChannel)." -ForegroundColor Green
+    # 'vpk upload github' CREATES the release for its tag and FATALs if that release already exists,
+    # so only the FIRST channel can go through vpk. The client actually updates from the PER-VERSION
+    # channel (UpdateChannel.ForVersion -> v0-10-1), so publish that one via vpk to create the
+    # release, then attach the 'win' channel's (distinctly-named) assets with gh. Channel asset names
+    # are suffixed (…-win-…, …-v0-10-1-…) so they never collide on the release.
+    vpk upload github --repoUrl $repoUrl --token $env:GITHUB_TOKEN --channel $verChannel `
+        --tag "v$Version" --releaseName "FatGuysSpeak $Version" --publish -o (Join-Path $vpkOut $verChannel)
+    if ($LASTEXITCODE) { throw "vpk upload github ($verChannel) failed" }
+
+    $winAssets = Get-ChildItem (Join-Path $vpkOut 'win') -File | ForEach-Object { $_.FullName }
+    gh release upload "v$Version" @winAssets --clobber
+    if ($LASTEXITCODE) { throw 'gh release upload (win channel) failed' }
+
+    Write-Host "Velopack assets uploaded to release v$Version (channels: $verChannel via vpk, win via gh)." -ForegroundColor Green
 } else {
     Write-Host "GITHUB_TOKEN not set - skipped vpk upload. Packages in $vpkOut." -ForegroundColor Yellow
 }
