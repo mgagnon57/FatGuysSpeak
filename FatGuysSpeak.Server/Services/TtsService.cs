@@ -63,8 +63,18 @@ public class TtsService(IHttpClientFactory httpFactory, IConfiguration config, I
         return await res.Content.ReadAsByteArrayAsync();
     }
 
-    private const int FrameMs = 20;     // each Opus frame is 20 ms of audio
-    private const int LeadMs   = 800;   // keep ~0.8 s buffered on the client so timer jitter can't starve it
+    private const int FrameMs = 20;      // each Opus frame is 20 ms of audio
+    private const int LeadMs   = 1500;   // buffer ~1.5 s on the client so internet jitter can't starve it (smoother)
+
+    // Per-channel handle on whatever PorkChop is currently saying, so it can be cut off.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, CancellationTokenSource> _speaking = new();
+
+    /// <summary>Immediately stop whatever PorkChop is saying/playing in this voice channel (someone
+    /// started talking, a newer line came in, or it was told to shut up). Cheap no-op if nothing's playing.</summary>
+    public void StopSpeaking(int channelId)
+    {
+        if (_speaking.TryGetValue(channelId, out var cts)) { try { cts.Cancel(); } catch { } }
+    }
 
     // Encode 48 kHz mono PCM to Opus and push it to the voice group. We burst-fill the client's
     // playback buffer up to a lead cushion, then pace off a stopwatch so the average rate stays
@@ -77,25 +87,40 @@ public class TtsService(IHttpClientFactory httpFactory, IConfiguration config, I
 
     private async Task StreamOpusAsync(int channelId, short[] samples)
     {
-        var encoder = OpusCodecFactory.CreateEncoder(VoiceRate, 1, OpusApplication.OPUS_APPLICATION_VOIP);
-        var group = hub.Clients.Group($"voice-{channelId}");
-        var buf = new byte[4000];
-        var clock = System.Diagnostics.Stopwatch.StartNew();
-        var sent = 0;
-        for (var off = 0; off + FrameSamples <= samples.Length; off += FrameSamples)
+        // A new line supersedes anything already playing in this channel — no overlapping/garbled audio.
+        var cts = new CancellationTokenSource();
+        if (_speaking.TryGetValue(channelId, out var prev)) { try { prev.Cancel(); } catch { } }
+        _speaking[channelId] = cts;
+        var token = cts.Token;
+        try
         {
-            var frame = new short[FrameSamples];
-            Array.Copy(samples, off, frame, 0, FrameSamples);
-            var len = encoder.Encode(frame, FrameSamples, buf, buf.Length);
-            if (len <= 0) continue;
+            var encoder = OpusCodecFactory.CreateEncoder(VoiceRate, 1, OpusApplication.OPUS_APPLICATION_VOIP);
+            var group = hub.Clients.Group($"voice-{channelId}");
+            var buf = new byte[4000];
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var sent = 0;
+            for (var off = 0; off + FrameSamples <= samples.Length; off += FrameSamples)
+            {
+                if (token.IsCancellationRequested) break;   // interrupted
+                var frame = new short[FrameSamples];
+                Array.Copy(samples, off, frame, 0, FrameSamples);
+                var len = encoder.Encode(frame, FrameSamples, buf, buf.Length);
+                if (len <= 0) continue;
 
-            await group.SendAsync("ReceiveVoiceData", buf[..len]);
-            sent++;
+                await group.SendAsync("ReceiveVoiceData", buf[..len], token);
+                sent++;
 
-            // How far ahead of real-time we've sent. Only wait once we're past the lead cushion.
-            var aheadMs = (long)sent * FrameMs - clock.ElapsedMilliseconds;
-            if (aheadMs > LeadMs)
-                await Task.Delay((int)(aheadMs - LeadMs));
+                // How far ahead of real-time we've sent. Only wait once we're past the lead cushion.
+                var aheadMs = (long)sent * FrameMs - clock.ElapsedMilliseconds;
+                if (aheadMs > LeadMs)
+                    await Task.Delay((int)(aheadMs - LeadMs), token);
+            }
+        }
+        catch (OperationCanceledException) { /* cut off by a newer line or someone talking */ }
+        finally
+        {
+            if (_speaking.TryGetValue(channelId, out var cur) && cur == cts) _speaking.TryRemove(channelId, out _);
+            cts.Dispose();
         }
     }
 

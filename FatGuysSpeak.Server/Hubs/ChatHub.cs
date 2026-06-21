@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FatGuysSpeak.Server.Hubs;
 
 [Authorize]
-public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTracker onlineTime, FatGuysSpeak.Server.Services.BotService bot) : Hub
+public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTracker onlineTime, FatGuysSpeak.Server.Services.BotService bot, FatGuysSpeak.Server.Services.TtsService tts) : Hub
 {
     // userId -> voice channelId
     private static readonly ConcurrentDictionary<int, int> VoiceChannelMap = new();
@@ -221,9 +221,17 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         if (data.Length > MaxVoicePacketBytes) return;
         if (!VoiceChannelMap.TryGetValue(UserId, out var channelId)) return;
         VoiceLastActivity[channelId] = DateTime.UtcNow;   // someone's talking — reset the idle timer
+        tts.StopSpeaking(channelId);                       // a human is talking — PorkChop yields the floor
         var group = Clients.OthersInGroup($"voice-{channelId}");
         await group.SendAsync("ReceiveVoiceData", data);
         await group.SendAsync("UserSpeaking", UserId);
+    }
+
+    /// <summary>Manually cut PorkChop off mid-sentence in the caller's current voice channel.</summary>
+    public Task StopBotSpeech()
+    {
+        if (VoiceChannelMap.TryGetValue(UserId, out var channelId)) tts.StopSpeaking(channelId);
+        return Task.CompletedTask;
     }
 
     public async Task LeaveVoiceChannel()

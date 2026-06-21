@@ -1003,6 +1003,20 @@ using (var scope = app.Services.CreateScope())
     }
     ctx.SaveChanges();
 
+    // One-time admin bootstrap: promote the configured username to Admin in every server they belong to.
+    // Grants the first admin when the role UI isn't usable. Idempotent and safe to leave configured.
+    var bootstrapAdmin = app.Configuration["BootstrapAdminUsername"];
+    if (!string.IsNullOrWhiteSpace(bootstrapAdmin))
+    {
+        var bootUser = ctx.Users.FirstOrDefault(u => u.Username == bootstrapAdmin);
+        if (bootUser is not null)
+        {
+            var memberships = ctx.ServerMembers.Where(m => m.UserId == bootUser.Id).ToList();
+            foreach (var m in memberships) m.Role = FatGuysSpeak.Shared.ServerRole.Admin;
+            if (memberships.Count > 0) ctx.SaveChanges();
+        }
+    }
+
     var blacklist = scope.ServiceProvider.GetRequiredService<SessionBlacklistService>();
     await blacklist.RehydrateAsync(ctx);
 }

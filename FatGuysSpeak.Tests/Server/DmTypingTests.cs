@@ -81,7 +81,7 @@ public class DmTypingTests : IDisposable
         mockCtx.Setup(c => c.ConnectionId).Returns(connectionId);
         mockCtx.Setup(c => c.User).Returns(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
 
-        var hub = new ChatHub(_testDb.Db, new FatGuysSpeak.Server.Services.OnlineTimeTracker(), TestHelpers.NullBot());
+        var hub = new ChatHub(_testDb.Db, new FatGuysSpeak.Server.Services.OnlineTimeTracker(), TestHelpers.NullBot(), TestHelpers.NullTts());
         hub.Context = mockCtx.Object;
         hub.Clients = _mockClients.Object;
         hub.Groups = _mockGroups.Object;

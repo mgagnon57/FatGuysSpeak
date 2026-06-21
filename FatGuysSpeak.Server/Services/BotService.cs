@@ -48,9 +48,20 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         var contextLines = recent.Select(m => $"{m.Author.Username}: {m.Content}").ToList();
 
+        var bare = StripBotMention(triggerContent);
+
+        // "@PorkChop stop / shut up / quiet" cuts off whatever he's saying aloud and posts nothing.
+        if (System.Text.RegularExpressions.Regex.IsMatch(bare.Trim(),
+                @"^(stop|shut\s*up|quiet|stfu|enough|zip it|can it|pipe down)\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            tts.StopSpeaking(channelId);
+            return;
+        }
+
         // A mention can also kick off a game — "@PorkChop trivia", "would you rather", "settle this",
         // "roast battle @a @b". Those route to dedicated prompts; anything else is the normal advice path.
-        var game = DetectGame(StripBotMention(triggerContent));
+        var game = DetectGame(bare);
         string? reply = game switch
         {
             Game.Trivia         => await PostToClaudeAsync(TriviaSystem, "Fire one off now."),
