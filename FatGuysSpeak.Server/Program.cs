@@ -5,6 +5,7 @@ using FatGuysSpeak.Server.Data;
 using FatGuysSpeak.Server.Hubs;
 using FatGuysSpeak.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -68,6 +69,18 @@ builder.Services.AddHttpClient("anthropic", c =>
     c.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddSingleton<FatGuysSpeak.Server.Services.BotService>();
+
+// Persist Data Protection keys to stable storage so encrypted payloads — notably the dashboard auth
+// cookie — survive app restarts and redeploys. Without this, App Service hands the container fresh
+// in-memory keys on every restart, the cookie becomes undecryptable, and protected dashboard endpoints
+// return 403. On App Service /home is persistent and survives deploys; elsewhere use the content root.
+var dpKeyDir = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME"))
+    ? "/home/DataProtection-Keys"
+    : Path.Combine(builder.Environment.ContentRootPath, "dp-keys");
+Directory.CreateDirectory(dpKeyDir);
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(dpKeyDir))
+    .SetApplicationName("FatGuysSpeak");
 
 var jwtKey = builder.Configuration["Jwt:Key"];
 if (string.IsNullOrWhiteSpace(jwtKey))
