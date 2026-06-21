@@ -22,8 +22,11 @@ jobs:
 
       # Headless Linux build. The project multi-targets net9.0 and net9.0-windows; -f net9.0
       # builds only the Linux target (the Windows/WPF target can't and shouldn't build here).
+      # EnableWindowsTargeting lets the Linux SDK resolve the project's net9.0-windows target's
+      # references during restore without building it (we build only net9.0). Without it the SDK
+      # errors NETSDK1100 on Linux.
       - name: Publish (headless net9.0)
-        run: dotnet publish FatGuysSpeak.Server/FatGuysSpeak.Server.csproj -c Release -f net9.0 -o "${{ env.PUBLISH_DIR }}"
+        run: dotnet publish FatGuysSpeak.Server/FatGuysSpeak.Server.csproj -c Release -f net9.0 -p:EnableWindowsTargeting=true -o "${{ env.PUBLISH_DIR }}"
 
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
