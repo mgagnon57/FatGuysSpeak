@@ -37,6 +37,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<GoogleAuthService>();
         builder.Services.AddSingleton<FatGuysSpeak.Client.Services.UpdateService>();
         builder.Services.AddSingleton<SettingsViewModel>();
+        builder.Services.AddSingleton<PorkChopViewModel>();   // singleton: the ephemeral tab persists in-memory while the app runs
 
         builder.Services.AddTransient<AuthViewModel>();
         builder.Services.AddTransient<MainViewModel>();

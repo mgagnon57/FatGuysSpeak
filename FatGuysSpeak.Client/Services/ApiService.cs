@@ -351,6 +351,31 @@ public class ApiService
         return resp.IsSuccessStatusCode;
     }
 
+    public async Task<bool> GetPrivateModeAsync()
+    {
+        try { return await _http.GetFromJsonAsync<bool>("api/users/me/private-mode"); }
+        catch { return false; }
+    }
+
+    public async Task<bool> SetPrivateModeAsync(bool enabled)
+    {
+        var resp = await _http.PutAsJsonAsync("api/users/me/private-mode", new SetPrivateModeRequest(enabled));
+        return resp.IsSuccessStatusCode;
+    }
+
+    // Ephemeral question to PorkChop — the answer is returned directly and nothing is stored server-side.
+    public async Task<string?> AskPorkChopAsync(string question)
+    {
+        try
+        {
+            var resp = await _http.PostAsJsonAsync("api/porkchop/ask", new PorkChopAskRequest(question));
+            if (!resp.IsSuccessStatusCode) return null;
+            var dto = await resp.Content.ReadFromJsonAsync<PorkChopAskResponse>();
+            return dto?.Answer;
+        }
+        catch { return null; }
+    }
+
     public Task<List<BlockedUserDto>?> GetBlockedUsersAsync() =>
         _http.GetFromJsonAsync<List<BlockedUserDto>>("api/users/me/blocks");
 

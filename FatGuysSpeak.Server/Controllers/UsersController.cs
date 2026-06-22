@@ -105,6 +105,47 @@ public class UsersController(AppDbContext db) : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("me/private-mode")]
+    public async Task<ActionResult<bool>> GetPrivateMode()
+    {
+        var user = await db.Users.FindAsync(UserId);
+        if (user is null) return NotFound();
+        return user.PrivateMode;
+    }
+
+    // Opt-in privacy toggle. Only ever sets the CALLING user's own flag — there is no path here
+    // for one user (or an admin) to change someone else's. Enforcement of what PrivateMode does
+    // lives server-side at every capture/AI point, so flipping this is authoritative.
+    [HttpPut("me/private-mode")]
+    public async Task<IActionResult> SetPrivateMode(SetPrivateModeRequest req)
+    {
+        var user = await db.Users.FindAsync(UserId);
+        if (user is null) return NotFound();
+
+        var turningOn = req.Enabled && !user.PrivateMode;
+        user.PrivateMode = req.Enabled;
+        await db.SaveChangesAsync();
+
+        // Turning it on undoes prior tracking: delete this user's stored voice transcriptions and
+        // any nicknames PorkChop learned for them. (ReplyToId is SetNull on delete, so replies to a
+        // purged transcription stay intact; reactions/pins on one are cleared first to be FK-safe.)
+        if (turningOn)
+        {
+            var voiceIds = await db.Messages
+                .Where(m => m.AuthorId == UserId && m.Source == MessageSource.Voice)
+                .Select(m => m.Id).ToListAsync();
+            if (voiceIds.Count > 0)
+            {
+                await db.MessageReactions.Where(r => voiceIds.Contains(r.MessageId)).ExecuteDeleteAsync();
+                await db.PinnedMessages.Where(p => voiceIds.Contains(p.MessageId)).ExecuteDeleteAsync();
+                await db.Messages.Where(m => voiceIds.Contains(m.Id)).ExecuteDeleteAsync();
+            }
+            await db.UserAliases.Where(a => a.UserId == UserId).ExecuteDeleteAsync();
+        }
+
+        return NoContent();
+    }
+
     [HttpPut("me/status")]
     public async Task<IActionResult> UpdateStatus(UpdateStatusRequest req, [FromServices] IHubContext<ChatHub> hub)
     {

@@ -10,7 +10,7 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService, ShareBorderOverlay shareBorder) : ObservableObject
+public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService, ShareBorderOverlay shareBorder, PorkChopViewModel porkChop) : ObservableObject
 {
     private bool _initialized;
     private string? _versionSyncCheckedFor;   // server version last handled this session
@@ -157,6 +157,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private Window? _streamWindow;
     private Window? _settingsWindow;
+    private Window? _porkChopWindow;
     private int _streamSending; // Interlocked — drop frames rather than queue when link is busy
     private int _cameraSending; // Interlocked — same drop pattern for camera frames
     private Timer? _latencyTimer;
@@ -1337,17 +1338,23 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         await api.TempBanUserAsync(SelectedServer.Id, userId, seconds);
     }
 
-    /// <summary>Pop a prompt, then post the question as a normal @PorkChop mention so both the
-    /// question and the bot's reply show in chat — same path as typing @PorkChop yourself.</summary>
+    /// <summary>Open the ephemeral PorkChop tab — a private conversation with the bot that's never
+    /// saved (clears when the app closes) and never posted to the channel, so it doesn't clutter chat.</summary>
     [RelayCommand]
-    private async Task AskPorkChop()
+    private void AskPorkChop()
     {
-        if (SelectedChannel is null) return;
-        var question = await Shell.Current.DisplayPromptAsync(
-            "Ask PorkChop", "What do you want to ask PorkChop?", "Ask", "Cancel",
-            placeholder: "e.g. how do I cook a ribeye?");
-        if (string.IsNullOrWhiteSpace(question)) return;
-        await PostMessageAsync($"@PorkChop {question.Trim()}", MessageSource.Text);
+        if (_porkChopWindow is not null) return;
+        var page = new Pages.PorkChopPage { BindingContext = porkChop };
+        _porkChopWindow = new Window(page)
+        {
+            Title = "FatGuysSpeak — PorkChop",
+            Width = 460,
+            Height = 620,
+            MinimumWidth = 360,
+            MinimumHeight = 420,
+        };
+        _porkChopWindow.Destroying += (_, _) => _porkChopWindow = null;
+        Application.Current!.OpenWindow(_porkChopWindow);
     }
 
     private async Task PostMessageAsync(string text, MessageSource source, string? attachmentUrl = null, string? attachmentFileName = null)
@@ -2249,6 +2256,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         var trimmed = text.Trim();
         if (string.IsNullOrEmpty(trimmed) || SelectedChannel is null) return;
+        // Private Mode: don't even send our own speech (the server drops it anyway, but skip the round-trip).
+        if (Preferences.Get("private_mode", false)) return;
         _ = PostMessageAsync(trimmed, MessageSource.Voice);
     }
 

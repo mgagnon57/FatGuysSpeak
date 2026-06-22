@@ -22,6 +22,44 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
     [ObservableProperty] private bool _isAdaptiveThresholdEnabled;
     [ObservableProperty] private string _selectedTheme = ThemeService.Dark;
 
+    // Opt-in privacy. Server-enforced; the toggle just calls the API. Off by default.
+    [ObservableProperty] private bool _privateMode;
+    [ObservableProperty] private bool _isPrivateModeBusy;
+    private bool _suppressPrivateModeSave;
+
+    partial void OnPrivateModeChanged(bool value)
+    {
+        if (_suppressPrivateModeSave) return;
+        _ = ApplyPrivateModeAsync(value);
+    }
+
+    private async Task ApplyPrivateModeAsync(bool value)
+    {
+        IsPrivateModeBusy = true;
+        try
+        {
+            var ok = await api.SetPrivateModeAsync(value);
+            if (ok)
+                Preferences.Set("private_mode", value);   // client-side hint (e.g. to suppress local STT posting)
+            else
+            {
+                _suppressPrivateModeSave = true;           // revert the switch; the server didn't accept it
+                PrivateMode = !value;
+                _suppressPrivateModeSave = false;
+            }
+        }
+        finally { IsPrivateModeBusy = false; }
+    }
+
+    private async Task LoadPrivateModeAsync()
+    {
+        var pm = await api.GetPrivateModeAsync();
+        _suppressPrivateModeSave = true;
+        PrivateMode = pm;
+        _suppressPrivateModeSave = false;
+        Preferences.Set("private_mode", pm);
+    }
+
     // All available themes, in display order — drives the Settings picker.
     public IReadOnlyList<string> ThemeNames => ThemeService.Names;
 
@@ -60,6 +98,7 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
         NoiseGateThreshold = audio.NoiseGateThreshold;
         IsAdaptiveThresholdEnabled = audio.AdaptiveThresholdEnabled;
         SelectedTheme = ThemeService.CurrentTheme;
+        _ = LoadPrivateModeAsync();
         audio.ThresholdChanged += OnThresholdChanged;
         ptt.KeyLearned += OnKeyLearned;
     }

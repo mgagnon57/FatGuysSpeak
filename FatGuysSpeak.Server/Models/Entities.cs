@@ -16,6 +16,10 @@ public class User
     public DateTime? LastSeenAt { get; set; }
     public long TotalOnlineSeconds { get; set; }
 
+    // Opt-in privacy. When true, PorkChop won't roast/profile/recap this user, their voice is
+    // never transcribed into stored messages, and their aliases aren't learned. Off by default.
+    public bool PrivateMode { get; set; }
+
     public List<ServerMember> ServerMemberships { get; set; } = [];
     public List<Message> Messages { get; set; } = [];
 }

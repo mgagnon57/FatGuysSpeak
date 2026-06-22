@@ -114,13 +114,13 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         foreach (var n in mentioned)
         {
             var u = await db.Users.FirstOrDefaultAsync(x => x.Username.ToLower() == n.ToLower());
-            if (u is not null && combatants.All(c => c.Id != u.Id)) combatants.Add(u);
+            if (u is not null && !u.PrivateMode && combatants.All(c => c.Id != u.Id)) combatants.Add(u);
             if (combatants.Count == 2) break;
         }
         if (combatants.Count < 2)
             foreach (var m in ((IEnumerable<Message>)recent).Reverse())
             {
-                if (m.AuthorId == BotUserId || m.Author is null) continue;
+                if (m.AuthorId == BotUserId || m.Author is null || m.Author.PrivateMode) continue;   // never roast a private user
                 if (combatants.Any(c => c.Id == m.AuthorId)) continue;
                 combatants.Add(m.Author);
                 if (combatants.Count == 2) break;
@@ -180,7 +180,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         foreach (var uid in userIds.Take(8))
         {
             var u = await db.Users.FindAsync(uid);
-            if (u is null) continue;
+            if (u is null || u.PrivateMode) continue;   // private users aren't roasted in idle nudges
             var sIds = await db.ServerMembers.Where(m => m.UserId == uid).Select(m => m.ServerId).ToListAsync();
             dossiers.Add("- " + (await BuildUserDossierAsync(db, u, sIds)).Replace("\n", "\n  "));
         }
@@ -248,6 +248,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         var recent = await db.Messages
             .Where(m => m.AuthorId != user.Id && !m.IsDeleted
                         && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice)
+                        && !m.Author.PrivateMode                    // never use a private user's words as roast material
                         && serverIds.Contains(m.Channel.ServerId)
                         && !restricted.Contains(m.ChannelId))
             .OrderByDescending(m => m.CreatedAt).Take(200)
@@ -280,7 +281,8 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         var since = DateTime.UtcNow.AddDays(-30);
         var lines = await db.Messages
-            .Where(m => !m.IsDeleted && m.Source != MessageSource.AI && m.Channel.ServerId == serverId && m.CreatedAt >= since)
+            .Where(m => !m.IsDeleted && m.Source != MessageSource.AI && m.Channel.ServerId == serverId && m.CreatedAt >= since
+                        && !m.Author.PrivateMode)                   // don't mine private users' chat for nicknames
             .OrderByDescending(m => m.CreatedAt).Take(150)
             .Select(m => new { User = m.Author.Username, m.Content })
             .ToListAsync();
@@ -289,6 +291,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         var members = await (from sm in db.ServerMembers where sm.ServerId == serverId select sm.User).ToListAsync();
         var idByName = members.ToDictionary(u => u.Username, u => u.Id, StringComparer.OrdinalIgnoreCase);
+        var privateIds = members.Where(u => u.PrivateMode).Select(u => u.Id).ToHashSet();   // never learn aliases FOR a private user
         var usernames = new HashSet<string>(members.Select(u => u.Username), StringComparer.OrdinalIgnoreCase);
 
         var transcript = string.Join("\n", lines.Select(l => $"{l.User}: {l.Content}"));
@@ -306,6 +309,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         {
             if (entry.Username is null || entry.Aliases is null) continue;
             if (!idByName.TryGetValue(entry.Username, out var uid)) continue;
+            if (privateIds.Contains(uid)) continue;   // private user — don't store nicknames for them
             foreach (var raw in entry.Aliases)
             {
                 var alias = raw?.Trim() ?? "";
@@ -362,6 +366,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         var user = await db.Users.FindAsync(userId);
         if (user is null) return;
+        if (user.PrivateMode) return;   // private users are never roasted on join
 
         var serverIds = await db.ServerMembers.Where(m => m.UserId == userId).Select(m => m.ServerId).ToListAsync();
         if (serverIds.Count == 0) return;
@@ -396,6 +401,15 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
     private const string SummarySystem = "You are PorkChop. Summarize ONE day of chat in a single channel of FatGuysSpeak. In 2-5 sentences, recap the main topics discussed, any decisions or plans made, and anything notable that was shared (links, files, jokes that landed). Be friendly and concise, refer to people by name, and don't invent anything that isn't in the transcript. If it was just light small talk, say so briefly.";
 
+    /// <summary>Answers a direct question from the ephemeral @PorkChop tab. Generates a reply and
+    /// returns it — writes NOTHING to the database, mines no channel history, and posts nothing. This
+    /// is the one PorkChop ability available in Private Mode precisely because it leaves no trace.</summary>
+    public async Task<string?> AskEphemeralAsync(string question)
+    {
+        if (string.IsNullOrEmpty(_apiKey) || string.IsNullOrWhiteSpace(question)) return null;
+        return await CallClaudeAsync(StripBotMention(question), []);
+    }
+
     private Task<string?> CallClaudeAsync(string userMessage, List<string> contextLines, List<ClaudeImage>? images = null)
     {
         var content = contextLines.Count > 0
@@ -422,6 +436,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         var next = date.AddDays(1);
         var lines = await db.Messages
             .Where(m => m.ChannelId == channelId && !m.IsDeleted && m.Source == source
+                        && !m.Author.PrivateMode                    // private users are excluded from recaps
                         && m.CreatedAt >= date && m.CreatedAt < next)
             .Include(m => m.Author)
             .OrderBy(m => m.CreatedAt)
@@ -474,6 +489,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         var rows = await db.Messages
             .Where(m => !m.IsDeleted && m.Source != MessageSource.AI
+                        && !m.Author.PrivateMode                    // private users are excluded from the digest
                         && m.CreatedAt >= weekStart && m.CreatedAt < weekEnd
                         && m.Channel.ServerId == serverId)
             .OrderBy(m => m.CreatedAt)
@@ -538,6 +554,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         var rows = await db.Messages
             .Where(m => !m.IsDeleted && m.Source == source && m.AuthorId != userId
+                        && !m.Author.PrivateMode                    // private users are excluded from catch-up
                         && m.CreatedAt >= since && serverIds.Contains(m.Channel.ServerId))
             .OrderBy(m => m.CreatedAt)
             .Select(m => new { m.ChannelId, ServerId = m.Channel.ServerId, Channel = m.Channel.Name, User = m.Author.Username, m.Content })

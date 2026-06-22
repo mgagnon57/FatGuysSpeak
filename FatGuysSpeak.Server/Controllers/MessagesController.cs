@@ -185,6 +185,11 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
 
         var user = await db.Users.FindAsync(UserId);
 
+        // Private Mode: a private user's speech is never logged. Drop voice-transcription messages at
+        // ingestion so they are never stored anywhere (enforced here, not trusted to the client).
+        if (req.Source == MessageSource.Voice && user is not null && user.PrivateMode)
+            return NoContent();
+
         var filteredContent = req.Content?.Trim() ?? "";
 
         if (senderMember.Role < ServerRole.Admin && !string.IsNullOrEmpty(filteredContent))
@@ -248,7 +253,10 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
             await hub.Clients.Group($"server-{channel.ServerId}").SendAsync("NewMessageNotification", dto);
         }
 
-        if (message.Content.Contains($"@{BotService.BotUsername}", StringComparison.OrdinalIgnoreCase))
+        // Private users don't get a public in-channel PorkChop reply (it would be stored and rope them
+        // into the tracked flow); they use the ephemeral @PorkChop tab instead.
+        if (message.Content.Contains($"@{BotService.BotUsername}", StringComparison.OrdinalIgnoreCase)
+            && !(user?.PrivateMode ?? false))
             _ = bot.RespondAsync(channelId, channel.ServerId, message.Content, UserId, req.SpeakReply);
 
         _ = DeliverMessageWebhooksAsync(channel.ServerId, channelId, message.Id, user!.Username, filteredContent);

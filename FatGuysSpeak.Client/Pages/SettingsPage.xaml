@@ -67,6 +67,29 @@
                     </Grid>
                 </VerticalStackLayout>
 
+                <!-- ── PRIVACY ────────────────────────────────────── -->
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="PRIVACY" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10"
+                           FontAttributes="Bold"/>
+                    <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" />
+
+                    <Grid ColumnDefinitions="140,Auto,*" Padding="0,4,0,0">
+                        <Label Grid.Column="0" Text="Private Mode"
+                               TextColor="{DynamicResource ThemeTextSecondary}" FontSize="12" VerticalOptions="Center" />
+                        <Switch Grid.Column="1"
+                                IsToggled="{Binding PrivateMode}"
+                                IsEnabled="{Binding IsPrivateModeBusy, Converter={StaticResource InvertBoolConverter}}"
+                                OnColor="{DynamicResource ThemeAccentLight}" ThumbColor="White"
+                                VerticalOptions="Center" />
+                        <Label Grid.Column="2"
+                               Text="PorkChop won't roast, profile, or recap you, and your voice is never transcribed or stored — only your typed messages are kept."
+                               TextColor="{DynamicResource ThemeTextMuted}" FontSize="11" FontAttributes="Italic"
+                               VerticalOptions="Center" Margin="10,0,0,0" />
+                    </Grid>
+                    <Label Text="You can still ask PorkChop directly in the PorkChop tab — those answers are shown only to you and never saved. Your text may still appear as passing context when someone else asks PorkChop."
+                           TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" Margin="0,2,0,0" />
+                </VerticalStackLayout>
+
                 <!-- ── AUDIO ──────────────────────────────────────── -->
                 <VerticalStackLayout Spacing="12">
                     <Label Text="AUDIO" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10"

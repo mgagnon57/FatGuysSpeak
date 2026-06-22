@@ -102,6 +102,10 @@ public record UserProfileDto(
 public record UpdateStatusRequest(UserStatus Status, string? StatusText = null);
 public record UpdateBioRequest(string? Bio);
 public record UpdateUsernameRequest(string Username);
+public record SetPrivateModeRequest(bool Enabled);
+// Direct, ephemeral question to PorkChop — nothing about this is stored server-side.
+public record PorkChopAskRequest(string Question, int? ChannelId = null);
+public record PorkChopAskResponse(string Answer);
 public record BlockedUserDto(int UserId, string Username, DateTime BlockedAt);
 
 public record UserDto(int Id, string Username, UserStatus Status, string? AvatarUrl = null, string? StatusText = null);

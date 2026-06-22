@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:FatGuysSpeak.Client.ViewModels"
+             x:Class="FatGuysSpeak.Client.Pages.PorkChopPage"
+             x:DataType="vm:PorkChopViewModel"
+             Title="PorkChop"
+             BackgroundColor="{DynamicResource ThemeBgPrimary}">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Header -->
+        <VerticalStackLayout Grid.Row="0" Padding="16,12" Spacing="2"
+                             BackgroundColor="{DynamicResource ThemeBgHeader}">
+            <Label Text="🐷 PorkChop" FontFamily="Bebas" FontSize="22" CharacterSpacing="1"
+                   TextColor="{DynamicResource ThemeAccentLight}" />
+            <Label Text="Ask anything. This chat is never saved — it clears when you close the app."
+                   FontSize="11" TextColor="{DynamicResource ThemeTextMuted}" />
+        </VerticalStackLayout>
+
+        <!-- Conversation -->
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Turns}" Margin="14,10"
+                        VerticalScrollBarVisibility="Always">
+            <CollectionView.EmptyView>
+                <Label Text="Say hi to PorkChop 🐷" HorizontalOptions="Center" VerticalOptions="Center"
+                       TextColor="{DynamicResource ThemeTextMuted}" FontSize="13" />
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:PorkChopTurnViewItem">
+                    <VerticalStackLayout Padding="0,6" Spacing="1">
+                        <Label Text="{Binding Sender}" FontSize="11" FontAttributes="Bold"
+                               TextColor="{DynamicResource ThemeAccentLight}" />
+                        <Label Text="{Binding Text}" FontSize="14" LineBreakMode="WordWrap"
+                               TextColor="{DynamicResource ThemeTextPrimary}" />
+                    </VerticalStackLayout>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Input -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Padding="14,10" ColumnSpacing="8"
+              BackgroundColor="{DynamicResource ThemeBgHeader}">
+            <Entry Grid.Column="0" Placeholder="Ask PorkChop…" Text="{Binding Draft}"
+                   ReturnCommand="{Binding SendCommand}"
+                   PlaceholderColor="{DynamicResource ThemeTextMuted}"
+                   TextColor="{DynamicResource ThemeTextPrimary}"
+                   BackgroundColor="{DynamicResource ThemeBgInput}" />
+            <Button Grid.Column="1" Text="Ask" Command="{Binding SendCommand}"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertBoolConverter}}"
+                    BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
+                    CornerRadius="8" Padding="18,0" />
+        </Grid>
+    </Grid>
+</ContentPage>

@@ -865,4 +865,29 @@ public class BotServiceTests : IDisposable
         Assert.Equal(0, result!.MessageCount);
         Assert.Contains("Quiet day", result.Summary);
     }
+
+    [Fact]
+    public async Task GetOrCreateDailySummary_ExcludesPrivateUsersMessages()
+    {
+        var (server, user) = await TestHelpers.SeedServerAsync(_db.Db);
+        var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
+
+        user.PrivateMode = true;
+        var day = DateTime.UtcNow.Date.AddDays(-2);
+        _db.Db.Messages.Add(new Message
+        {
+            Content = "private chatter", AuthorId = user.Id, ChannelId = channel.Id,
+            Source = MessageSource.Text, CreatedAt = day.AddHours(12),
+        });
+        await _db.Db.SaveChangesAsync();
+
+        var svc = MakeBotService(MakeHttpFactory("should not be used"), MakeConfig());
+        var result = await svc.GetOrCreateDailySummaryAsync(channel.Id, day, MessageSource.Text);
+
+        // The private user's message is filtered out, so the day reads as quiet (count 0) and no
+        // transcript is ever sent to the model.
+        Assert.NotNull(result);
+        Assert.Equal(0, result!.MessageCount);
+        Assert.Contains("Quiet day", result.Summary);
+    }
 }

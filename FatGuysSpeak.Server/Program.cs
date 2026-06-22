@@ -351,6 +351,10 @@ using (var scope = app.Services.CreateScope())
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"Bio\" TEXT");
 
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Users' AND column_name='PrivateMode'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Users\" ADD COLUMN \"PrivateMode\" BOOLEAN NOT NULL DEFAULT FALSE");
+
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='Channels' AND column_name='SlowmodeSeconds'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE \"Channels\" ADD COLUMN \"SlowmodeSeconds\" INTEGER NOT NULL DEFAULT 0");
@@ -443,6 +447,10 @@ using (var scope = app.Services.CreateScope())
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='Bio'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
             ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN Bio TEXT");
+
+        checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Users') WHERE name='PrivateMode'";
+        if ((long)checkCmd.ExecuteScalar()! == 0)
+            ctx.Database.ExecuteSqlRaw("ALTER TABLE Users ADD COLUMN PrivateMode INTEGER NOT NULL DEFAULT 0");
 
         checkCmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Channels') WHERE name='SlowmodeSeconds'";
         if ((long)checkCmd.ExecuteScalar()! == 0)
