@@ -4,6 +4,8 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) and the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ## [Unreleased]
+
+## [0.12.0] - 2026-06-21
 ### Added
 - New PorkChop app icon (a pig in a headset). It replaces the old placeholder everywhere: the
   Windows app/taskbar/window icon, the top bar, the login and register screens, PorkChop's chat
