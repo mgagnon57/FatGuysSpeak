@@ -22,7 +22,7 @@ public class AuthControllerTests : IDisposable
     [Fact]
     public async Task Register_Success_ReturnsToken()
     {
-        var result = await _controller.Register(new RegisterRequest("alice", "password123", "alice@test.com"));
+        var result = await _controller.Register(new RegisterRequest("alice", "password123"));
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var auth = Assert.IsType<AuthResponse>(ok.Value);
@@ -33,27 +33,29 @@ public class AuthControllerTests : IDisposable
     [Fact]
     public async Task Register_DuplicateUsername_ReturnsConflict()
     {
-        await _controller.Register(new RegisterRequest("alice", "password123", "alice@test.com"));
+        await _controller.Register(new RegisterRequest("alice", "password123"));
 
-        var result = await _controller.Register(new RegisterRequest("alice", "password456", "other@test.com"));
+        var result = await _controller.Register(new RegisterRequest("alice", "password456"));
 
         Assert.IsType<ConflictObjectResult>(result.Result);
     }
 
     [Fact]
-    public async Task Register_DuplicateEmail_ReturnsConflict()
+    public async Task Register_MultipleAccountsWithoutEmail_AllSucceed()
     {
-        await _controller.Register(new RegisterRequest("alice", "password123", "shared@test.com"));
+        // Manual registration no longer collects an email, so every account is created with an
+        // empty email. The filtered unique index must allow more than one such account.
+        var first = await _controller.Register(new RegisterRequest("alice", "password123"));
+        var second = await _controller.Register(new RegisterRequest("bob", "password123"));
 
-        var result = await _controller.Register(new RegisterRequest("bob", "password123", "shared@test.com"));
-
-        Assert.IsType<ConflictObjectResult>(result.Result);
+        Assert.IsType<OkObjectResult>(first.Result);
+        Assert.IsType<OkObjectResult>(second.Result);
     }
 
     [Fact]
     public async Task Login_Success_ReturnsToken()
     {
-        await _controller.Register(new RegisterRequest("alice", "password123", "alice@test.com"));
+        await _controller.Register(new RegisterRequest("alice", "password123"));
 
         var result = await _controller.Login(new LoginRequest("alice", "password123"));
 
@@ -65,7 +67,7 @@ public class AuthControllerTests : IDisposable
     [Fact]
     public async Task Login_WrongPassword_ReturnsUnauthorizedWithMessage()
     {
-        await _controller.Register(new RegisterRequest("alice", "correctpass", "alice@test.com"));
+        await _controller.Register(new RegisterRequest("alice", "correctpass"));
 
         var result = await _controller.Login(new LoginRequest("alice", "wrongpass"));
 
@@ -87,7 +89,7 @@ public class AuthControllerTests : IDisposable
     {
         var (server, _) = await TestHelpers.SeedServerAsync(_testDb.Db, "owner");
 
-        await _controller.Register(new RegisterRequest("newuser", "password123", "new@test.com"));
+        await _controller.Register(new RegisterRequest("newuser", "password123"));
 
         var newUser = _testDb.Db.Users.First(u => u.Username == "newuser");
         var isMember = _testDb.Db.ServerMembers

@@ -9,7 +9,6 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
 {
     [ObservableProperty] private string _username = "";
     [ObservableProperty] private string _password = "";
-    [ObservableProperty] private string _email = "";
     [ObservableProperty] private string _errorMessage = "";
     [ObservableProperty] private bool _isLoading;
     [ObservableProperty] private bool _isGoogleAvailable;
@@ -130,7 +129,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
         try
         {
             api.SetServerUrl(ServerUrl);
-            var result = await api.RegisterAsync(new RegisterRequest(Username, Password, Email));
+            var result = await api.RegisterAsync(new RegisterRequest(Username, Password));
             if (result is null) { ErrorMessage = "Registration failed."; return; }
 
             api.SetToken(result.Token);

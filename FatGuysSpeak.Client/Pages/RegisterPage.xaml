@@ -8,13 +8,9 @@
     <ScrollView>
         <VerticalStackLayout Padding="40" Spacing="16" VerticalOptions="Center">
 
+            <Image Source="fgs_logo.png" WidthRequest="104" HeightRequest="104" HorizontalOptions="Center" Margin="0,0,0,4" />
             <Label Text="Create an account" FontSize="24" FontAttributes="Bold"
                    TextColor="{DynamicResource ThemeTextPrimary}" HorizontalOptions="Center" />
-
-            <Label Text="EMAIL" FontSize="12" TextColor="{DynamicResource ThemeTextSecondary}" FontAttributes="Bold" />
-            <Entry Placeholder="Enter your email" PlaceholderColor="{DynamicResource ThemeTextMuted}"
-                   TextColor="White" BackgroundColor="{DynamicResource ThemeBgInput}"
-                   Keyboard="Email" Text="{Binding Email}" />
 
             <Label Text="USERNAME" FontSize="12" TextColor="{DynamicResource ThemeTextSecondary}" FontAttributes="Bold" />
             <Entry Placeholder="Choose a username" PlaceholderColor="{DynamicResource ThemeTextMuted}"

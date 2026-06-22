@@ -20,6 +20,9 @@ public class ChatHubService
     public event Action<int, UserDto>? UserJoinedChannel;
     public event Action<int, UserDto>? UserLeftChannel;
     public event Action<byte[]>? VoiceDataReceived;
+    // PorkChop's spoken (TTS) audio comes on its own event so the client can drop it when the
+    // user has muted PorkChop's voice — including server-initiated speech like idle/join roasts.
+    public event Action<byte[]>? BotVoiceDataReceived;
     public event Action<int, string>? OfferReceived;
     public event Action<int, string>? AnswerReceived;
     public event Action<int, string>? IceCandidateReceived;
@@ -94,6 +97,7 @@ public class ChatHubService
         _connection.On<int, UserDto>("UserJoinedChannel", (cid, dto) => UserJoinedChannel?.Invoke(cid, dto));
         _connection.On<int, UserDto>("UserLeftChannel", (cid, dto) => UserLeftChannel?.Invoke(cid, dto));
         _connection.On<byte[]>("ReceiveVoiceData", data => VoiceDataReceived?.Invoke(data));
+        _connection.On<byte[]>("ReceiveBotVoice", data => BotVoiceDataReceived?.Invoke(data));
         _connection.On<int, string>("ReceiveOffer", (uid, sdp) => OfferReceived?.Invoke(uid, sdp));
         _connection.On<int, string>("ReceiveAnswer", (uid, sdp) => AnswerReceived?.Invoke(uid, sdp));
         _connection.On<int, string>("ReceiveIceCandidate", (uid, c) => IceCandidateReceived?.Invoke(uid, c));

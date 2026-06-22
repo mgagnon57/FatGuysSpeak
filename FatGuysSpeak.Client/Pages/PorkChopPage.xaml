@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:FatGuysSpeak.Client.ViewModels"
              x:Class="FatGuysSpeak.Client.Pages.PorkChopPage"
+             x:Name="PageRoot"
              x:DataType="vm:PorkChopViewModel"
              Title="PorkChop"
              BackgroundColor="{DynamicResource ThemeBgPrimary}">
@@ -32,6 +33,17 @@
                                TextColor="{DynamicResource ThemeAccentLight}" />
                         <Label Text="{Binding Text}" FontSize="14" LineBreakMode="WordWrap"
                                TextColor="{DynamicResource ThemeTextPrimary}" />
+                        <!-- Opt-in: share a PorkChop answer to the current channel (off by default). -->
+                        <Button Text="{Binding ShareButtonText}"
+                                IsVisible="{Binding CanShare}"
+                                IsEnabled="{Binding IsShared, Converter={StaticResource InvertBoolConverter}}"
+                                Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.ShareWithChannelCommand}"
+                                CommandParameter="{Binding .}"
+                                HorizontalOptions="Start" Margin="0,4,0,0" Padding="10,2"
+                                FontSize="11" CornerRadius="6"
+                                BackgroundColor="Transparent" BorderWidth="1"
+                                BorderColor="{DynamicResource ThemeAccent}"
+                                TextColor="{DynamicResource ThemeAccentLight}" />
                     </VerticalStackLayout>
                 </DataTemplate>
             </CollectionView.ItemTemplate>

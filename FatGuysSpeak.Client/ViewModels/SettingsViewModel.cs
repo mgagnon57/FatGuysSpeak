@@ -27,28 +27,74 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
     [ObservableProperty] private bool _isPrivateModeBusy;
     private bool _suppressPrivateModeSave;
 
+    // The Settings page runs in its own Window (not the Shell), so Shell.Current is null here —
+    // dialogs must go through the page itself. Set by MainViewModel.OpenSettings.
+    public Page? HostPage { get; set; }
+    private Page? Dialog => HostPage ?? Application.Current?.Windows?.LastOrDefault()?.Page;
+
     partial void OnPrivateModeChanged(bool value)
     {
         if (_suppressPrivateModeSave) return;
-        _ = ApplyPrivateModeAsync(value);
+        _ = OnSwitchToggledAsync(value);
     }
 
-    private async Task ApplyPrivateModeAsync(bool value)
+    // Drives the Settings switch. The actual consent/apply lives in ConfirmAndApplyPrivateModeAsync
+    // so the channel-toolbar dropdown can reuse it; on a declined/failed change we snap the switch back.
+    private async Task OnSwitchToggledAsync(bool value)
     {
         IsPrivateModeBusy = true;
         try
         {
-            var ok = await api.SetPrivateModeAsync(value);
-            if (ok)
-                Preferences.Set("private_mode", value);   // client-side hint (e.g. to suppress local STT posting)
-            else
-            {
-                _suppressPrivateModeSave = true;           // revert the switch; the server didn't accept it
-                PrivateMode = !value;
-                _suppressPrivateModeSave = false;
-            }
+            var ok = await ConfirmAndApplyPrivateModeAsync(value, Dialog);
+            if (!ok) SetPrivateModeSilently(!value);
         }
         finally { IsPrivateModeBusy = false; }
+    }
+
+    // Update the bound PrivateMode flag without re-triggering the consent/apply flow.
+    public void SetPrivateModeSilently(bool value)
+    {
+        _suppressPrivateModeSave = true;
+        PrivateMode = value;
+        _suppressPrivateModeSave = false;
+    }
+
+    /// <summary>
+    /// Shared consent + apply for Private Mode, used by both the Settings switch and the channel
+    /// dropdown. Turning OFF prompts for consent (voice will be used by AI); turning ON shows the
+    /// data-deletion notice. Returns true only if the change was accepted and persisted server-side.
+    /// Does NOT mutate the bound PrivateMode flag — the caller updates UI state on success.
+    /// </summary>
+    public async Task<bool> ConfirmAndApplyPrivateModeAsync(bool value, Page? host)
+    {
+        host ??= Dialog;
+        if (!value)
+        {
+            if (host is null) return false;   // can't get consent without a UI
+            var accepted = await host.DisplayAlert(
+                "🎙️ Let PorkChop Listen In?",
+                "Flip this off and PorkChop gets your voice. Every word you say in voice chat gets " +
+                "transcribed, stored on the server, and used to roast you, profile you, slap dumb " +
+                "nicknames on you, and drag you into the recaps. He's gonna have a field day.\n\n" +
+                "You cool with that, you magnificent degenerate?",
+                "🔥 Hell yeah, roast me", "🔒 Nope, stay private");
+            if (!accepted) return false;
+        }
+
+        var ok = await api.SetPrivateModeAsync(value);
+        if (!ok) return false;
+
+        Preferences.Set("private_mode", value);   // client-side hint (e.g. to suppress local STT posting)
+        if (value && host is not null)
+            await host.DisplayAlert(
+                "🔒 Private Mode On — PorkChop's Pissed",
+                "Done. PorkChop just had everything he scraped on you yanked off the server — your " +
+                "voice transcripts AND the dumb nicknames he cooked up, gone, even the old stuff he'd " +
+                "been hoarding. All that's left is what runs your account: your username, password, and " +
+                "the messages you actually typed.\n\n" +
+                "From here on he can't hear you, roast you, or recap you. Enjoy the silence. 🐷🔇",
+                "😎 Sweet");
+        return true;
     }
 
     private async Task LoadPrivateModeAsync()

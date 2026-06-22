@@ -110,6 +110,12 @@ public partial class MessageViewItem : ObservableObject
     public bool GifPaused => HasGifAttachment && _attachmentDisplayUrl is null;
 
     public bool HasAvatarImage => !string.IsNullOrEmpty(Message.AuthorAvatarUrl);
+    // Avatar rendering: PorkChop (the bot) always shows the app logo; everyone else shows their
+    // uploaded avatar or, failing that, their initials. Split into three exclusive flags so the
+    // XAML can bind each element's visibility directly without a MultiBinding.
+    public bool ShowBotAvatar  => IsBot;
+    public bool ShowUserAvatar => !IsBot && HasAvatarImage;
+    public bool ShowInitials   => !IsBot && !HasAvatarImage;
     public bool HasReply => Message.ReplyToId.HasValue;
 
     // Link / video helpers
@@ -283,6 +289,8 @@ public partial class MessageViewItem : ObservableObject
         OnPropertyChanged(nameof(IsFileAttachment));
         OnPropertyChanged(nameof(AttachmentFileName));
         OnPropertyChanged(nameof(HasAvatarImage));
+        OnPropertyChanged(nameof(ShowUserAvatar));
+        OnPropertyChanged(nameof(ShowInitials));
         OnPropertyChanged(nameof(HasReply));
         OnPropertyChanged(nameof(ReplyAuthor));
         OnPropertyChanged(nameof(ReplyBodyPreview));

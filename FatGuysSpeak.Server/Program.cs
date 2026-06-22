@@ -803,6 +803,11 @@ using (var scope = app.Services.CreateScope())
                 ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
             )");
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ExternalLogins_Provider_ProviderUserId"" ON ""ExternalLogins"" (""Provider"", ""ProviderUserId"")");
+
+        // Email is now optional (manual registration dropped it). Replace the plain unique email
+        // index with a filtered one so multiple no-email accounts ("") can coexist.
+        ctx.Database.ExecuteSqlRaw(@"DROP INDEX IF EXISTS ""IX_Users_Email""");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS ""IX_Users_Email"" ON ""Users"" (""Email"") WHERE ""Email"" <> ''");
     }
     else
     {
@@ -816,6 +821,11 @@ using (var scope = app.Services.CreateScope())
                 CreatedAt TEXT NOT NULL DEFAULT (datetime('now'))
             )");
         ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_ExternalLogins_Provider_ProviderUserId ON ExternalLogins (Provider, ProviderUserId)");
+
+        // Email is now optional (manual registration dropped it). Replace the plain unique email
+        // index with a filtered one so multiple no-email accounts ("") can coexist.
+        ctx.Database.ExecuteSqlRaw(@"DROP INDEX IF EXISTS IX_Users_Email");
+        ctx.Database.ExecuteSqlRaw(@"CREATE UNIQUE INDEX IF NOT EXISTS IX_Users_Email ON Users (Email) WHERE Email <> ''");
     }
 
     // Soundboard clips (per server).

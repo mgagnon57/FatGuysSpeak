@@ -59,3 +59,6 @@ logs/
 
 # ASP.NET Data Protection keys (local) — sensitive, never commit
 FatGuysSpeak.Server/dp-keys/
+
+# Icon design scratch (working files; final assets live in Resources/Installer/docs)
+icon-concepts/

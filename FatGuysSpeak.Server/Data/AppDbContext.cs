@@ -48,8 +48,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<User>()
             .HasIndex(u => u.Username).IsUnique();
+        // Email is optional (manual registration no longer collects it; only Google sign-in sets it).
+        // Filter the unique index so multiple no-email accounts ("") don't collide while real emails
+        // stay unique. The filter SQL is valid for both SQLite and PostgreSQL.
         b.Entity<User>()
-            .HasIndex(u => u.Email).IsUnique();
+            .HasIndex(u => u.Email).IsUnique().HasFilter("\"Email\" <> ''");
 
         b.Entity<MessageReaction>()
             .HasIndex(r => new { r.MessageId, r.UserId, r.Emoji }).IsUnique();

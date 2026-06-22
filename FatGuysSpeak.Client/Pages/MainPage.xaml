@@ -42,11 +42,7 @@
               ColumnDefinitions="Auto,Auto,Auto,*">
             <!-- Brand lives in its own Auto column so the connection status can never squeeze it -->
             <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
-                <Border BackgroundColor="{DynamicResource ThemeAccent}" StrokeThickness="0"
-                        StrokeShape="RoundRectangle 6" Padding="6,2" VerticalOptions="Center">
-                    <Label Text="FGS" FontFamily="Bebas" CharacterSpacing="1" TextColor="White"
-                           FontSize="13" FontAttributes="Bold" VerticalOptions="Center" />
-                </Border>
+                <Image Source="fgs_logo.png" WidthRequest="34" HeightRequest="34" VerticalOptions="Center" />
                 <Label Text="FatGuysSpeak" FontFamily="Bebas" CharacterSpacing="1" TextColor="{DynamicResource ThemeTextPrimary}"
                        FontSize="17" VerticalOptions="Center" LineBreakMode="NoWrap" />
             </HorizontalStackLayout>
@@ -517,6 +513,12 @@
                         </HorizontalStackLayout>
                         <HorizontalStackLayout Grid.Column="2" Spacing="0" VerticalOptions="Center"
                                 IsVisible="{Binding SelectedChannel, Converter={StaticResource NullToBoolConverter}}">
+                            <Picker ItemsSource="{Binding PrivateModeOptions}"
+                                    SelectedIndex="{Binding PrivateModeIndex}"
+                                    TextColor="{Binding PrivateModeStatusColor}"
+                                    BackgroundColor="Transparent" FontSize="11"
+                                    WidthRequest="120" HeightRequest="34" VerticalOptions="Center" Margin="0,0,4,0"
+                                    ToolTipProperties.Text="Switch Private Mode on/off — your voice is only used by AI when this says 'AI on'." />
                             <Button Text="{Binding PorkChopVoiceIcon}"
                                     Command="{Binding TogglePorkChopVoiceCommand}"
                                     BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
@@ -938,9 +940,12 @@
                                             <Label Text="{Binding Message.AuthorUsername, Converter={StaticResource InitialsConverter}}"
                                                    TextColor="White" FontSize="12" FontAttributes="Bold"
                                                    HorizontalOptions="Center" VerticalOptions="Center"
-                                                   IsVisible="{Binding HasAvatarImage, Converter={StaticResource InvertBoolConverter}}" />
+                                                   IsVisible="{Binding ShowInitials}" />
                                             <Image Source="{Binding Message.AuthorAvatarUrl}"
-                                                   IsVisible="{Binding HasAvatarImage}"
+                                                   IsVisible="{Binding ShowUserAvatar}"
+                                                   Aspect="AspectFill" />
+                                            <Image Source="fgs_logo.png"
+                                                   IsVisible="{Binding ShowBotAvatar}"
                                                    Aspect="AspectFill" />
                                         </Grid>
                                     </Frame>
@@ -1491,9 +1496,13 @@
                                 <Frame Grid.Column="0" CornerRadius="14" WidthRequest="28" HeightRequest="28"
                                        BackgroundColor="{DynamicResource ThemeAccent}" Padding="0" Margin="0,0,8,0"
                                        VerticalOptions="Start">
-                                    <Label Text="{Binding Message.AuthorUsername, Converter={StaticResource InitialsConverter}}"
-                                           TextColor="White" FontSize="10" FontAttributes="Bold"
-                                           HorizontalOptions="Center" VerticalOptions="Center" />
+                                    <Grid>
+                                        <Label Text="{Binding Message.AuthorUsername, Converter={StaticResource InitialsConverter}}"
+                                               TextColor="White" FontSize="10" FontAttributes="Bold"
+                                               HorizontalOptions="Center" VerticalOptions="Center"
+                                               IsVisible="{Binding ShowBotAvatar, Converter={StaticResource InvertBoolConverter}}" />
+                                        <Image Source="fgs_logo.png" IsVisible="{Binding ShowBotAvatar}" Aspect="AspectFill" />
+                                    </Grid>
                                 </Frame>
                                 <VerticalStackLayout Grid.Column="1" Spacing="2">
                                     <HorizontalStackLayout Spacing="6">

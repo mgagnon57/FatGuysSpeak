@@ -4,6 +4,25 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) and the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ## [Unreleased]
+### Added
+- New PorkChop app icon (a pig in a headset). It replaces the old placeholder everywhere: the
+  Windows app/taskbar/window icon, the top bar, the login and register screens, PorkChop's chat
+  avatar, the server installer, and the website favicon + landing-page chat demo.
+- Private Mode quick toggle: a dropdown right next to the PorkChop voice button lets you switch
+  Private Mode on or off without opening Settings. Turning it OFF first asks you to accept that
+  your voice will be transcribed and used by the AI; turning it ON confirms that everything the AI
+  had gathered about you — including data collected earlier — has been deleted from the server.
+- "Share with channel" on the Ask PorkChop tab: a PorkChop answer stays private to you unless you
+  choose to post it into the channel you're viewing.
+
+### Changed
+- Registration now asks only for a username and password — no email required.
+- PorkChop's replies are now adults-only: he'll swear, get crude, and tell a dirty joke when asked
+  instead of giving a polite refusal, and he knows BillyBong built him.
+
+### Fixed
+- Muting PorkChop's voice now silences all of his speech, including the idle-channel and join
+  roasts — previously the mute only affected replies to your own messages.
 
 ## [0.11.0] - 2026-06-21
 ### Added

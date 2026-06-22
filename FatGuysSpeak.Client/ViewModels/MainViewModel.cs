@@ -55,6 +55,51 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     }
     [RelayCommand] private void TogglePorkChopVoice() => PorkChopVoice = !PorkChopVoice;
 
+    // Private Mode dropdown shown next to the PorkChop controls. Loaded from the server on init and
+    // kept in sync with the Settings toggle (which lives in a separate window). Index 0 = Private,
+    // index 1 = AI on. Selecting an option runs the same consent/notice popups as the Settings page.
+    public string[] PrivateModeOptions { get; } = ["🔒 Private", "🎙 AI on"];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PrivateModeStatusColor))]
+    private bool _isPrivateMode;
+    public Color PrivateModeStatusColor => IsPrivateMode ? Color.FromArgb("#36b864") : Color.FromArgb("#e89000");
+
+    [ObservableProperty] private int _privateModeIndex = 1;   // default "AI on" until the server value loads
+    private bool _suppressPrivateIndex;
+
+    partial void OnIsPrivateModeChanged(bool value)
+    {
+        _suppressPrivateIndex = true;
+        PrivateModeIndex = value ? 0 : 1;
+        _suppressPrivateIndex = false;
+        OnPropertyChanged(nameof(PrivateModeStatusColor));
+    }
+
+    partial void OnPrivateModeIndexChanged(int value)
+    {
+        if (_suppressPrivateIndex) return;
+        _ = ApplyPrivateModeFromDropdownAsync(value == 0);
+    }
+
+    private async Task ApplyPrivateModeFromDropdownAsync(bool desired)
+    {
+        if (desired == IsPrivateMode) return;
+        // Shell.Current is the main window's shell (a Page) — popups show over the channel view.
+        var ok = await settings.ConfirmAndApplyPrivateModeAsync(desired, Shell.Current);
+        if (ok)
+        {
+            IsPrivateMode = desired;                  // also re-syncs the dropdown index + colour
+            settings.SetPrivateModeSilently(desired); // keep the Settings switch in agreement
+        }
+        else
+        {
+            _suppressPrivateIndex = true;             // declined/failed — snap the dropdown back
+            PrivateModeIndex = IsPrivateMode ? 0 : 1;
+            _suppressPrivateIndex = false;
+        }
+    }
+
     [ObservableProperty] private ObservableCollection<ServerViewItem> _servers = [];
     [ObservableProperty] private ObservableCollection<ChannelViewItem> _channels = [];
     private List<CategoryDto> _serverCategories = [];
@@ -432,6 +477,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         OnPropertyChanged(nameof(CurrentChannelSlowmodeLabel));
         OnPropertyChanged(nameof(CurrentChannelHasSlowmode));
         IsPinsOpen = false;
+        // Track the active channel so detached surfaces (e.g. the PorkChop tab's "Share with
+        // channel") know where to post.
+        api.SetCurrentChannel(value?.Id, value?.Name);
     }
     partial void OnIsStreamingChanged(bool value)
     {
@@ -527,6 +575,14 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         if (_initialized) return;
         _initialized = true;
+        // Keep the Private Mode status chip in sync with the Settings toggle (separate window),
+        // and load the current value from the server.
+        settings.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SettingsViewModel.PrivateMode))
+                IsPrivateMode = settings.PrivateMode;
+        };
+        _ = LoadPrivateModeStatusAsync();
         hub.MessageReceived   += OnMessageReceived;
         hub.UserJoinedVoice   += OnUserJoinedVoice;
         hub.UserLeftVoice     += OnUserLeftVoice;
@@ -540,6 +596,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.UserJoinedChannel += OnUserJoinedChannel;
         hub.UserLeftChannel   += OnUserLeftChannel;
         hub.VoiceDataReceived += OnVoiceDataReceived;
+        hub.BotVoiceDataReceived += OnBotVoiceDataReceived;
         hub.StreamStarted        += OnStreamStarted;
         hub.StreamStopped        += OnStreamStopped;
         hub.StreamFrameReceived  += OnStreamFrameReceived;
@@ -2138,6 +2195,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.UserJoinedChannel      -= OnUserJoinedChannel;
         hub.UserLeftChannel        -= OnUserLeftChannel;
         hub.VoiceDataReceived      -= OnVoiceDataReceived;
+        hub.BotVoiceDataReceived   -= OnBotVoiceDataReceived;
         hub.StreamStarted          -= OnStreamStarted;
         hub.StreamStopped          -= OnStreamStopped;
         hub.StreamFrameReceived    -= OnStreamFrameReceived;
@@ -2251,6 +2309,13 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     private void OnVoiceDataReceived(byte[] data) =>
         audio.PlayAudio(data);
+
+    // PorkChop's spoken audio (replies + idle/join roasts) — honour the per-user mute toggle, so
+    // muting PorkChop silences his voice everywhere, not just replies to your own messages.
+    private void OnBotVoiceDataReceived(byte[] data)
+    {
+        if (PorkChopVoice) audio.PlayAudio(data);
+    }
 
     private void OnSpeechRecognized(string text)
     {
@@ -3185,10 +3250,16 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     }
 
     [RelayCommand]
+    private async Task LoadPrivateModeStatusAsync()
+    {
+        try { IsPrivateMode = await api.GetPrivateModeAsync(); } catch { /* keep default until Settings loads */ }
+    }
+
     public void OpenSettings()
     {
         if (_settingsWindow is not null) return;
         var page = new Pages.SettingsPage { BindingContext = settings };
+        settings.HostPage = page;   // Settings runs in its own Window (no Shell), so dialogs go through this page
         _settingsWindow = new Window(page)
         {
             Title = "FatGuysSpeak — Settings",

@@ -107,7 +107,8 @@ public class TtsService(IHttpClientFactory httpFactory, IConfiguration config, I
                 var len = encoder.Encode(frame, FrameSamples, buf, buf.Length);
                 if (len <= 0) continue;
 
-                await group.SendAsync("ReceiveVoiceData", buf[..len], token);
+                // Bot speech goes on its own event so each client can honour its PorkChop-voice mute.
+                await group.SendAsync("ReceiveBotVoice", buf[..len], token);
                 sent++;
 
                 // How far ahead of real-time we've sent. Only wait once we're past the lead cushion.

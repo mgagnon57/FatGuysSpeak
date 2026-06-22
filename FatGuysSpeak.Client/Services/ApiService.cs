@@ -51,6 +51,17 @@ public class ApiService
     public string CurrentUsername { get; private set; } = "";
     public string? CurrentAvatarUrl { get; private set; }
 
+    // The text channel the user is currently viewing, tracked so detached surfaces (e.g. the
+    // PorkChop tab) can post into it. Null when no channel is selected or in DM mode.
+    public int? CurrentChannelId { get; private set; }
+    public string? CurrentChannelName { get; private set; }
+
+    public void SetCurrentChannel(int? channelId, string? channelName)
+    {
+        CurrentChannelId = channelId;
+        CurrentChannelName = channelName;
+    }
+
     public void SetToken(string token)
     {
         _token = token;
@@ -72,6 +83,8 @@ public class ApiService
         CurrentUserId = 0;
         CurrentUsername = "";
         CurrentAvatarUrl = null;
+        CurrentChannelId = null;
+        CurrentChannelName = null;
         _http.DefaultRequestHeaders.Authorization = null;
     }
 

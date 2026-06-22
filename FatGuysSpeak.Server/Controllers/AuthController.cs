@@ -27,17 +27,12 @@ public class AuthController(AppDbContext db, TokenService tokens, SessionBlackli
             return BadRequest("Username may only contain letters, digits, underscores, hyphens, and periods.");
         if (string.IsNullOrWhiteSpace(req.Password) || req.Password.Length < 8)
             return BadRequest("Password must be at least 8 characters.");
-        if (string.IsNullOrWhiteSpace(req.Email) || req.Email.Length > 200)
-            return BadRequest("Email must be 1–200 characters.");
         if (await db.Users.AnyAsync(u => u.Username == req.Username))
             return Conflict("Username already taken.");
-        if (await db.Users.AnyAsync(u => u.Email == req.Email))
-            return Conflict("Email already in use.");
 
         var user = new User
         {
             Username = req.Username,
-            Email = req.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password),
         };
         await using var tx = await db.Database.BeginTransactionAsync();

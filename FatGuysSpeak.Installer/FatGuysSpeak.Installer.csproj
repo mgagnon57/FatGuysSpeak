@@ -7,6 +7,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>app.ico</ApplicationIcon>
     <!-- Single-file publish: everything (including embedded server ZIP) in one exe -->
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
