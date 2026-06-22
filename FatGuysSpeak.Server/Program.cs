@@ -1124,24 +1124,34 @@ app.MapGet("/api/update-status", (FatGuysSpeak.Server.Services.UpdateStatus s) =
 app.MapHub<ChatHub>("/hubs/chat");
 
 #if WINDOWS
-// Start ASP.NET Core in the background, then open the dashboard as a WPF window.
-// Closing the window also stops the server.
-await app.StartAsync();
-
-var tcs = new TaskCompletionSource();
-var wpfThread = new Thread(() =>
+// Only the interactive desktop build shows the WPF dashboard window. When running non-interactively
+// (e.g. installed as a Windows Service, session 0 with no desktop), a WPF window can't be created and
+// would hang/crash the host — so run headless instead. Admins use the web dashboard at /dashboard.
+if (Environment.UserInteractive)
 {
-    var wpfApp = new System.Windows.Application();
-    wpfApp.ShutdownMode = System.Windows.ShutdownMode.OnMainWindowClose;
-    wpfApp.Run(new FatGuysSpeak.Server.Dashboard.DashboardWindow());
-    tcs.SetResult();
-});
-wpfThread.SetApartmentState(ApartmentState.STA);
-wpfThread.IsBackground = false;
-wpfThread.Start();
+    // Start ASP.NET Core in the background, then open the dashboard as a WPF window.
+    // Closing the window also stops the server.
+    await app.StartAsync();
 
-await tcs.Task;
-await app.StopAsync();
+    var tcs = new TaskCompletionSource();
+    var wpfThread = new Thread(() =>
+    {
+        var wpfApp = new System.Windows.Application();
+        wpfApp.ShutdownMode = System.Windows.ShutdownMode.OnMainWindowClose;
+        wpfApp.Run(new FatGuysSpeak.Server.Dashboard.DashboardWindow());
+        tcs.SetResult();
+    });
+    wpfThread.SetApartmentState(ApartmentState.STA);
+    wpfThread.IsBackground = false;
+    wpfThread.Start();
+
+    await tcs.Task;
+    await app.StopAsync();
+}
+else
+{
+    app.Run();   // headless (Windows Service / non-interactive)
+}
 #else
 app.Run();
 #endif

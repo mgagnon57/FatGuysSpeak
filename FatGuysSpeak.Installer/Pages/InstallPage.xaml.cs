@@ -170,7 +170,9 @@ public partial class InstallPage : UserControl, IWizardPage
     {
         var port = _config.Port;
         var lan = $"http://{_config.LocalIp}:{port}";
-        _dashboardUrl = $"{lan}/metrics";
+        // Land on the login form: hitting /dashboard with no session returns a raw 401 (the request
+        // routes to the JWT challenge), whereas /dashboard/login serves the cookie sign-in page.
+        _dashboardUrl = $"{lan}/dashboard/login";
 
         TxtDashboardUrl.Text = _dashboardUrl;
         TxtLanUrl.Text = lan;
