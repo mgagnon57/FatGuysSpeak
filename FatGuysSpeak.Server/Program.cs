@@ -17,6 +17,12 @@ using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
+#if WINDOWS
+// Integrate with the Windows Service Control Manager when installed as a service (no-op otherwise),
+// so `sc start` gets a proper "running" signal and stop is handled cleanly.
+builder.Host.UseWindowsService();
+#endif
+
 // ── Logging: console + rolling daily file so a beta/run is diagnosable after the fact ──
 var logDir = Path.Combine(builder.Environment.ContentRootPath, "logs");
 Directory.CreateDirectory(logDir);
@@ -1124,10 +1130,11 @@ app.MapGet("/api/update-status", (FatGuysSpeak.Server.Services.UpdateStatus s) =
 app.MapHub<ChatHub>("/hubs/chat");
 
 #if WINDOWS
-// Only the interactive desktop build shows the WPF dashboard window. When running non-interactively
-// (e.g. installed as a Windows Service, session 0 with no desktop), a WPF window can't be created and
-// would hang/crash the host — so run headless instead. Admins use the web dashboard at /dashboard.
-if (Environment.UserInteractive)
+// Show the WPF dashboard window only on a normal desktop launch. When actually running as a Windows
+// Service (session 0, no desktop) a WPF window can't be created and would hang the host — so run
+// headless. Use IsWindowsService() rather than Environment.UserInteractive, which also reports
+// non-interactive for processes merely spawned without a console (and wrongly suppressed the window).
+if (!Microsoft.Extensions.Hosting.WindowsServices.WindowsServiceHelpers.IsWindowsService())
 {
     // Start ASP.NET Core in the background, then open the dashboard as a WPF window.
     // Closing the window also stops the server.

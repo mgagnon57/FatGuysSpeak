@@ -61,10 +61,12 @@ public class UserProfileEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task NonLoopback_Forbidden()
+    public async Task NonLoopback_Allowed()
     {
+        // Admin endpoints are now gated by the DashboardAdmin login, not by loopback, so a remote
+        // (non-localhost) caller is no longer Forbidden — it proceeds like any authorized request.
         _controller.ControllerContext.HttpContext.Connection.RemoteIpAddress = IPAddress.Parse("8.8.8.8");
         var result = await _controller.GetUserProfile(1, _tracker, null);
-        Assert.IsType<ForbidResult>(result);
+        Assert.IsNotType<ForbidResult>(result);
     }
 }

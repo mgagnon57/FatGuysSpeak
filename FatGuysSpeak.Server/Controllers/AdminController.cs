@@ -13,16 +13,13 @@ namespace FatGuysSpeak.Server.Controllers;
 [Authorize(Policy = "DashboardAdmin")]
 public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMetricsService metrics) : ControllerBase
 {
-    // Restrict to localhost only — dashboard is the only consumer
-    private bool IsLocal => HttpContext.Connection.RemoteIpAddress is { } ip &&
-        (ip.Equals(System.Net.IPAddress.Loopback) ||
-         ip.Equals(System.Net.IPAddress.IPv6Loopback) ||
-         ip.ToString() == "::1");
+    // Admin endpoints are gated by the DashboardAdmin policy (the dashboard login). They used to
+    // additionally require localhost, which made the admin tabs unusable on a remote/hosted server;
+    // the dashboard cookie auth is the security boundary, so loopback is no longer required.
 
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers()
     {
-        if (!IsLocal) return Forbid();
 
         var online = ChatHub.OnlineUserSnapshot;
         var voice  = ChatHub.VoiceChannelSnapshot;
@@ -57,7 +54,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpGet("users/{id}/profile")]
     public async Task<IActionResult> GetUserProfile(int id, [FromServices] OnlineTimeTracker onlineTime, [FromQuery] int? serverId = null)
     {
-        if (!IsLocal) return Forbid();
 
         var user = await db.Users.FindAsync(id);
         if (user is null) return NotFound();
@@ -97,7 +93,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpPost("users/{userId}/kick-voice")]
     public async Task<IActionResult> KickFromVoice(int userId)
     {
-        if (!IsLocal) return Forbid();
 
         // Authoritatively remove them from voice server-side (don't just ask the client to —
         // that's what left them "notified but not actually removed").
@@ -135,7 +130,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         [FromQuery] int? beforeId = null,
         [FromQuery] bool? showDeleted = null)
     {
-        if (!IsLocal) return Forbid();
 
         var query = db.Messages
             .Include(m => m.Author)
@@ -162,14 +156,12 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpGet("rate-limits")]
     public IActionResult GetRateLimits()
     {
-        if (!IsLocal) return Forbid();
         return Ok(metrics.GetRateLimitSnapshot());
     }
 
     [HttpDelete("messages/{messageId}")]
     public async Task<IActionResult> DeleteMessage(int messageId)
     {
-        if (!IsLocal) return Forbid();
 
         var msg = await db.Messages.Include(m => m.Channel).ThenInclude(c => c.Server)
             .Include(m => m.Author)
@@ -199,7 +191,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
         [FromQuery] string? action = null,
         [FromQuery] int limit = 100)
     {
-        if (!IsLocal) return Forbid();
 
         var query = db.AuditLogs.AsQueryable();
         if (serverId.HasValue) query = query.Where(a => a.ServerId == serverId.Value);
@@ -219,7 +210,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpGet("servers/{serverId}/members")]
     public async Task<IActionResult> GetServerMembers(int serverId)
     {
-        if (!IsLocal) return Forbid();
 
         var members = await db.ServerMembers
             .Where(sm => sm.ServerId == serverId)
@@ -241,7 +231,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpPut("servers/{serverId}/members/{userId}/mute")]
     public async Task<IActionResult> MuteUser(int serverId, int userId, [FromBody] FatGuysSpeak.Shared.MuteUserRequest req)
     {
-        if (!IsLocal) return Forbid();
         if (req.Seconds < 0 || req.Seconds > 86400) return BadRequest("Mute duration must be 0–86400 seconds.");
 
         var target = await db.ServerMembers.Include(m => m.User)
@@ -265,7 +254,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpPut("servers/{serverId}/members/{userId}/tempban")]
     public async Task<IActionResult> TempBanUser(int serverId, int userId, [FromBody] FatGuysSpeak.Shared.TempBanRequest req)
     {
-        if (!IsLocal) return Forbid();
         if (req.Seconds <= 0 || req.Seconds > 2592000) return BadRequest("Ban duration must be 1–2592000 seconds.");
 
         var server = await db.Servers.FindAsync(serverId);
@@ -297,7 +285,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpPut("servers/{serverId}/members/{userId}/role")]
     public async Task<IActionResult> SetMemberRole(int serverId, int userId, FatGuysSpeak.Shared.SetRoleRequest req)
     {
-        if (!IsLocal) return Forbid();
 
         var server = await db.Servers.FindAsync(serverId);
         if (server is null) return NotFound("Server not found.");
@@ -323,7 +310,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpDelete("servers/{serverId}/members/{userId}")]
     public async Task<IActionResult> KickMember(int serverId, int userId)
     {
-        if (!IsLocal) return Forbid();
 
         var server = await db.Servers.FindAsync(serverId);
         if (server?.OwnerId == userId) return BadRequest("Cannot kick the server owner.");
@@ -349,7 +335,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpPut("servers/{serverId}/channels/{channelId}/permissions")]
     public async Task<IActionResult> SetChannelPermissions(int serverId, int channelId, FatGuysSpeak.Shared.SetChannelPermissionRequest req)
     {
-        if (!IsLocal) return Forbid();
 
         var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
         if (channel is null) return NotFound();
@@ -384,7 +369,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpGet("servers/{serverId}/wordfilter")]
     public async Task<IActionResult> GetWordFilters(int serverId)
     {
-        if (!IsLocal) return Forbid();
         var filters = await db.WordFilters
             .Where(f => f.ServerId == serverId)
             .OrderBy(f => f.Pattern)
@@ -396,7 +380,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpPost("servers/{serverId}/wordfilter")]
     public async Task<IActionResult> AddWordFilter(int serverId, [FromBody] FatGuysSpeak.Shared.AddWordFilterRequest req)
     {
-        if (!IsLocal) return Forbid();
         var pattern = req.Pattern.Trim();
         if (string.IsNullOrEmpty(pattern) || pattern.Length > 100)
             return BadRequest("Pattern must be 1–100 characters.");
@@ -413,7 +396,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpDelete("servers/{serverId}/wordfilter/{filterId}")]
     public async Task<IActionResult> RemoveWordFilter(int serverId, int filterId)
     {
-        if (!IsLocal) return Forbid();
         var filter = await db.WordFilters.FindAsync(filterId);
         if (filter is null || filter.ServerId != serverId) return NotFound();
         db.WordFilters.Remove(filter);
@@ -424,7 +406,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpPatch("servers/{serverId}/channels/{channelId}/name")]
     public async Task<IActionResult> RenameChannel(int serverId, int channelId, [FromBody] AdminRenameChannelRequest req)
     {
-        if (!IsLocal) return Forbid();
 
         var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
         if (channel is null) return NotFound();
@@ -452,7 +433,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpDelete("servers/{serverId}/channels/{channelId}")]
     public async Task<IActionResult> DeleteChannel(int serverId, int channelId)
     {
-        if (!IsLocal) return Forbid();
 
         var channel = await db.Channels.FirstOrDefaultAsync(c => c.Id == channelId && c.ServerId == serverId);
         if (channel is null) return NotFound();
@@ -490,7 +470,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpPost("servers/{serverId}/channels")]
     public async Task<IActionResult> CreateChannel(int serverId, [FromBody] AdminCreateChannelRequest req)
     {
-        if (!IsLocal) return Forbid();
 
         var server = await db.Servers.FindAsync(serverId);
         if (server is null) return NotFound("Server not found.");
@@ -555,7 +534,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpPost("messages/delete")]
     public async Task<IActionResult> BulkDelete(FatGuysSpeak.Shared.BulkDeleteRequest req)
     {
-        if (!IsLocal) return Forbid();
 
         var hasIds = req.Ids is { Length: > 0 };
         var hasFilter = req.Filter is not null;
@@ -610,7 +588,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpPost("messages/restore")]
     public async Task<IActionResult> BulkRestore(FatGuysSpeak.Shared.BulkRestoreRequest req)
     {
-        if (!IsLocal) return Forbid();
 
         var hasIds = req.Ids is { Length: > 0 };
         var hasFilter = req.Filter is not null;
@@ -639,7 +616,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpGet("servers")]
     public async Task<IActionResult> GetServers()
     {
-        if (!IsLocal) return Forbid();
 
         var servers = await db.Servers
             .OrderBy(s => s.Id)
@@ -652,7 +628,6 @@ public class AdminController(AppDbContext db, IHubContext<ChatHub> hub, ServerMe
     [HttpGet("channels")]
     public async Task<IActionResult> GetChannelsWithPermissions([FromQuery] int? serverId = null)
     {
-        if (!IsLocal) return Forbid();
 
         var query = db.Channels.Include(c => c.Server).AsQueryable();
         if (serverId.HasValue) query = query.Where(c => c.ServerId == serverId.Value);
