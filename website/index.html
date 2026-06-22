@@ -500,6 +500,29 @@
       animation: cmin 0.28s ease forwards;
     }
 
+    /* PorkChop (AI) reply — accent-tinted, pig avatar, AI tag */
+    .cm.ai .cm-av {
+      background: linear-gradient(135deg, var(--red), var(--red2));
+      color: #fff;
+      font-size: 0.72rem;
+    }
+    .cm.ai .cm-text {
+      background: rgba(212,45,0,0.07);
+      border-left: 2px solid var(--red);
+      padding: 0.26rem 0.5rem;
+      margin-top: 2px;
+    }
+    .cm-ai-tag {
+      font-family: var(--font-bd);
+      font-size: 0.5rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--red2);
+      border: 1px solid rgba(212,45,0,0.45);
+      padding: 0 0.25rem;
+      align-self: center;
+    }
+
     .typing-row {
       display: none;
       align-items: center;
@@ -1423,19 +1446,21 @@
   const typingLabel  = document.getElementById('typingLabel');
 
   const SCRIPT = [
-    { kind: 'msg',     user: 'BigGus',   color: '#d42d00', text: 'yo who\'s in tonight',          time: '9:41 PM' },
-    { kind: 'msg',     user: 'FatMike',  color: '#e89000', text: 'I\'m already in lobby 🎮',       time: '9:41 PM' },
+    { kind: 'msg',     user: 'BigGus',   color: '#d42d00', text: 'yo who\'s in tonight',                 time: '9:41 PM' },
+    { kind: 'msg',     user: 'FatMike',  color: '#e89000', text: 'already in lobby 🎮',                  time: '9:41 PM' },
     { kind: 'system',  text: 'SlimJim_ joined voice · lobby' },
     { kind: 'voice',   id: 'vu1' },
-    { kind: 'msg',     user: 'SlimJim_', color: '#36b864', text: 'what we playing',                time: '9:42 PM' },
-    { kind: 'whisper', text: '🎙 Transcribed: "what we playing"' },
-    { kind: 'msg',     user: 'BigGus',   color: '#d42d00', text: 'Rust or MW3?',                   time: '9:42 PM' },
-    { kind: 'msg',     user: 'FatMike',  color: '#e89000', text: 'RUST 🔥🔥🔥',                   time: '9:42 PM' },
+    { kind: 'ai',      text: 'Look who finally showed. SlimJim_, last week you rage-quit to "do laundry." The laundry won. 🧺', time: '9:41 PM' },
+    { kind: 'msg',     user: 'SlimJim_', color: '#36b864', text: 'what we playing',                      time: '9:42 PM' },
+    { kind: 'whisper', text: '🎙 Transcribed from voice: "what we playing"' },
+    { kind: 'msg',     user: 'BigGus',   color: '#d42d00', text: '@PorkChop settle it — Rust or MW3?',   time: '9:42 PM' },
+    { kind: 'ai',      text: 'Rust. MW3 is where K/D ratios go to apologize. Go get irradiated. 💀',     time: '9:42 PM' },
+    { kind: 'msg',     user: 'FatMike',  color: '#e89000', text: 'RUST 🔥🔥🔥',                          time: '9:42 PM' },
     { kind: 'voice',   id: 'vu2' },
-    { kind: 'msg',     user: 'SlimJim_', color: '#36b864', text: 'rust LFG',                       time: '9:43 PM' },
     { kind: 'system',  text: 'BigGus started sharing screen' },
     { kind: 'voice',   id: 'vu3' },
-    { kind: 'msg',     user: 'BigGus',   color: '#d42d00', text: 'alright let\'s run it 💀',       time: '9:43 PM' },
+    { kind: 'msg',     user: 'SlimJim_', color: '#36b864', text: 'rust LFG',                             time: '9:43 PM' },
+    { kind: 'msg',     user: 'BigGus',   color: '#d42d00', text: 'alright let\'s run it 💀',             time: '9:43 PM' },
   ];
 
   let idx = 0;
@@ -1477,6 +1502,26 @@
         d.appendChild(body);
         appendEl(d);
         setTimeout(next, 350 + Math.random() * 550);
+      }, delay);
+
+    } else if (step.kind === 'ai') {
+      typingLabel.textContent = 'PorkChop is thinking…';
+      typingRow.classList.add('show');
+      const delay = 700 + step.text.length * 12;
+      setTimeout(() => {
+        typingRow.classList.remove('show');
+        const d = document.createElement('div');
+        d.className = 'cm ai';
+        const av = document.createElement('div');
+        av.className = 'cm-av';
+        av.textContent = '🐷';
+        const body = document.createElement('div');
+        body.className = 'cm-body';
+        body.innerHTML = `<div class="cm-head"><span class="cm-user" style="color:var(--red2)">PorkChop</span><span class="cm-ai-tag">AI</span><span class="cm-time">${step.time}</span></div><div class="cm-text">${step.text}</div>`;
+        d.appendChild(av);
+        d.appendChild(body);
+        appendEl(d);
+        setTimeout(next, 500 + Math.random() * 500);
       }, delay);
 
     } else if (step.kind === 'system') {
