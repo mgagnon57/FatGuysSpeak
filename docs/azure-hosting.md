@@ -121,3 +121,29 @@ hostname isn't decided yet.)
 
 Screen-share/webcam are bandwidth-heavy (~1–2 Mbps per viewer); heavy use can push past the free
 100 GB/mo egress at ~$0.08/GB after.
+
+## Dashboard credentials & rotation
+
+The admin dashboard (`/dashboard`, login at `/dashboard/login`) authenticates against the
+`Dashboard__Username` / `Dashboard__Password` app settings. The dashboard's admin actions are no
+longer restricted to localhost — they're protected solely by this login — so the password must be
+strong and unique. **Never commit the password value to the repo.**
+
+Rotate the password (generates a fresh value, sets it, and restarts the app):
+
+```powershell
+$bytes = New-Object byte[] 28
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+$chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+$pw = -join ($bytes | ForEach-Object { $chars[$_ % $chars.Length] })
+az webapp config appsettings set -g fatguysspeak-rg -n fatguysspeak-server `
+  --settings "Dashboard__Password=$pw" -o none   # -o none avoids dumping other secrets
+"New password: $pw"   # store in a password manager; not retrievable later
+```
+
+Changing any app setting restarts the web app (brief 502, then back). Verify with `/api/version`
+(200) and `/dashboard/login` (200), then log in to confirm.
+
+Rotation log:
+- 2026-06-22 — dashboard password rotated to a fresh 28-char random value (after the admin endpoints
+  were opened to remote access).
