@@ -9,6 +9,17 @@ $root = $PSScriptRoot
 $propsPath = Join-Path $root 'Directory.Build.props'
 $changelogPath = Join-Path $root 'CHANGELOG.md'
 
+# git writes informational notices (e.g. "LF will be replaced by CRLF") to stderr. Under the
+# script-wide 'Stop' preference, PowerShell 5.1 turns any native stderr line into a terminating
+# error — which aborts the release at `git add` even though git itself succeeded. Run git with a
+# non-fatal preference and gate success on the exit code instead. ($args carries all tokens,
+# including `-C`, straight through to git.)
+function Invoke-Git {
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & git $args } finally { $ErrorActionPreference = $old }
+}
+
 function Parse-SemVer([string]$v) {
     if ($v -notmatch '^\d+\.\d+\.\d+$') { return $null }
     $p = $v.Split('.'); return [version]::new([int]$p[0], [int]$p[1], [int]$p[2])
@@ -25,7 +36,7 @@ $current = Parse-SemVer $Matches[1]
 if ($new -lt $current) { throw "Version $Version must be >= current $($Matches[1]) (no downgrades)." }
 
 # 2. Require a clean working tree
-$dirty = (git -C $root status --porcelain)
+$dirty = (Invoke-Git -C $root status --porcelain)
 if ($dirty) { throw "Working tree is dirty. Commit or stash before releasing.`n$dirty" }
 
 # 3. Bump <Version>
@@ -128,9 +139,10 @@ if ($env:GITHUB_TOKEN) {
 }
 
 # 8. Commit + tag (NO push)
-git -C $root add Directory.Build.props CHANGELOG.md website/index.html docs/index.html
-git -C $root commit -m "Release $Version"; if ($LASTEXITCODE) { throw 'git commit failed' }
-git -C $root tag "v$Version"; if ($LASTEXITCODE) { throw 'git tag failed' }
+Invoke-Git -C $root add Directory.Build.props CHANGELOG.md website/index.html docs/index.html
+if ($LASTEXITCODE) { throw 'git add failed' }
+Invoke-Git -C $root commit -m "Release $Version"; if ($LASTEXITCODE) { throw 'git commit failed' }
+Invoke-Git -C $root tag "v$Version"; if ($LASTEXITCODE) { throw 'git tag failed' }
 
 # 9. Next step
 Write-Host "`nReleased $Version locally. Artifacts in release-output/." -ForegroundColor Green
