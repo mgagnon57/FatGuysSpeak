@@ -99,15 +99,21 @@ builder.Services.AddAuthentication(opt =>
 {
     // Routes to JWT or Dashboard cookie depending on which is present
     opt.DefaultScheme = "SmartBearer";
-    opt.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    opt.DefaultChallengeScheme = "SmartBearer";
     opt.DefaultForbidScheme = JwtBearerDefaults.AuthenticationScheme;
 })
 .AddPolicyScheme("SmartBearer", "JWT or Dashboard Cookie", opt =>
 {
     opt.ForwardDefaultSelector = ctx =>
-        ctx.Request.Cookies.ContainsKey(".FatGuysSpeak.Dashboard")
+        // Dashboard *page* requests always use the cookie scheme, so an unauthenticated visit
+        // challenges via the cookie handler and redirects to /dashboard/login (instead of a raw 401
+        // from JWT). API/hub requests use the cookie when the dashboard JS sends it, else JWT (so the
+        // desktop client and unauthenticated API calls still get a clean 401).
+        ctx.Request.Path.StartsWithSegments("/dashboard")
             ? "Dashboard"
-            : JwtBearerDefaults.AuthenticationScheme;
+            : ctx.Request.Cookies.ContainsKey(".FatGuysSpeak.Dashboard")
+                ? "Dashboard"
+                : JwtBearerDefaults.AuthenticationScheme;
 })
 .AddJwtBearer(opt =>
 {
