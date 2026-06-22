@@ -4,6 +4,8 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) and the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ## [Unreleased]
+
+## [0.11.0] - 2026-06-21
 ### Added
 - Private Mode: an opt-in privacy switch in Settings (off by default). When on, PorkChop won't
   roast, profile, or recap you, your voice is never transcribed or stored, and your learned
