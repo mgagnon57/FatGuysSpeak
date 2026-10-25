@@ -593,7 +593,7 @@
                     </Grid>
                 </Grid>
 
-                <!-- Tab bar (Voice tab hidden — voice is still captured and transcribed in the background) -->
+                <!-- Tab bar (Voice tab hidden — voice is never transcribed or stored) -->
                 <Grid Grid.Row="1" ColumnDefinitions="*,*" HeightRequest="34" BackgroundColor="{DynamicResource ThemeBgElevated}"
                       IsVisible="{Binding ShowChannelUiElements}">
                     <Button Grid.Column="0" Text="💬 Chat"
@@ -1305,12 +1305,6 @@
                                 BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}"
                                 FontSize="13" HeightRequest="28" WidthRequest="28" Padding="0" />
                     </Grid>
-                    <!-- Live speech hypothesis -->
-                    <Label Grid.Row="1"
-                           Text="{Binding HypothesisText, StringFormat='🎙 {0}…'}"
-                           TextColor="{DynamicResource ThemeWarning}" FontSize="11" FontAttributes="Italic"
-                           Margin="0,0,0,2"
-                           IsVisible="{Binding HypothesisText, Converter={StaticResource StringToBoolConverter}}" />
                     <!-- Typing indicator -->
                     <Label Grid.Row="2"
                            Text="{Binding TypingText}"

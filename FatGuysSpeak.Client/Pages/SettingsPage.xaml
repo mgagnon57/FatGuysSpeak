@@ -82,7 +82,7 @@
                                 OnColor="{DynamicResource ThemeAccentLight}" ThumbColor="White"
                                 VerticalOptions="Center" />
                         <Label Grid.Column="2"
-                               Text="PorkChop won't roast, profile, or recap you, and your voice is never transcribed or stored — only your typed messages are kept."
+                               Text="PorkChop won't roast, profile, or recap you. Voice is never recorded or transcribed for anyone."
                                TextColor="{DynamicResource ThemeTextMuted}" FontSize="11" FontAttributes="Italic"
                                VerticalOptions="Center" Margin="10,0,0,0" />
                     </Grid>

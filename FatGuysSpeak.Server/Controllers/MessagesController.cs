@@ -185,9 +185,10 @@ public class MessagesController(AppDbContext db, IHubContext<ChatHub> hub, Serve
 
         var user = await db.Users.FindAsync(UserId);
 
-        // Private Mode: a private user's speech is never logged. Drop voice-transcription messages at
-        // ingestion so they are never stored anywhere (enforced here, not trusted to the client).
-        if (req.Source == MessageSource.Voice && user is not null && user.PrivateMode)
+        // Voice is never transcribed or stored, for anyone (legal requirement). Older clients still
+        // post Whisper transcriptions as Voice messages — drop them silently at ingestion so nothing
+        // is ever written (enforced here, not trusted to the client).
+        if (req.Source == MessageSource.Voice)
             return NoContent();
 
         var filteredContent = req.Content?.Trim() ?? "";

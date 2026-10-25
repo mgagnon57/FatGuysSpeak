@@ -14,8 +14,8 @@ public class CatchupController(BotService bot) : ControllerBase
 {
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-    // GET /api/catchup?source=Text|Voice — PorkChop's personal recap of what the caller missed in
-    // that chat source since last online (matches the tab they're viewing).
+    // GET /api/catchup?source=Text — PorkChop's personal recap of what the caller missed in that chat
+    // source since last online (matches the tab they're viewing). Voice is never transcribed.
     [HttpGet]
     public async Task<ActionResult<CatchupDto>> Get([FromQuery] string source = "Text")
     {

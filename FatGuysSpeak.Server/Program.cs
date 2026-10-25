@@ -1047,6 +1047,10 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
+    // Voice is never transcribed or stored (legal requirement): scrub anything older builds collected.
+    var purged = await FatGuysSpeak.Server.Services.VoiceTranscriptPurge.RunAsync(ctx);
+    if (purged > 0) Console.WriteLine($"[Startup] purged {purged} stored voice transcription row(s)");
+
     var blacklist = scope.ServiceProvider.GetRequiredService<SessionBlacklistService>();
     await blacklist.RehydrateAsync(ctx);
 }

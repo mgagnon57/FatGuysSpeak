@@ -4,6 +4,16 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) and the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ## [Unreleased]
+### Removed
+- Voice is no longer transcribed, for anyone. Speech-to-text (Whisper) is gone from the client:
+  push-to-talk only carries your live audio to the people in the channel, and nothing you say is
+  recorded, transcribed, or stored. The server also rejects voice transcripts sent by older
+  clients and deletes every voice transcript and voice recap stored by earlier versions. As a
+  result, PorkChop can no longer be asked a question out loud — type @PorkChop instead (he still
+  answers out loud when you're in voice).
+
+### Fixed
+- The ⚙ Settings button in the top bar did nothing; it opens Settings again.
 
 ## [0.12.0] - 2026-06-21
 ### Added

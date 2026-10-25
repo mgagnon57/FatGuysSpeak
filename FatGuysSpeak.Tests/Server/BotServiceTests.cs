@@ -336,7 +336,7 @@ public class BotServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetOrCreateDailySummary_TextAndVoice_AreSummarizedSeparately()
+    public async Task GetOrCreateDailySummary_RecapsText_ButNeverVoice()
     {
         var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);
         var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
@@ -354,11 +354,10 @@ public class BotServiceTests : IDisposable
         var voice = await svc.GetOrCreateDailySummaryAsync(channel.Id, day, MessageSource.Voice);
 
         Assert.Equal(2, text!.MessageCount);    // only the two typed messages
-        Assert.Equal(1, voice!.MessageCount);   // only the one spoken message
+        Assert.Null(voice);                     // voice is never transcribed, so never recapped
 
-        // Two independent cached rows, one per source.
         Assert.True(await _db.Db.DailyChatSummaries.AnyAsync(s => s.ChannelId == channel.Id && s.Date == day && s.Source == MessageSource.Text));
-        Assert.True(await _db.Db.DailyChatSummaries.AnyAsync(s => s.ChannelId == channel.Id && s.Date == day && s.Source == MessageSource.Voice));
+        Assert.False(await _db.Db.DailyChatSummaries.AnyAsync(s => s.Source == MessageSource.Voice));
     }
 
     [Fact]
@@ -437,7 +436,7 @@ public class BotServiceTests : IDisposable
         Assert.Equal("Here's what you missed.", result.Summary);
 
         var voiceResult = await svc.GenerateCatchupAsync(owner.Id, MessageSource.Voice);
-        Assert.Equal(1, voiceResult.MessageCount);   // only the spoken message
+        Assert.Equal(0, voiceResult.MessageCount);   // voice is never transcribed — nothing to catch up on
     }
 
     [Fact]
@@ -576,7 +575,7 @@ public class BotServiceTests : IDisposable
 
         var body = await captured!.Content!.ReadAsStringAsync();
         Assert.Contains("pineapple absolutely belongs on pizza", body);
-        Assert.Contains("smoked brisket", body);
+        Assert.DoesNotContain("smoked brisket", body);   // voice-source rows are never roast material
     }
 
     [Fact]
@@ -781,7 +780,7 @@ public class BotServiceTests : IDisposable
         await _db.Db.SaveChangesAsync();
         _db.Db.Messages.AddRange(
             new Message { Content = "I only play Elden Ring anymore", AuthorId = joiner.Id, ChannelId = channel.Id, Source = MessageSource.Text },
-            new Message { Content = "crossfit is my whole personality", AuthorId = second.Id, ChannelId = channel.Id, Source = MessageSource.Voice }
+            new Message { Content = "crossfit is my whole personality", AuthorId = second.Id, ChannelId = channel.Id, Source = MessageSource.Text }
         );
         await _db.Db.SaveChangesAsync();
 

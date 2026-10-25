@@ -78,8 +78,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         await PostBotReplyAsync(db, channelId, serverId, reply);
 
-        // If the person who asked is sitting in this channel's voice, talk back out loud too — this is
-        // what makes "@PorkChop" said over voice (transcribed to text) get an audible answer.
+        // If the person who asked is sitting in this channel's voice, talk back out loud too.
         if (speak && _speakReplies && tts.Enabled && speakerUserId is int sid
             && ChatHub.VoiceChannelSnapshot.TryGetValue(sid, out var vc) && vc == channelId)
             _ = tts.SpeakIntoVoiceChannelAsync(channelId, reply);
@@ -203,7 +202,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         return text;
     }
 
-    // Everything PorkChop knows about one person, for a roast: their bio, their own recent text/voice
+    // Everything PorkChop knows about one person, for a roast: their bio, their own recent typed
     // chat, the aliases they go by, and recent things OTHER people said that mention them (by username
     // OR a learned alias).
     private static async Task<string> BuildUserDossierAsync(AppDbContext db, User user, List<int> serverIds)
@@ -212,7 +211,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
             .Where(p => p.MinRoleToRead > ServerRole.Member).Select(p => p.ChannelId).ToListAsync();
         var own = await db.Messages
             .Where(m => m.AuthorId == user.Id && !m.IsDeleted
-                        && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice)
+                        && m.Source == MessageSource.Text
                         && !restricted.Contains(m.ChannelId))
             .OrderByDescending(m => m.CreatedAt).Take(20)
             .Select(m => m.Content).ToListAsync();
@@ -232,7 +231,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
     }
 
     // Recent messages from OTHER people that mention this user by any of their names (username +
-    // learned aliases), whole-word and case-insensitive so it catches them typed or voice-transcribed.
+    // learned aliases), whole-word and case-insensitive.
     // Names shorter than 3 chars are skipped to avoid matching basically everything.
     private static async Task<List<string>> WhatOthersSaidAboutAsync(AppDbContext db, User user, List<string> names, List<int> serverIds)
     {
@@ -247,7 +246,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         var recent = await db.Messages
             .Where(m => m.AuthorId != user.Id && !m.IsDeleted
-                        && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice)
+                        && m.Source == MessageSource.Text
                         && !m.Author.PrivateMode                    // never use a private user's words as roast material
                         && serverIds.Contains(m.Channel.ServerId)
                         && !restricted.Contains(m.ChannelId))
@@ -281,7 +280,8 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         var since = DateTime.UtcNow.AddDays(-30);
         var lines = await db.Messages
-            .Where(m => !m.IsDeleted && m.Source != MessageSource.AI && m.Channel.ServerId == serverId && m.CreatedAt >= since
+            .Where(m => !m.IsDeleted && m.Source != MessageSource.AI && m.Source != MessageSource.Voice
+                        && m.Channel.ServerId == serverId && m.CreatedAt >= since
                         && !m.Author.PrivateMode)                   // don't mine private users' chat for nicknames
             .OrderByDescending(m => m.CreatedAt).Take(150)
             .Select(m => new { User = m.Author.Username, m.Content })
@@ -419,12 +419,13 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
     }
 
     /// <summary>Lazily returns the cached PorkChop recap for a channel's completed (UTC) day and
-    /// chat source (text vs voice are summarized separately), generating and storing it on first
-    /// request. Returns null for today/future days, or when generation isn't possible.</summary>
+    /// chat source, generating and storing it on first request. Returns null for today/future days,
+    /// for Voice (never transcribed or stored), or when generation isn't possible.</summary>
     public async Task<DailySummaryDto?> GetOrCreateDailySummaryAsync(int channelId, DateTime dayUtc, MessageSource source)
     {
         var date = dayUtc.Date;
         if (date >= DateTime.UtcNow.Date) return null;   // only summarize days that are over
+        if (source == MessageSource.Voice) return null;  // voice is never transcribed — nothing to recap
 
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -445,7 +446,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
 
         string summary;
         if (lines.Count == 0)
-            summary = source == MessageSource.Voice ? "Quiet day — nobody spoke in this channel." : "Quiet day — no messages in this channel.";
+            summary = "Quiet day — no messages in this channel.";
         else
         {
             if (string.IsNullOrEmpty(_apiKey))
@@ -453,9 +454,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
                 Console.WriteLine("[PorkChop] cannot summarize — no Anthropic API key set.");
                 return null;
             }
-            var lead = source == MessageSource.Voice
-                ? "Here is a transcript of the SPOKEN voice conversation for this day (auto-transcribed, so wording may be rough; each line is \"speaker: words\"). Summarize what was talked about:\n\n"
-                : "Here is the full text chat transcript for this day (each line is \"username: message\"). Summarize it:\n\n";
+            const string lead = "Here is the full text chat transcript for this day (each line is \"username: message\"). Summarize it:\n\n";
             var result = await PostToClaudeAsync(SummarySystem, lead + string.Join("\n", lines));
             if (result is null) return null;   // generation failed — don't cache, allow a later retry
             summary = result;
@@ -488,7 +487,7 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
             return null;   // already posted
 
         var rows = await db.Messages
-            .Where(m => !m.IsDeleted && m.Source != MessageSource.AI
+            .Where(m => !m.IsDeleted && m.Source != MessageSource.AI && m.Source != MessageSource.Voice
                         && !m.Author.PrivateMode                    // private users are excluded from the digest
                         && m.CreatedAt >= weekStart && m.CreatedAt < weekEnd
                         && m.Channel.ServerId == serverId)
@@ -537,15 +536,17 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
     private const string CatchupSystem = "You are PorkChop, giving one person a quick personal catch-up on what they missed in FatGuysSpeak while they were away. You're given the messages posted since they were last online, grouped by channel. In a few short, friendly sentences, tell them what they missed: the main conversations per channel, anything aimed at them or that needs a reply, and any decisions or plans. Refer to people and channels by name, keep it brief, and don't invent anything that isn't in the transcript.";
 
     /// <summary>Builds a personal "what you missed" recap for one user, for one chat source (the tab
-    /// they're viewing — Text vs Voice are caught up separately), covering messages posted since they
-    /// were last online (LastSeenAt, or the last 24h if never recorded). Excludes the user's own
-    /// messages and respects per-channel read permissions. Ephemeral — not cached.</summary>
+    /// they're viewing), covering messages posted since they were last online (LastSeenAt, or the
+    /// last 24h if never recorded). Excludes the user's own messages and respects per-channel read
+    /// permissions. Voice is never transcribed, so it has nothing to catch up on. Ephemeral — not cached.</summary>
     public async Task<CatchupDto> GenerateCatchupAsync(int userId, MessageSource source)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var user = await db.Users.FindAsync(userId);
+        if (source == MessageSource.Voice)
+            return new CatchupDto("Voice isn't recorded or transcribed, so there's nothing to catch up on there.", 0, user?.LastSeenAt);
         var since = user?.LastSeenAt ?? DateTime.UtcNow.AddHours(-24);
 
         var memberships = await db.ServerMembers.Where(m => m.UserId == userId).ToListAsync();
@@ -565,20 +566,16 @@ public class BotService(IHttpClientFactory httpFactory, IConfiguration config, I
         var visible = rows.Where(r => !minReadByChannel.TryGetValue(r.ChannelId, out var min)
                                       || (roleByServer.TryGetValue(r.ServerId, out var role) && role >= min)).ToList();
 
-        var kind = source == MessageSource.Voice ? "voice" : "chat";
         if (visible.Count == 0)
-            return new CatchupDto($"You're all caught up — nothing new in {kind} since you were last here. 👍", 0, user?.LastSeenAt);
+            return new CatchupDto("You're all caught up — nothing new in chat since you were last here. 👍", 0, user?.LastSeenAt);
 
         if (string.IsNullOrEmpty(_apiKey))
         {
             Console.WriteLine("[PorkChop] cannot generate catch-up — no Anthropic API key set.");
-            return new CatchupDto($"You missed {visible.Count} {kind} message(s), but PorkChop isn't configured to summarize them.", visible.Count, user?.LastSeenAt);
+            return new CatchupDto($"You missed {visible.Count} chat message(s), but PorkChop isn't configured to summarize them.", visible.Count, user?.LastSeenAt);
         }
 
-        var lead = source == MessageSource.Voice
-            ? "Here is the SPOKEN voice conversation (auto-transcribed) posted since this person was last online, grouped by channel. Give them their personal voice catch-up:\n\n"
-            : "Here is everything posted in text chat since this person was last online, grouped by channel. Give them their personal catch-up:\n\n";
-        var transcript = lead
+        var transcript = "Here is everything posted in text chat since this person was last online, grouped by channel. Give them their personal catch-up:\n\n"
             + string.Join("\n\n", visible.GroupBy(r => r.Channel)
                 .Select(g => $"#{g.Key}\n" + string.Join("\n", g.Select(r => $"{r.User}: {r.Content}"))));
         var text = await PostToClaudeAsync(CatchupSystem, transcript);

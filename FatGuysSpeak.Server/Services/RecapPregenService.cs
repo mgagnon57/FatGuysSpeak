@@ -48,11 +48,11 @@ public class RecapPregenService(
             var day  = lastCompletedDay.AddDays(-d);
             var next = day.AddDays(1);
 
-            // Channel/source pairs that had real Text or Voice messages that day. Stream isn't
-            // day-grouped in the client, and AI replies aren't part of the conversation.
+            // Channel/source pairs that had real Text messages that day. Stream isn't day-grouped in
+            // the client, AI replies aren't part of the conversation, and voice is never transcribed.
             var combos = await db.Messages
                 .Where(m => !m.IsDeleted && m.CreatedAt >= day && m.CreatedAt < next
-                            && (m.Source == MessageSource.Text || m.Source == MessageSource.Voice))
+                            && m.Source == MessageSource.Text)
                 .Select(m => new { m.ChannelId, m.Source })
                 .Distinct()
                 .ToListAsync(ct);

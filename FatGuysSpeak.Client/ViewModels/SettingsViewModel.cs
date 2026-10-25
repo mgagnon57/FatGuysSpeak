@@ -73,9 +73,9 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
             if (host is null) return false;   // can't get consent without a UI
             var accepted = await host.DisplayAlert(
                 "🎙️ Let PorkChop Listen In?",
-                "Flip this off and PorkChop gets your voice. Every word you say in voice chat gets " +
-                "transcribed, stored on the server, and used to roast you, profile you, slap dumb " +
-                "nicknames on you, and drag you into the recaps. He's gonna have a field day.\n\n" +
+                "Flip this off and PorkChop gets your chat. Everything you type gets used to roast " +
+                "you, profile you, slap dumb nicknames on you, and drag you into the recaps. He's " +
+                "gonna have a field day. (Your voice is never recorded or transcribed — for anyone.)\n\n" +
                 "You cool with that, you magnificent degenerate?",
                 "🔥 Hell yeah, roast me", "🔒 Nope, stay private");
             if (!accepted) return false;
@@ -84,14 +84,13 @@ public partial class SettingsViewModel(ApiService api, AudioService audio, PttSe
         var ok = await api.SetPrivateModeAsync(value);
         if (!ok) return false;
 
-        Preferences.Set("private_mode", value);   // client-side hint (e.g. to suppress local STT posting)
+        Preferences.Set("private_mode", value);   // client-side hint
         if (value && host is not null)
             await host.DisplayAlert(
                 "🔒 Private Mode On — PorkChop's Pissed",
-                "Done. PorkChop just had everything he scraped on you yanked off the server — your " +
-                "voice transcripts AND the dumb nicknames he cooked up, gone, even the old stuff he'd " +
-                "been hoarding. All that's left is what runs your account: your username, password, and " +
-                "the messages you actually typed.\n\n" +
+                "Done. PorkChop just had the dumb nicknames he cooked up on you yanked off the " +
+                "server, even the old ones he'd been hoarding. All that's left is what runs your " +
+                "account: your username, password, and the messages you actually typed.\n\n" +
                 "From here on he can't hear you, roast you, or recap you. Enjoy the silence. 🐷🔇",
                 "😎 Sweet");
         return true;

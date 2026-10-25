@@ -60,7 +60,7 @@ public class RecapPregenServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RunOnce_PregeneratesTextAndVoiceForCompletedDay()
+    public async Task RunOnce_PregeneratesTextButNeverVoiceForCompletedDay()
     {
         var (server, owner) = await TestHelpers.SeedServerAsync(_db.Db);
         var channel = _db.Db.Channels.First(c => c.ServerId == server.Id && c.Type == ChannelType.Text);
@@ -75,7 +75,7 @@ public class RecapPregenServiceTests : IDisposable
         await svc.RunOnceAsync();
 
         Assert.True(await _db.Db.DailyChatSummaries.AnyAsync(s => s.ChannelId == channel.Id && s.Date == day && s.Source == MessageSource.Text));
-        Assert.True(await _db.Db.DailyChatSummaries.AnyAsync(s => s.ChannelId == channel.Id && s.Date == day && s.Source == MessageSource.Voice));
+        Assert.False(await _db.Db.DailyChatSummaries.AnyAsync(s => s.Source == MessageSource.Voice));
     }
 
     [Fact]

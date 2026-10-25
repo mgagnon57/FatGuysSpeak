@@ -10,7 +10,7 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, SpeechService speech, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService, ShareBorderOverlay shareBorder, PorkChopViewModel porkChop) : ObservableObject
+public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService, ShareBorderOverlay shareBorder, PorkChopViewModel porkChop) : ObservableObject
 {
     private bool _initialized;
     private string? _versionSyncCheckedFor;   // server version last handled this session
@@ -119,7 +119,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private bool _isTestMic;
     [ObservableProperty] private bool _isLoopbackActive;
     [ObservableProperty] private double _micLevel;
-    [ObservableProperty] private string _hypothesisText = string.Empty;
     [ObservableProperty] private bool _isPttActive;
     [ObservableProperty] private bool _isSettingPttKey;
     [ObservableProperty] private string _pttKeyName = "(not set)";
@@ -221,7 +220,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private Action<string?>? _hubReconnectedHandler;
     private Action<Exception?>? _hubDisconnectedHandler;
     private Action<double>? _micLevelHandler;
-    private Action<string>? _hypothesisChangedHandler;
     private Action<string>? _keyLearnedHandler;
 
     [ObservableProperty] private int _streamLatencyMs;
@@ -305,7 +303,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
 
     public string VoiceHintText => ptt.PttKey == 0
         ? "⚠  Push to Talk key not set — open mic is not allowed. Click ⚙ Settings to set one."
-        : $"Hold {PttKeyName} to speak — transcription posts automatically";
+        : $"Hold {PttKeyName} to speak";
 
     public Color VoiceHintColor => ptt.PttKey == 0 ? Color.FromArgb("#e67e22") : Color.FromArgb("#666666");
 
@@ -661,9 +659,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         screen.StreamAudioCaptured += OnStreamAudioCaptured;
         _micLevelHandler = level => MainThread.BeginInvokeOnMainThread(() => MicLevel = level);
         audio.MicLevelChanged += _micLevelHandler;
-        speech.TextRecognized  += OnSpeechRecognized;
-        _hypothesisChangedHandler = text => MainThread.BeginInvokeOnMainThread(() => HypothesisText = text);
-        speech.HypothesisChanged += _hypothesisChangedHandler;
         ptt.PttDown    += OnPttDown;
         ptt.PttUp      += OnPttUp;
         _keyLearnedHandler = name =>
@@ -2154,14 +2149,12 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (SelectedChannel is null) return;
         IsPttActive = true;
         audio.StartCapture();
-        _ = speech.StartListeningAsync();
     }
 
     private void OnPttUp()
     {
         IsPttActive = false;
         audio.StopCapture();
-        _ = speech.StopAndFlushAsync();
     }
 
     [RelayCommand]
@@ -2171,7 +2164,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         StopTypingDebounced();
         ptt.CancelLearning();
         ptt.ClearUser();
-        speech.StopListening();
         if (InVoice) await LeaveVoiceAsync();
         await hub.DisconnectAsync();
         UnsubscribeEvents();
@@ -2247,8 +2239,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         screen.FrameCaptured       -= OnScreenFrameCaptured;
         screen.StreamAudioCaptured -= OnStreamAudioCaptured;
         if (_micLevelHandler is not null)         audio.MicLevelChanged    -= _micLevelHandler;
-        speech.TextRecognized                     -= OnSpeechRecognized;
-        if (_hypothesisChangedHandler is not null) speech.HypothesisChanged -= _hypothesisChangedHandler;
         ptt.PttDown -= OnPttDown;
         ptt.PttUp   -= OnPttUp;
         if (_keyLearnedHandler is not null) ptt.KeyLearned -= _keyLearnedHandler;
@@ -2315,15 +2305,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     private void OnBotVoiceDataReceived(byte[] data)
     {
         if (PorkChopVoice) audio.PlayAudio(data);
-    }
-
-    private void OnSpeechRecognized(string text)
-    {
-        var trimmed = text.Trim();
-        if (string.IsNullOrEmpty(trimmed) || SelectedChannel is null) return;
-        // Private Mode: don't even send our own speech (the server drops it anyway, but skip the round-trip).
-        if (Preferences.Get("private_mode", false)) return;
-        _ = PostMessageAsync(trimmed, MessageSource.Voice);
     }
 
     private void OnMessageReceived(MessageDto msg)

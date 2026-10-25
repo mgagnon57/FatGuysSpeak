@@ -67,10 +67,6 @@
                         <TextBlock Text="●" Foreground="#f04010" FontSize="8" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <TextBlock Text="Screen sharing and webcam streaming" FontFamily="Segoe UI" FontSize="12" Foreground="#aaaaaa"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="●" Foreground="#f04010" FontSize="8" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <TextBlock Text="Whisper speech-to-text transcription" FontFamily="Segoe UI" FontSize="12" Foreground="#aaaaaa"/>
-                    </StackPanel>
                 </StackPanel>
             </Border>
         </StackPanel>

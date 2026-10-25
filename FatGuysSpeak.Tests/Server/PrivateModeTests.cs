@@ -72,33 +72,6 @@ public class PrivateModeTests : IDisposable
     }
 
     [Fact]
-    public async Task PrivateUser_VoiceMessage_IsDroppedAtIngestion()
-    {
-        var (channelId, user) = await SeedUserWithChatAsync("alice");
-        await Users(user.Id).SetPrivateMode(new SetPrivateModeRequest(true));
-        var before = await _testDb.Db.Messages.CountAsync(m => m.ChannelId == channelId && m.Source == MessageSource.Voice);
-
-        var result = await Messages(user.Id).SendMessage(channelId,
-            new SendMessageRequest("nobody should log this", MessageSource.Voice));
-
-        Assert.IsType<NoContentResult>(result.Result);
-        var after = await _testDb.Db.Messages.CountAsync(m => m.ChannelId == channelId && m.Source == MessageSource.Voice);
-        Assert.Equal(before, after);   // nothing new was stored
-    }
-
-    [Fact]
-    public async Task NonPrivateUser_VoiceMessage_IsStored()
-    {
-        var (channelId, user) = await SeedUserWithChatAsync("alice");   // PrivateMode stays false
-
-        await Messages(user.Id).SendMessage(channelId,
-            new SendMessageRequest("this one is fine to log", MessageSource.Voice));
-
-        Assert.True(await _testDb.Db.Messages.AnyAsync(m =>
-            m.ChannelId == channelId && m.Source == MessageSource.Voice && m.Content == "this one is fine to log"));
-    }
-
-    [Fact]
     public async Task EphemeralAsk_StoresNothing()
     {
         var (_, user) = await TestHelpers.SeedServerAsync(_testDb.Db, "alice");

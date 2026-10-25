@@ -376,11 +376,10 @@ public class MetricsController(ServerMetricsService metrics, UpdateStatus update
               <input class="search-box" id="msgAuthor"  placeholder="Author…"  data-input="loadMessages" style="width:120px" title="Filter by the username who sent the message" />
               <input class="search-box" id="msgChannel" placeholder="Channel…" data-input="loadMessages" style="width:120px" title="Filter by channel name (without #)" />
               <input class="search-box" id="msgKeyword" placeholder="Search text…" data-input="loadMessages" style="width:140px" title="Search within message content" />
-              <select id="msgSource" data-change="loadMessages" title="Filter by message type: text chat, Whisper voice transcription, or stream event"
+              <select id="msgSource" data-change="loadMessages" title="Filter by message type: text chat or stream event"
                 style="background:#161414;border:1px solid #292525;border-radius:4px;color:#e9e4d9;font-size:11px;padding:5px 8px;font-family:inherit;">
                 <option value="">All sources</option>
                 <option value="Text">Text</option>
-                <option value="Voice">Voice</option>
                 <option value="Stream">Stream</option>
               </select>
               <select id="msgServer" data-change="loadMessages" title="Filter by server"

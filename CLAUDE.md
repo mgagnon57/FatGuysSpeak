@@ -81,7 +81,7 @@ Because these dictionaries are static, hub tests are in the `[Collection("HubTes
 
 ### Voice + Media Pipeline
 
-Voice: NAudio WaveIn (48kHz/16-bit/mono) → Opus encode (Concentus) → `SendVoiceData` hub method (max 8 KB) → server relays to `voice-{channelId}` group → `ReceiveVoiceData` → Opus decode → NAudio playback. PTT via global keyboard hook (`PttService`). Whisper STT auto-posts transcriptions as messages.
+Voice: NAudio WaveIn (48kHz/16-bit/mono) → Opus encode (Concentus) → `SendVoiceData` hub method (max 8 KB) → server relays to `voice-{channelId}` group → `ReceiveVoiceData` → Opus decode → NAudio playback. PTT via global keyboard hook (`PttService`). Voice is NEVER transcribed or stored (legal requirement): there is no STT, the server drops any `MessageSource.Voice` post, and `VoiceTranscriptPurge` scrubs old transcripts at startup. Don't reintroduce speech capture.
 
 Screen share and webcam: MJPEG frames over SignalR. `ScreenStreamService` uses GDI `CopyFromScreen`; `CameraService` uses WinRT `MediaCapture`. Both use an Interlocked `_busy` flag to drop frames when the previous send is still in flight. `MaximumReceiveMessageSize` is set to 4 MB to handle full-res JPEG frames.
 

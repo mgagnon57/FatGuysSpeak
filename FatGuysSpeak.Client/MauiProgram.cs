@@ -27,7 +27,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<ApiService>();
         builder.Services.AddSingleton<ChatHubService>();
         builder.Services.AddSingleton<AudioService>();
-        builder.Services.AddSingleton<SpeechService>();
         builder.Services.AddSingleton<PttService>();
         builder.Services.AddSingleton<ScreenStreamService>();
         builder.Services.AddSingleton<RemoteInputService>();

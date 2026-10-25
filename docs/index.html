@@ -907,7 +907,7 @@
         <span class="red">SPEAK</span>
       </h1>
       <p class="hero-sub">
-        Your crew's private comms hub. Real-time text, push-to-talk voice, screen sharing, AI transcription, and a full admin suite — all running on your server, on your terms.
+        Your crew's private comms hub. Real-time text, push-to-talk voice, screen sharing, an AI sidekick, and a full admin suite — all running on your server, on your terms.
       </p>
       <div class="hero-ctas">
         <span class="btn btn-red dl-btn-disabled">Server — Coming Soon</span>
@@ -967,7 +967,7 @@
   <div class="ticker-track">
     PUSH-TO-TALK <span class="tick-sep">·</span>
     SCREEN SHARE <span class="tick-sep">·</span>
-    WHISPER AI <span class="tick-sep">·</span>
+    PORKCHOP AI <span class="tick-sep">·</span>
     GROUP DMS <span class="tick-sep">·</span>
     ADMIN DASHBOARD <span class="tick-sep">·</span>
     ZERO TELEMETRY <span class="tick-sep">·</span>
@@ -991,7 +991,7 @@
     READ RECEIPTS <span class="tick-sep">·</span>&nbsp;
     PUSH-TO-TALK <span class="tick-sep">·</span>
     SCREEN SHARE <span class="tick-sep">·</span>
-    WHISPER AI <span class="tick-sep">·</span>
+    PORKCHOP AI <span class="tick-sep">·</span>
     GROUP DMS <span class="tick-sep">·</span>
     ADMIN DASHBOARD <span class="tick-sep">·</span>
     ZERO TELEMETRY <span class="tick-sep">·</span>
@@ -1076,7 +1076,6 @@
         <li>Remote desktop control</li>
         <li>Adaptive quality control</li>
         <li>Multi-streamer support</li>
-        <li>Whisper STT transcription</li>
       </ul>
     </div>
     <div class="pillar reveal">
@@ -1119,15 +1118,15 @@
       <span class="feat-tag">Admin</span>
     </div>
     <div class="feat-card">
-      <span class="feat-icon">🤖</span>
-      <h4>Whisper Transcription</h4>
-      <p>AI-powered speech-to-text auto-posts what was said in voice into the text channel. Great for logging, accessibility, or just catching what the quiet guy mumbled.</p>
-      <span class="feat-tag">AI</span>
+      <span class="feat-icon">🔒</span>
+      <h4>Voice Stays Off the Record</h4>
+      <p>Voice is live-only. Nothing anyone says is recorded, transcribed, or stored — not by the server, not by PorkChop. What's said in voice stays in voice.</p>
+      <span class="feat-tag">Privacy</span>
     </div>
     <div class="feat-card">
       <span class="feat-icon">🐷</span>
       <h4>PorkChop Daily Recaps</h4>
-      <p>Miss a day? PorkChop reads the room and writes a short recap of what everyone talked about. Text chat and voice are summarized as two separate streams — one recap for what was typed, another for what was actually said out loud — so you can catch up on either at a glance. Recaps generate once the day is over and are cached, so they're instant every time after.</p>
+      <p>Miss a day? PorkChop reads the room and writes a short recap of what everyone talked about. Recaps generate once the day is over and are cached, so they're instant every time after.</p>
       <span class="feat-tag">AI</span>
     </div>
     <div class="feat-card">
@@ -1139,7 +1138,7 @@
     <div class="feat-card">
       <span class="feat-icon">🗞</span>
       <h4>Catch Me Up</h4>
-      <p>Step away for a while? One tap and PorkChop summarizes everything you missed since you were last online — just for you, channel by channel. The text and voice tabs catch you up separately, so you can skim what was typed or what was actually said out loud.</p>
+      <p>Step away for a while? One tap and PorkChop summarizes everything you missed since you were last online — just for you, channel by channel.</p>
       <span class="feat-tag">AI</span>
     </div>
     <div class="feat-card">
@@ -1247,7 +1246,7 @@
     <div class="feat-card">
       <span class="feat-icon">🗣</span>
       <h4>PorkChop Talks Back</h4>
-      <p>Ask PorkChop something out loud in a voice channel and he answers out loud. Your words are transcribed, he reads the room, and his reply is spoken right back into the channel — not just posted as text.</p>
+      <p>@PorkChop him while you're sitting in voice and he answers out loud — his reply is spoken right back into the channel, not just posted as text.</p>
       <span class="feat-tag">PorkChop</span>
     </div>
     <div class="feat-card">
@@ -1378,7 +1377,6 @@
     <div class="tech-badge"><span class="bd"></span>Entity Framework Core</div>
     <div class="tech-badge"><span class="bd"></span>SQLite · PostgreSQL</div>
     <div class="tech-badge"><span class="bd"></span>JWT Bearer Auth</div>
-    <div class="tech-badge"><span class="bd"></span>Whisper STT</div>
     <div class="tech-badge"><span class="bd"></span>BCrypt Password Hashing</div>
     <div class="tech-badge"><span class="bd"></span>Railway Deploy</div>
     <div class="tech-badge"><span class="bd"></span>WPF Admin Dashboard</div>
@@ -1417,7 +1415,7 @@
       <div class="dl-status dl-status-soon">Coming Soon</div>
       <span class="dl-icon">💬</span>
       <h3 class="dl-title">Windows Client</h3>
-      <p class="dl-desc">The native Windows desktop client with push-to-talk voice, screen sharing, webcam, Whisper transcription, and the full messaging suite.</p>
+      <p class="dl-desc">The native Windows desktop client with push-to-talk voice, screen sharing, webcam, and the full messaging suite.</p>
       <ul class="dl-reqs">
         <li>Windows 10 / 11 (64-bit)</li>
         <li>.NET 9 Desktop Runtime required</li>
@@ -1455,7 +1453,6 @@
     { kind: 'voice',   id: 'vu1' },
     { kind: 'ai',      text: 'Look who finally showed. SlimJim_, last week you rage-quit to "do laundry." The laundry won. 🧺', time: '9:41 PM' },
     { kind: 'msg',     user: 'SlimJim_', color: '#36b864', text: 'what we playing',                      time: '9:42 PM' },
-    { kind: 'whisper', text: '🎙 Transcribed from voice: "what we playing"' },
     { kind: 'msg',     user: 'BigGus',   color: '#d42d00', text: '@PorkChop settle it — Rust or MW3?',   time: '9:42 PM' },
     { kind: 'ai',      text: 'Rust. MW3 is where K/D ratios go to apologize. Go get irradiated. 💀',     time: '9:42 PM' },
     { kind: 'msg',     user: 'FatMike',  color: '#e89000', text: 'RUST 🔥🔥🔥',                          time: '9:42 PM' },
@@ -1533,13 +1530,6 @@
       d.textContent = step.text;
       appendEl(d);
       setTimeout(next, 480);
-
-    } else if (step.kind === 'whisper') {
-      const d = document.createElement('div');
-      d.className = 'cm-whisper';
-      d.textContent = step.text;
-      appendEl(d);
-      setTimeout(next, 600);
 
     } else if (step.kind === 'voice') {
       const el = document.getElementById(step.id);
