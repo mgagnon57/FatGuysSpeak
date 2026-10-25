@@ -3249,12 +3249,12 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             AdjustStreamQuality(ms);
     }
 
-    [RelayCommand]
     private async Task LoadPrivateModeStatusAsync()
     {
         try { IsPrivateMode = await api.GetPrivateModeAsync(); } catch { /* keep default until Settings loads */ }
     }
 
+    [RelayCommand]
     public void OpenSettings()
     {
         if (_settingsWindow is not null) return;
