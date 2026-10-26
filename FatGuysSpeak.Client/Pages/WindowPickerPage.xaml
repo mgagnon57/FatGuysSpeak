@@ -13,7 +13,7 @@
         <!-- Header -->
         <Grid Grid.Row="0" BackgroundColor="{DynamicResource ThemeBgElevated}" Padding="16,12"
               ColumnDefinitions="*,Auto">
-            <Label Grid.Column="0" Text="Choose what to share"
+            <Label Grid.Column="0" Text="{Binding Heading}"
                    TextColor="{DynamicResource ThemeTextPrimary}" FontAttributes="Bold" FontSize="14"
                    VerticalOptions="Center" />
             <Button Grid.Column="1" Text="✕"
@@ -84,7 +84,7 @@
         <Grid Grid.Row="3" BackgroundColor="{DynamicResource ThemeBgElevated}" Padding="14,10"
               ColumnDefinitions="*,Auto,Auto">
             <Label Grid.Column="0"
-                   Text="Select a window or Entire Screen to share"
+                   Text="{Binding Hint}"
                    TextColor="{DynamicResource ThemeTextMuted}" FontSize="11"
                    VerticalOptions="Center" />
             <Button Grid.Column="1" Text="Cancel"
