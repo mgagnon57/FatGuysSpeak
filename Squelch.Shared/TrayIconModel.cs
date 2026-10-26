@@ -6,7 +6,8 @@ public enum TrayVisual { Idle, Muted, Level }
 public readonly record struct TrayIconChoice(TrayVisual Visual, int Level);
 
 /// <summary>Maps voice state + mic level to a tray icon. Update runs on every mic-level event, so it returns
-/// null unless the icon actually changes, and caps level-only swaps at ~12 fps (icon swaps are costly).</summary>
+/// null unless the icon actually changes. Swaps between Idle and Level frames (including a level hovering at the
+/// gate) are capped at ~12 fps since icon swaps are costly; anything involving Muted, or leaving voice, is immediate.</summary>
 public sealed class TrayIconModel
 {
     public const int MinFrameIntervalMs = 80;
@@ -32,8 +33,10 @@ public sealed class TrayIconModel
         else choice = new(TrayVisual.Level, Math.Max(1, (int)Math.Round(_smoothed * MaxLevel)));
 
         if (choice == _last) return null;
-        // Level-only change: hold back until the frame interval has passed (a later call will return it).
-        if (_last is { } prev && prev.Visual == choice.Visual && nowMs - _lastReturnMs < MinFrameIntervalMs) return null;
+        // Idle/Level frame change: hold back until the frame interval has passed (a later call will return it).
+        // Leaving voice and any Muted transition bypass the throttle.
+        if (inVoice && _last is { } prev && prev.Visual != TrayVisual.Muted && choice.Visual != TrayVisual.Muted
+            && nowMs - _lastReturnMs < MinFrameIntervalMs) return null;
 
         _last = choice;
         _lastReturnMs = nowMs;

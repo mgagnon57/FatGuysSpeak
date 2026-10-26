@@ -53,6 +53,25 @@ public class TrayIconModelTests
     }
 
     [Fact]
+    public void GateFlicker_ThrottledTo80ms()
+    {
+        // Smoothing 1.0 makes the output follow the input, so it genuinely crosses the gate (Idle <-> Level).
+        var model = new TrayIconModel(smoothing: 1.0);
+        var returned = 0;
+        for (var t = 0; t <= 1000; t += 10)
+            if (model.Update(true, false, true, t / 10 % 2 == 0 ? 0.0 : 0.9, 0.05, t) is not null) returned++;
+        Assert.InRange(returned, 1, 13);
+    }
+
+    [Fact]
+    public void LeavingVoice_NotThrottled()
+    {
+        var model = new TrayIconModel();
+        Assert.Equal(TrayVisual.Level, model.Update(true, false, true, 1.0, 0.05, 0)!.Value.Visual);
+        Assert.Equal(Idle, model.Update(false, false, true, 1.0, 0.05, 10));
+    }
+
+    [Fact]
     public void MuteToggle_NotThrottled()
     {
         var model = new TrayIconModel();
