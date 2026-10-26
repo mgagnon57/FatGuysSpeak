@@ -714,6 +714,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         ptt.KeyLearned += _keyLearnedHandler;
         PttKeyName = ptt.PttKeyName;
         IsStreamChatOverlayVisible = Preferences.Get("stream_chat_overlay", false);
+#if WINDOWS
+        IPlatformApplication.Current?.Services.GetService<TrayIconService>()?.Start(this);
+#endif
     }
 
     [RelayCommand]

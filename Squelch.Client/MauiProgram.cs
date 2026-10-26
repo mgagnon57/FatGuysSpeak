@@ -37,6 +37,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<ToastNotificationService>();
         builder.Services.AddSingleton<GoogleAuthService>();
         builder.Services.AddSingleton<Squelch.Client.Services.UpdateService>();
+#if WINDOWS
+        builder.Services.AddSingleton<TrayIconService>();
+#endif
         builder.Services.AddSingleton<SettingsViewModel>();
         builder.Services.AddSingleton<PorkChopViewModel>();   // singleton: the ephemeral tab persists in-memory while the app runs
 

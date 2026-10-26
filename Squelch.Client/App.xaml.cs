@@ -23,6 +23,10 @@ public partial class App : Application
 
         window.Destroying += async (_, _) =>
         {
+#if WINDOWS
+            // Remove the tray icon first: the process can exit while the hub disconnect is awaited.
+            IPlatformApplication.Current?.Services.GetService<TrayIconService>()?.Dispose();
+#endif
             var hub = IPlatformApplication.Current?.Services.GetService<ChatHubService>();
             if (hub is not null)
                 await hub.DisconnectAsync();
