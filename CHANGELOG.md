@@ -5,6 +5,8 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-25
+
 ### Fixed
 - Stream Game never sends sound from FatGuysSpeak itself, from whatever launched it, or from voice
   chat apps — picking such a window streams video only (game sound could otherwise have carried
