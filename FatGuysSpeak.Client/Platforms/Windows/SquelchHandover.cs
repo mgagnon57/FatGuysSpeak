@@ -23,6 +23,23 @@ public static class SquelchHandover
     private static readonly TimeSpan DownloadStallTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan SetupTimeout = TimeSpan.FromMinutes(10);
 
+    private const string InstanceMutexName = @"Local\FatGuysSpeak.Handover";
+    private static Mutex? _instanceMutex;   // held (never released) until this process exits
+
+    /// <summary>Only one bridge instance may run the handover (the owner often runs two clients).
+    /// Returns false when another instance already holds the handover lock.</summary>
+    public static bool TryAcquireInstanceLock()
+    {
+        if (_instanceMutex is not null) return true;
+        var m = new Mutex(false, InstanceMutexName);
+        bool owned;
+        try { owned = m.WaitOne(0); }
+        catch (AbandonedMutexException) { owned = true; }   // previous holder died: ours now
+        if (!owned) { m.Dispose(); Log("Another instance is running the handover; quitting"); return false; }
+        _instanceMutex = m;
+        return true;
+    }
+
     /// <summary>The single place the setup location is read.</summary>
     internal static string ResolveSetupUrl() => SetupUrl;
 
@@ -48,17 +65,29 @@ public static class SquelchHandover
             var setupPath = Path.Combine(Path.GetTempPath(), SquelchHandoverPlan.SetupFileName);
             Log($"Handover start (app dir {AppContext.BaseDirectory})");
 
-            if (SquelchHandoverPlan.Decide(File.Exists(squelchExe)) == HandoverStart.DownloadAndInstall)
+            // Key on a COMPLETED Velopack install (current\exe + current\sq.version), not the root stub,
+            // so a half-finished earlier install gets reinstalled instead of "opened".
+            bool SquelchInstalled() => SquelchHandoverPlan.IsCompletedInstall(
+                File.Exists(SquelchHandoverPlan.SquelchCurrentExePath(localAppData)),
+                File.Exists(SquelchHandoverPlan.SquelchVersionFilePath(localAppData)));
+
+            if (SquelchHandoverPlan.Decide(SquelchInstalled()) == HandoverStart.DownloadAndInstall)
             {
-                // 1. Download
+                // 1. Download (a failed download leaves no partial setup file behind)
                 Step("Downloading Squelch…");
+                string? downloadError = null;
                 try { await DownloadAsync(ResolveSetupUrl(), setupPath, status, ct); }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                { return Fail("Moving to Squelch took too long and was stopped."); }
+                { downloadError = "Moving to Squelch took too long and was stopped."; }
                 catch (OperationCanceledException)
-                { return Fail("Couldn't download Squelch: the download stalled."); }
+                { downloadError = "Couldn't download Squelch: the download stalled."; }
                 catch (Exception ex)
-                { return Fail($"Couldn't download Squelch: {ex.Message}"); }
+                { downloadError = $"Couldn't download Squelch: {ex.Message}"; }
+                if (downloadError is not null)
+                {
+                    try { File.Delete(setupPath); } catch { }
+                    return Fail(downloadError);
+                }
 
                 // 2. Silent install with a deadline. Velopack's Setup --silent does NOT start the app.
                 Step("Installing Squelch…");
@@ -84,7 +113,7 @@ public static class SquelchHandover
                     try { File.Delete(setupPath); } catch { }   // ~95 MB; best-effort cleanup
 
                     Log($"Setup exited with code {setup.ExitCode}");
-                    var failure = SquelchHandoverPlan.SetupFailure(setup.ExitCode, File.Exists(squelchExe));
+                    var failure = SquelchHandoverPlan.SetupFailure(setup.ExitCode, SquelchInstalled());
                     if (failure is not null) return Fail(failure);
                 }
                 catch (Exception ex)

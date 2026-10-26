@@ -99,7 +99,7 @@ if (-not (Test-Path $clientDir)) { throw "Client build output not found at $clie
 Compress-Archive -Path (Join-Path $clientDir '*') -DestinationPath (Join-Path $out "FatGuysSpeak-Client-$Version.zip") -Force
 
 # 7b. Velopack: publish the client and upload to the GitHub release (default + per-version channel)
-$repoUrl = 'https://github.com/mgagnon57/FatGuysSpeak'
+$repoUrl = 'https://github.com/mgagnon57/Squelch'   # repo was renamed; upload to the real name, not the redirect
 $verChannel = 'v' + ($Version -replace '\.', '-')        # 1.2.0 -> v1-2-0 (matches UpdateChannel.ForVersion)
 $clientPub = Join-Path $root 'release-output\client-pub'
 Remove-Item -Recurse -Force $clientPub -ErrorAction SilentlyContinue
@@ -130,7 +130,7 @@ if ($env:GITHUB_TOKEN) {
     if ($LASTEXITCODE) { throw "vpk upload github ($verChannel) failed" }
 
     $winAssets = Get-ChildItem (Join-Path $vpkOut 'win') -File | ForEach-Object { $_.FullName }
-    gh release upload "v$Version" @winAssets --clobber
+    gh release upload "v$Version" @winAssets --clobber --repo mgagnon57/Squelch
     if ($LASTEXITCODE) { throw 'gh release upload (win channel) failed' }
 
     Write-Host "Velopack assets uploaded to release v$Version (channels: $verChannel via vpk, win via gh)." -ForegroundColor Green

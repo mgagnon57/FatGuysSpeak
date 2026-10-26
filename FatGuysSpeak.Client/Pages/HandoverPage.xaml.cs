@@ -20,6 +20,15 @@ public partial class HandoverPage : ContentPage
         if (_started) return;
         _started = true;
 #if WINDOWS
+        if (!SquelchHandover.TryAcquireInstanceLock())
+        {
+            // Another FatGuysSpeak window is already doing the move; don't race it.
+            StatusLabel.Text = "Moving you over in another window…";
+            await Task.Delay(2000);
+            Application.Current?.Quit();
+            return;
+        }
+
         var status = new Progress<string>(s => StatusLabel.Text = s);   // created on the UI thread
         HandoverResult result;
         // Overall deadline so a stalled download / hung setup always ends on the failure panel.

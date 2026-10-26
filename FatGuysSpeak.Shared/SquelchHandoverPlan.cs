@@ -17,10 +17,24 @@ public static class SquelchHandoverPlan
     public static string SquelchExePath(string localAppData)
         => Path.Combine(localAppData, SquelchPackageId, SquelchExeName);
 
+    /// <summary>The real app inside Velopack's &lt;root&gt;\current\ folder.</summary>
+    public static string SquelchCurrentExePath(string localAppData)
+        => Path.Combine(localAppData, SquelchPackageId, "current", SquelchExeName);
+
+    /// <summary>Velopack writes current\sq.version as part of a completed install.</summary>
+    public static string SquelchVersionFilePath(string localAppData)
+        => Path.Combine(localAppData, SquelchPackageId, "current", "sq.version");
+
+    /// <summary>A completed Velopack install has both current\Squelch.Client.exe and current\sq.version;
+    /// the root stub alone (or a half-extracted current\) is a partial install and doesn't count.</summary>
+    public static bool IsCompletedInstall(bool currentExeExists, bool versionFileExists)
+        => currentExeExists && versionFileExists;
+
     /// <summary>Squelch already installed (earlier handover whose uninstall didn't happen, or a
-    /// hand install) → skip download/install and only open it + retry the uninstall.</summary>
-    public static HandoverStart Decide(bool squelchExeExists)
-        => squelchExeExists ? HandoverStart.OpenExisting : HandoverStart.DownloadAndInstall;
+    /// hand install) → skip download/install and only open it + retry the uninstall.
+    /// Pass <see cref="IsCompletedInstall"/>, not just "the stub exists".</summary>
+    public static HandoverStart Decide(bool squelchInstalled)
+        => squelchInstalled ? HandoverStart.OpenExisting : HandoverStart.DownloadAndInstall;
 
     /// <summary>Velopack runs the app from &lt;root&gt;\current\ with Update.exe in &lt;root&gt;.
     /// Derive the root from the running app's base directory; if the app isn't running from a
@@ -39,11 +53,11 @@ public static class SquelchHandoverPlan
 
     /// <summary>Classifies the silent setup run. Returns null when Squelch installed correctly,
     /// otherwise a user-facing error.</summary>
-    public static string? SetupFailure(int exitCode, bool squelchExeExists)
+    public static string? SetupFailure(int exitCode, bool squelchInstalled)
     {
         if (exitCode != 0)
             return $"The Squelch installer failed (exit code {exitCode}).";
-        if (!squelchExeExists)
+        if (!squelchInstalled)
             return "The Squelch installer finished, but Squelch wasn't found where it should be.";
         return null;
     }

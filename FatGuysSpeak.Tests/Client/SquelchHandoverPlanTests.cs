@@ -12,12 +12,35 @@ public class SquelchHandoverPlanTests
                         SquelchHandoverPlan.SquelchExePath(LocalAppData));
 
     [Fact]
+    public void SquelchCurrentExePath_IsInsideCurrent()
+        => Assert.Equal(Path.Combine(LocalAppData, "Squelch.Client", "current", "Squelch.Client.exe"),
+                        SquelchHandoverPlan.SquelchCurrentExePath(LocalAppData));
+
+    [Fact]
+    public void SquelchVersionFilePath_IsCurrentSqVersion()
+        => Assert.Equal(Path.Combine(LocalAppData, "Squelch.Client", "current", "sq.version"),
+                        SquelchHandoverPlan.SquelchVersionFilePath(LocalAppData));
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]   // half-extracted current\ (no sq.version yet)
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]  // e.g. only the root stub exists
+    public void IsCompletedInstall_NeedsCurrentExeAndSqVersion(bool exe, bool version, bool expected)
+        => Assert.Equal(expected, SquelchHandoverPlan.IsCompletedInstall(exe, version));
+
+    [Fact]
     public void Decide_SquelchAlreadyInstalled_SkipsInstall()
-        => Assert.Equal(HandoverStart.OpenExisting, SquelchHandoverPlan.Decide(squelchExeExists: true));
+        => Assert.Equal(HandoverStart.OpenExisting, SquelchHandoverPlan.Decide(squelchInstalled: true));
 
     [Fact]
     public void Decide_NoSquelch_DownloadsAndInstalls()
-        => Assert.Equal(HandoverStart.DownloadAndInstall, SquelchHandoverPlan.Decide(squelchExeExists: false));
+        => Assert.Equal(HandoverStart.DownloadAndInstall, SquelchHandoverPlan.Decide(squelchInstalled: false));
+
+    [Fact]
+    public void Decide_PartialInstall_Reinstalls()
+        => Assert.Equal(HandoverStart.DownloadAndInstall,
+            SquelchHandoverPlan.Decide(SquelchHandoverPlan.IsCompletedInstall(currentExeExists: true, versionFileExists: false)));
 
     [Theory]
     [InlineData(@"D:\Apps\FatGuysSpeak.Client\current\")]
