@@ -10,7 +10,7 @@ using FatGuysSpeak.Shared;
 
 namespace FatGuysSpeak.Client.ViewModels;
 
-public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, PttService ptt, ScreenStreamService screen, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService, ShareBorderOverlay shareBorder, PorkChopViewModel porkChop) : ObservableObject
+public partial class MainViewModel(ApiService api, ChatHubService hub, AudioService audio, PttService ptt, ScreenStreamService screen, GameCaptureService gameCapture, GameWindowScanner gameScanner, RemoteInputService remoteInput, CameraService camera, SettingsViewModel settings, ToastNotificationService toast, UpdateService updateService, ShareBorderOverlay shareBorder, PorkChopViewModel porkChop) : ObservableObject
 {
     private bool _initialized;
     private string? _versionSyncCheckedFor;   // server version last handled this session
@@ -126,6 +126,12 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private bool _hasUnreadBelow;
     [ObservableProperty] private int _unreadBelowCount;
     [ObservableProperty] private bool _isStreaming;
+    // What *I* am streaming (meaningful while IsStreaming) and what the stream I'm watching is.
+    [ObservableProperty] private StreamKind _currentStreamKind;
+    [ObservableProperty] private string? _streamingGameName;
+    [ObservableProperty] private StreamKind _activeStreamKind;
+    [ObservableProperty] private string? _activeStreamGameName;
+    [ObservableProperty] private bool _gameSoundEnabled = Preferences.Get("stream_game_sound", true);
     [ObservableProperty] private bool _isCameraOn;
     [ObservableProperty] private bool _isDmMode;
     [ObservableProperty] private DmConversationItem? _selectedDmConversation;
@@ -157,8 +163,10 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [ObservableProperty] private bool _versionMismatch;
     [ObservableProperty] private string? _versionMismatchText;
 
-    public bool CanOfferControl => IsStreaming && DeviceInfo.Platform == DevicePlatform.WinUI;
-    public bool CanRequestControl => ActiveStreamerId > 0 && !IsStreaming && DeviceInfo.Platform == DevicePlatform.WinUI;
+    // Remote control is for troubleshooting: Share Screen streams only, never Stream Game.
+    public bool CanOfferControl => IsStreaming && CurrentStreamKind == StreamKind.Screen && DeviceInfo.Platform == DevicePlatform.WinUI;
+    public bool CanRequestControl => ActiveStreamerId > 0 && !IsStreaming && ActiveStreamKind == StreamKind.Screen
+                                     && DeviceInfo.Platform == DevicePlatform.WinUI;
 
     /// <summary>Exposes hub for page code-behind to call SendRemoteInput.</summary>
     public void SendRemoteInput(RemoteInputDto dto) => _ = hub.SendRemoteInput(dto);
@@ -259,14 +267,27 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     public string MessagePlaceholderText => IsDmMode && SelectedDmConversation is not null
         ? $"Message @{SelectedDmConversation.OtherUsername}"
         : SelectedChannel is not null ? $"Message #{SelectedChannel.Name}" : "Select a channel";
-    public string StreamButtonLabel => IsStreaming ? "⏹ Stop Sharing" : "📺 Share Screen";
+    public const string GameStreamNeedsWindows11 = "Stream Game needs Windows 11 — upgrade to use it. Share Screen still works.";
+    public bool IsGameStreamSupported => DeviceInfo.Platform == DevicePlatform.WinUI
+                                         && StreamText.SupportsGameStream(Environment.OSVersion.Version.Build);
+    public bool IsStreamingGame => IsStreaming && CurrentStreamKind == StreamKind.Game;
+    public bool IsSharingScreen => IsStreaming && CurrentStreamKind == StreamKind.Screen;
+    public string StreamGameButtonLabel => IsStreamingGame ? "⏹ Stop Streaming" : "🎮 Stream Game";
+    public Color StreamGameButtonColor => IsStreamingGame ? Color.FromArgb("#ed4245") : Color.FromArgb("#3a3a3a");
+    public double StreamGameButtonOpacity => IsGameStreamSupported && !IsSharingScreen ? 1.0 : 0.45;
+    public string StreamGameTooltip => IsGameStreamSupported ? "Stream the game you're playing" : GameStreamNeedsWindows11;
+    public string ShareScreenButtonLabel => IsSharingScreen ? "⏹ Stop Sharing" : "🖥 Share Screen";
+    public Color ShareScreenButtonColor => IsSharingScreen ? Color.FromArgb("#ed4245") : Color.FromArgb("#3a3a3a");
+    public bool CanShareScreen => !IsStreamingGame;
+    public string GameSoundLabel => GameSoundEnabled ? "🔊 Game sound" : "🔇 Game sound";
+    public string StreamingGameText => $"Streaming {StreamingGameName} · Change";
+    public string ActiveStreamLabel => StreamText.ViewerLabel(ActiveStreamKind, ActiveStreamerName ?? "", ActiveStreamGameName);
     public double StreamTabOpacity => HasActiveStream ? 1.0 : 0.5;
     public string StreamHeaderText => IsStreaming
-        ? "🟢  You are sharing your screen"
+        ? (IsStreamingGame ? $"🟢  You are streaming {StreamingGameName}" : "🟢  You are sharing your screen")
         : HasActiveStream
-            ? $"📺  {ActiveStreamerName} is sharing their screen"
+            ? ActiveStreamLabel
             : "📺  No active stream";
-    public Color StreamButtonColor => IsStreaming ? Color.FromArgb("#ed4245") : Color.FromArgb("#3a3a3a");
     public Color StreamLatencyColor => StreamLatencyMs <= 0 ? Color.FromArgb("#888888")
         : StreamLatencyMs < 20 ? Color.FromArgb("#23a55a")
         : StreamLatencyMs < 50 ? Color.FromArgb("#f0a030")
@@ -479,10 +500,27 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         // channel") know where to post.
         api.SetCurrentChannel(value?.Id, value?.Name);
     }
+    private void NotifyStreamButtons()
+    {
+        foreach (var name in new[] { nameof(IsStreamingGame), nameof(IsSharingScreen), nameof(StreamGameButtonLabel),
+                     nameof(StreamGameButtonColor), nameof(StreamGameButtonOpacity), nameof(ShareScreenButtonLabel),
+                     nameof(ShareScreenButtonColor), nameof(CanShareScreen), nameof(StreamHeaderText),
+                     nameof(CanOfferControl), nameof(CanRequestControl), nameof(StreamingGameText), nameof(ActiveStreamLabel) })
+            OnPropertyChanged(name);
+    }
+    partial void OnCurrentStreamKindChanged(StreamKind value) => NotifyStreamButtons();
+    partial void OnStreamingGameNameChanged(string? value) => NotifyStreamButtons();
+    partial void OnActiveStreamKindChanged(StreamKind value) => NotifyStreamButtons();
+    partial void OnActiveStreamGameNameChanged(string? value) => NotifyStreamButtons();
+    partial void OnGameSoundEnabledChanged(bool value)
+    {
+        Preferences.Set("stream_game_sound", value);
+        gameCapture.SetGameSound(value);
+        OnPropertyChanged(nameof(GameSoundLabel));
+    }
     partial void OnIsStreamingChanged(bool value)
     {
-        OnPropertyChanged(nameof(StreamButtonLabel));
-        OnPropertyChanged(nameof(StreamButtonColor));
+        NotifyStreamButtons();
         OnPropertyChanged(nameof(HasActiveStream));
         OnPropertyChanged(nameof(IsWaitingForStream));
         OnPropertyChanged(nameof(StreamHeaderText));
@@ -490,14 +528,16 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         OnPropertyChanged(nameof(CanOfferControl));
         OnPropertyChanged(nameof(CanRequestControl));
 
-        // Show the Teams-style red "you're sharing this" outline around the captured region.
-        if (value) shareBorder.Show(() => screen.CurrentCaptureRect);
+        // Show the Teams-style red "you're sharing this" outline around the captured region
+        // (Share Screen only — an outline over the game you're playing would just be in the way).
+        if (value && CurrentStreamKind == StreamKind.Screen) shareBorder.Show(() => screen.CurrentCaptureRect);
         else shareBorder.Hide();
     }
     partial void OnActiveStreamerIdChanged(int value) => OnPropertyChanged(nameof(CanRequestControl));
     partial void OnIsFullScreenChanged(bool value) => OnPropertyChanged(nameof(StreamViewerVisible));
     partial void OnActiveStreamerNameChanged(string? value)
     {
+        OnPropertyChanged(nameof(ActiveStreamLabel));
         OnPropertyChanged(nameof(HasActiveStream));
         OnPropertyChanged(nameof(IsWaitingForStream));
         OnPropertyChanged(nameof(StreamTabOpacity));
@@ -597,6 +637,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.BotVoiceDataReceived += OnBotVoiceDataReceived;
         hub.StreamStarted        += OnStreamStarted;
         hub.StreamStopped        += OnStreamStopped;
+        hub.StreamDetails        += OnStreamDetails;
         hub.StreamFrameReceived  += OnStreamFrameReceived;
         hub.StreamAudioReceived  += OnStreamAudioReceived;
         hub.StreamNotification   += OnStreamNotification;
@@ -656,6 +697,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         _hubDisconnectedHandler = _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Disconnected");
         hub.Disconnected += _hubDisconnectedHandler;
         screen.FrameCaptured       += OnScreenFrameCaptured;
+        gameCapture.FrameCaptured  += OnScreenFrameCaptured;
+        gameCapture.StreamAudioCaptured += OnStreamAudioCaptured;
+        gameCapture.TargetClosed   += OnGameTargetClosed;
         _micLevelHandler = level => MainThread.BeginInvokeOnMainThread(() => MicLevel = level);
         audio.MicLevelChanged += _micLevelHandler;
         ptt.PttDown    += OnPttDown;
@@ -2075,7 +2119,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [RelayCommand]
     public async Task LeaveVoiceAsync()
     {
-        if (IsStreaming) { screen.StopCapture(); await hub.StopStreamAsync(); IsStreaming = false; }
+        if (IsStreaming) await StopMyStreamAsync();
         if (IsCameraOn) await StopCameraAsync();
         audio.AudioCaptured -= OnAudioCaptured;
         await hub.LeaveVoiceChannelAsync();
@@ -2159,7 +2203,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     [RelayCommand]
     public async Task LogoutAsync()
     {
-        if (IsStreaming) { screen.StopCapture(); await hub.StopStreamAsync(); IsStreaming = false; }
+        if (IsStreaming) await StopMyStreamAsync();
         StopTypingDebounced();
         ptt.CancelLearning();
         ptt.ClearUser();
@@ -2189,6 +2233,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         hub.BotVoiceDataReceived   -= OnBotVoiceDataReceived;
         hub.StreamStarted          -= OnStreamStarted;
         hub.StreamStopped          -= OnStreamStopped;
+        hub.StreamDetails          -= OnStreamDetails;
         hub.StreamFrameReceived    -= OnStreamFrameReceived;
         hub.StreamAudioReceived    -= OnStreamAudioReceived;
         hub.StreamNotification     -= OnStreamNotification;
@@ -2236,6 +2281,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (_hubReconnectedHandler is not null)   hub.Reconnected  -= _hubReconnectedHandler;
         if (_hubDisconnectedHandler is not null)  hub.Disconnected -= _hubDisconnectedHandler;
         screen.FrameCaptured       -= OnScreenFrameCaptured;
+        gameCapture.FrameCaptured  -= OnScreenFrameCaptured;
+        gameCapture.StreamAudioCaptured -= OnStreamAudioCaptured;
+        gameCapture.TargetClosed   -= OnGameTargetClosed;
         if (_micLevelHandler is not null)         audio.MicLevelChanged    -= _micLevelHandler;
         ptt.PttDown -= OnPttDown;
         ptt.PttUp   -= OnPttUp;
@@ -3131,45 +3179,55 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             SelectedServer.Id, channelItem.Channel.Id, new SetChannelCategoryRequest(catId));
     }
 
-    [RelayCommand]
-    public async Task ToggleStreamAsync()
+    private async Task StopMyStreamAsync()
     {
-        if (IsStreaming)
-        {
-            screen.StopCapture();
-            await hub.StopStreamAsync();
-            IsStreaming = false;
-            ActiveStreamerName = null;
-            ActiveStreamerId = 0;
-            return;
-        }
+        screen.StopCapture();
+        gameCapture.Stop();
+        await hub.StopStreamAsync();
+        IsStreaming = false;
+        StreamingGameName = null;
+        ActiveStreamerName = null;
+        ActiveStreamerId = 0;
+    }
 
+    // Shared pre-flight for both kinds of stream. Returns the channel to stream into, or null (already explained).
+    private async Task<int?> StreamPreflightAsync()
+    {
         if (SelectedServer is null)
         {
             await Shell.Current.DisplayAlert("Stream Error", "No server selected.", "OK");
-            return;
+            return null;
         }
-
         if (!hub.IsConnected)
         {
             await Shell.Current.DisplayAlert("Stream Error", "Not connected to server. Please reconnect.", "OK");
+            return null;
+        }
+        var channelId = SelectedChannel?.Id
+            ?? Channels.FirstOrDefault(c => c.Channel.Type == ChannelType.Text)?.Channel.Id;
+        if (channelId is null)
+            await Shell.Current.DisplayAlert("Stream Error", "No text channel available on this server.", "OK");
+        return channelId;
+    }
+
+    /// <summary>Share Screen: pick a window or the whole screen, no sound, remote control allowed. For troubleshooting.</summary>
+    [RelayCommand]
+    public async Task ShareScreenAsync()
+    {
+        if (IsStreaming)
+        {
+            if (IsSharingScreen) await StopMyStreamAsync();
             return;
         }
+        if (await StreamPreflightAsync() is not int channelId) return;
 
-        var selected = await ShowWindowPickerAsync();
+        var selected = await ShowWindowPickerAsync(vm => vm.Load());
         if (selected is null) return;
 
         try
         {
-            var channelId = SelectedChannel?.Id
-                ?? Channels.FirstOrDefault(c => c.Channel.Type == ChannelType.Text)?.Channel.Id;
-            if (channelId is null)
-            {
-                await Shell.Current.DisplayAlert("Stream Error", "No text channel available on this server.", "OK");
-                return;
-            }
-
-            await hub.StartStreamAsync(channelId.Value);
+            CurrentStreamKind = StreamKind.Screen;
+            await hub.StartStreamAsync(channelId);
             StreamQualityLabel = "1080p 20fps";
             screen.StartCapture(selected.Handle, fps: 20);
             IsStreaming = true;
@@ -3182,10 +3240,106 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         }
     }
 
-    private Task<AppWindow?> ShowWindowPickerAsync()
+    /// <summary>Stream Game: finds the game you're playing and streams just that window with its own sound.</summary>
+    [RelayCommand]
+    public async Task StreamGameAsync()
+    {
+        if (IsStreaming)
+        {
+            if (IsStreamingGame) await StopMyStreamAsync();
+            return;
+        }
+        if (!IsGameStreamSupported)
+        {
+            await Shell.Current.DisplayAlert("Stream Game", GameStreamNeedsWindows11, "OK");
+            return;
+        }
+        if (await StreamPreflightAsync() is not int channelId) return;
+
+        var game = await PickGameAsync(autoPick: true);
+        if (game is null) return;
+        var gameName = game.GameName ?? GameNames.Clean(game.ProcessName);
+
+        try
+        {
+            CurrentStreamKind = StreamKind.Game;
+            StreamingGameName = gameName;
+            await hub.StartGameStreamAsync(channelId, gameName);
+            StreamQualityLabel = "1080p 20fps";
+            var sound = GameSoundEnabled;
+            await Task.Run(() => gameCapture.Start(game.Handle, game.ProcessId, sound));
+            IsStreaming = true;
+            ActiveStreamerName = api.CurrentUsername;
+            ActiveStreamerId = api.CurrentUserId;
+        }
+        catch (Exception ex)
+        {
+            gameCapture.Stop();
+            try { await hub.StopStreamAsync(); } catch { }
+            StreamingGameName = null;
+            await Shell.Current.DisplayAlert("Stream Error", $"Couldn't stream {gameName}: {ex.Message}", "OK");
+        }
+    }
+
+    /// <summary>"Streaming X · Change": switch to another window without ending the stream.</summary>
+    [RelayCommand]
+    public async Task ChangeGameAsync()
+    {
+        if (!IsStreamingGame) return;
+        var game = await PickGameAsync(autoPick: false);
+        if (game is null || !IsStreamingGame) return;
+        var gameName = game.GameName ?? GameNames.Clean(game.ProcessName);
+        try
+        {
+            await Task.Run(() => gameCapture.SwitchTarget(game.Handle, game.ProcessId));
+            StreamingGameName = gameName;
+            await hub.UpdateStreamGameAsync(gameName);
+        }
+        catch (Exception ex)
+        {
+            await Shell.Current.DisplayAlert("Stream Error", $"Couldn't switch to {gameName}: {ex.Message}", "OK");
+        }
+    }
+
+    [RelayCommand]
+    public void ToggleGameSound() => GameSoundEnabled = !GameSoundEnabled;
+
+    private async Task<AppWindow?> PickGameAsync(bool autoPick)
+    {
+        var (exeNames, roots) = await gameScanner.GetLibraryAsync();
+        var facts = await Task.Run(gameScanner.GetWindowFacts);
+        var detection = GameDetector.Detect(facts, exeNames, roots);
+        if (autoPick && detection.ConfidentPick is { } p)
+            return new AppWindow((IntPtr)p.Window.Handle, p.Window.Title, p.Window.ProcessName, p.Window.ProcessId, true, p.GameName);
+        return await ShowWindowPickerAsync(vm => vm.LoadForGame(detection, facts));
+    }
+
+    private void OnGameTargetClosed()
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            if (!IsStreamingGame) return;
+            var game = StreamingGameName ?? "Your game";
+            await StopMyStreamAsync();
+            toast.Show("Stream ended", $"{game} closed — your stream has stopped.");
+        });
+    }
+
+    private void OnStreamDetails(int userId, int channelId, StreamKind kind, string? gameName)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (ActiveStreamerId != userId) return;
+            ActiveStreamKind = kind;
+            ActiveStreamGameName = gameName;
+        });
+    }
+
+    private Task<AppWindow?> ShowWindowPickerAsync(Action<WindowPickerViewModel> load)
     {
         var tcs = new TaskCompletionSource<AppWindow?>();
         var pickerVm = new WindowPickerViewModel();
+        load(pickerVm);
         var pickerPage = new WindowPickerPage { BindingContext = pickerVm };
         var pickerWindow = new Window(pickerPage)
         {
@@ -3261,6 +3415,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             _     => (5,  40,  960, "540p 5fps"),
         };
         screen.UpdateQuality(fps, quality, maxWidth);
+        gameCapture.UpdateQuality(fps, quality, maxWidth);
         MainThread.BeginInvokeOnMainThread(() => StreamQualityLabel = label);
     }
 
@@ -3270,6 +3425,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         {
             ActiveStreamerId = userId;
             ActiveStreamerName = username;
+            ActiveStreamKind = StreamKind.Screen;   // StreamDetails follows with the real kind/game
+            ActiveStreamGameName = null;
             _streamChannelId = channelId;
             if (!IsStreaming)
             {
@@ -3330,6 +3487,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         {
             if (ActiveStreamerId != userId) return;
             if (IsFullScreen) CloseStreamWindow();
+            if (IsStreaming && userId == api.CurrentUserId) { screen.StopCapture(); gameCapture.Stop(); }
             if (!IsStreaming)
             {
                 _ = hub.StopWatchingAsync(channelId);

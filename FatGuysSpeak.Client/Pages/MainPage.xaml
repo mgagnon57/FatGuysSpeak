@@ -812,7 +812,7 @@
                 <!-- Compact bar when stream is popped out -->
                 <Grid Grid.Row="3" BackgroundColor="{DynamicResource ThemeBgElevated}" Padding="12,6" IsVisible="{Binding IsFullScreen}">
                     <HorizontalStackLayout Spacing="12" HorizontalOptions="Center">
-                        <Label Text="{Binding ActiveStreamerName, StringFormat='📺  {0} — stream in separate window'}"
+                        <Label Text="{Binding ActiveStreamLabel, StringFormat='{0} — stream in separate window'}"
                                TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" VerticalOptions="Center" />
                         <Button Text="↩ Return to In-App"
                                 Command="{Binding ToggleFullScreenCommand}"
@@ -1580,13 +1580,35 @@
                     HeightRequest="32" CornerRadius="3" Margin="0,0,8,0" Padding="10,0"
                     ToolTipProperties.Text="Hold your Push to Talk key to transmit. Click here to rebind." />
 
-            <Button Grid.Column="5"
-                    Text="{Binding StreamButtonLabel}"
-                    Command="{Binding ToggleStreamCommand}"
-                    BackgroundColor="{Binding StreamButtonColor}"
-                    TextColor="White" FontSize="11"
-                    HeightRequest="32" CornerRadius="3" Margin="0,0,4,0" Padding="10,0"
-                    ToolTipProperties.Text="Share your screen with everyone in the channel" />
+            <HorizontalStackLayout Grid.Column="5" Spacing="4" VerticalOptions="Center" Margin="0,0,4,0">
+                <Button Text="{Binding StreamGameButtonLabel}"
+                        Command="{Binding StreamGameCommand}"
+                        BackgroundColor="{Binding StreamGameButtonColor}"
+                        Opacity="{Binding StreamGameButtonOpacity}"
+                        TextColor="White" FontSize="11"
+                        HeightRequest="32" CornerRadius="3" Padding="10,0"
+                        ToolTipProperties.Text="{Binding StreamGameTooltip}" />
+                <Button Text="{Binding GameSoundLabel}"
+                        Command="{Binding ToggleGameSoundCommand}"
+                        IsVisible="{Binding IsGameStreamSupported}"
+                        BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10"
+                        HeightRequest="32" Padding="6,0"
+                        ToolTipProperties.Text="Send the game's own sound with your stream (never voice chat)" />
+                <Label Text="{Binding StreamingGameText}"
+                       IsVisible="{Binding IsStreamingGame}"
+                       TextColor="{DynamicResource ThemeAccentLight}" FontSize="11" VerticalOptions="Center">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding ChangeGameCommand}" />
+                    </Label.GestureRecognizers>
+                </Label>
+                <Button Text="{Binding ShareScreenButtonLabel}"
+                        Command="{Binding ShareScreenCommand}"
+                        BackgroundColor="{Binding ShareScreenButtonColor}"
+                        IsEnabled="{Binding CanShareScreen}"
+                        TextColor="White" FontSize="11"
+                        HeightRequest="32" CornerRadius="3" Padding="10,0"
+                        ToolTipProperties.Text="Share a window or your whole screen to troubleshoot (no sound)" />
+            </HorizontalStackLayout>
 
             <Button Grid.Column="6"
                     Text="{Binding CameraButtonLabel}"

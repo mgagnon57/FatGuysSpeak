@@ -18,7 +18,7 @@
         <!-- Overlay: streamer name + latency (top-left) -->
         <VerticalStackLayout HorizontalOptions="Start" VerticalOptions="Start"
                              Margin="10,8,0,0" Spacing="3">
-            <Label Text="{Binding ActiveStreamerName, StringFormat='📺  {0}'}"
+            <Label Text="{Binding ActiveStreamLabel}"
                    TextColor="#8ab4d4" FontSize="11" FontAttributes="Bold" />
             <HorizontalStackLayout Spacing="5">
                 <Ellipse WidthRequest="7" HeightRequest="7"
