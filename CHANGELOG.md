@@ -5,6 +5,8 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-25
+
 ### Added
 - 🎮 Stream Game: one click streams the game you're playing. It finds the game on its own (Steam,
   Epic, Xbox, Riot, Battle.net and more), captures just that window — so alt-tabbing never shows
