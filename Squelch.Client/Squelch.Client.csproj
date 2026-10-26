@@ -44,7 +44,7 @@
 
 	<ItemGroup>
 		<!-- App Icon -->
-		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#0a0909" />
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" Color="#0B0B0D" />
 
 		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
@@ -71,6 +71,11 @@
 		<PackageReference Include="Velopack" Version="1.2.0" />
 	</ItemGroup>
 
+	<PropertyGroup Condition="$(TargetFramework.Contains('-windows'))">
+		<!-- hand-tuned small-size geometry for the exe/taskbar icon -->
+		<ApplicationIcon>Platforms\Windows\squelch.ico</ApplicationIcon>
+	</PropertyGroup>
+
 	<ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
 		<PackageReference Include="System.Drawing.Common" Version="9.0.0" />
 	</ItemGroup>
@@ -79,4 +84,7 @@
 	  <ProjectReference Include="..\Squelch.Shared\Squelch.Shared.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<Content Include="Resources\Tray\*.ico" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
 </Project>

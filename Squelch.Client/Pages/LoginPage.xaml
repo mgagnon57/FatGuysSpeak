@@ -9,7 +9,7 @@
     <ScrollView>
         <VerticalStackLayout Padding="40" Spacing="16" VerticalOptions="Center">
 
-            <Image Source="fgs_logo.png" WidthRequest="120" HeightRequest="120" HorizontalOptions="Center" Margin="0,0,0,4" />
+            <Image Source="squelch_logo.png" WidthRequest="120" HeightRequest="120" HorizontalOptions="Center" Margin="0,0,0,4" />
             <Label Text="Squelch" FontFamily="Bebas" FontSize="44" CharacterSpacing="2"
                    TextColor="{DynamicResource ThemeAccentLight}" HorizontalOptions="Center" />
             <Label Text="BUILT BY BILLY BONG" FontFamily="DMMono" FontSize="11" CharacterSpacing="2"

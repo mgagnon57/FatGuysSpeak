@@ -6,6 +6,7 @@
         WindowStyle="SingleBorderWindow"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
+        Icon="squelch.ico"
         Background="#0d0d0d">
 
     <Grid>

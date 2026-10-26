@@ -11,9 +11,13 @@
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <ApplicationIcon>squelch.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup Condition="Exists('client-bundle.zip')">
     <EmbeddedResource Include="client-bundle.zip"/>
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="squelch.ico" />
   </ItemGroup>
 </Project>

@@ -42,7 +42,7 @@
               ColumnDefinitions="Auto,Auto,Auto,*">
             <!-- Brand lives in its own Auto column so the connection status can never squeeze it -->
             <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
-                <Image Source="fgs_logo.png" WidthRequest="34" HeightRequest="34" VerticalOptions="Center" />
+                <Image Source="squelch_logo.png" WidthRequest="34" HeightRequest="34" VerticalOptions="Center" />
                 <VerticalStackLayout Spacing="0" VerticalOptions="Center">
                     <Label Text="Squelch" FontFamily="Bebas" CharacterSpacing="1" TextColor="{DynamicResource ThemeTextPrimary}"
                            FontSize="17" LineBreakMode="NoWrap" />
@@ -950,7 +950,7 @@
                                             <Image Source="{Binding Message.AuthorAvatarUrl}"
                                                    IsVisible="{Binding ShowUserAvatar}"
                                                    Aspect="AspectFill" />
-                                            <Image Source="fgs_logo.png"
+                                            <Image Source="porkchop_avatar.png"
                                                    IsVisible="{Binding ShowBotAvatar}"
                                                    Aspect="AspectFill" />
                                         </Grid>
@@ -1501,7 +1501,7 @@
                                                TextColor="White" FontSize="10" FontAttributes="Bold"
                                                HorizontalOptions="Center" VerticalOptions="Center"
                                                IsVisible="{Binding ShowBotAvatar, Converter={StaticResource InvertBoolConverter}}" />
-                                        <Image Source="fgs_logo.png" IsVisible="{Binding ShowBotAvatar}" Aspect="AspectFill" />
+                                        <Image Source="porkchop_avatar.png" IsVisible="{Binding ShowBotAvatar}" Aspect="AspectFill" />
                                     </Grid>
                                 </Frame>
                                 <VerticalStackLayout Grid.Column="1" Spacing="2">

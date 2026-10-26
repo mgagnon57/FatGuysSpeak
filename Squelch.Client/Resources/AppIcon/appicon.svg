@@ -1,10 +1,6 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="456" height="456" viewBox="0 0 456 456" version="1.1" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <radialGradient id="bg" cx="50%" cy="40%" r="78%">
-      <stop offset="0%" stop-color="#1b1412"/>
-      <stop offset="100%" stop-color="#0a0909"/>
-    </radialGradient>
-  </defs>
-  <rect x="0" y="0" width="456" height="456" fill="url(#bg)" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+<rect width="256" height="256" rx="58" fill="#0B0B0D"/>
+<g stroke-width="11" stroke-linecap="round"><line x1="128" y1="22" x2="128" y2="44" stroke="#E5202E" transform="rotate(-135.00 128 128)"/><line x1="128" y1="22" x2="128" y2="44" stroke="#E5202E" transform="rotate(-108.00 128 128)"/><line x1="128" y1="22" x2="128" y2="44" stroke="#E5202E" transform="rotate(-81.00 128 128)"/><line x1="128" y1="22" x2="128" y2="44" stroke="#E5202E" transform="rotate(-54.00 128 128)"/><line x1="128" y1="22" x2="128" y2="44" stroke="#E5202E" transform="rotate(-27.00 128 128)"/><line x1="128" y1="22" x2="128" y2="44" stroke="#E5202E" transform="rotate(0.00 128 128)"/><line x1="128" y1="22" x2="128" y2="44" stroke="#E5202E" transform="rotate(27.00 128 128)"/><line x1="128" y1="22" x2="128" y2="44" stroke="#3A3A40" transform="rotate(54.00 128 128)"/><line x1="128" y1="22" x2="128" y2="44" stroke="#3A3A40" transform="rotate(81.00 128 128)"/><line x1="128" y1="22" x2="128" y2="44" stroke="#3A3A40" transform="rotate(108.00 128 128)"/><line x1="128" y1="22" x2="128" y2="44" stroke="#3A3A40" transform="rotate(135.00 128 128)"/></g>
+<circle cx="128" cy="128" r="54" fill="#E5202E"/>
+<line x1="128" y1="128" x2="128" y2="88" stroke="#0B0B0D" stroke-width="13" stroke-linecap="round" transform="rotate(27.00 128 128)"/>
 </svg>

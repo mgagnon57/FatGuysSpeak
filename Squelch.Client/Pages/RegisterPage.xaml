@@ -8,7 +8,7 @@
     <ScrollView>
         <VerticalStackLayout Padding="40" Spacing="16" VerticalOptions="Center">
 
-            <Image Source="fgs_logo.png" WidthRequest="104" HeightRequest="104" HorizontalOptions="Center" Margin="0,0,0,4" />
+            <Image Source="squelch_logo.png" WidthRequest="104" HeightRequest="104" HorizontalOptions="Center" Margin="0,0,0,4" />
             <Label Text="Create an account" FontSize="24" FontAttributes="Bold"
                    TextColor="{DynamicResource ThemeTextPrimary}" HorizontalOptions="Center" />
 

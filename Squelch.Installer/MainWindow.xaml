@@ -5,6 +5,7 @@
         Height="530" Width="620"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterScreen"
+        Icon="squelch.ico"
         Background="#0d0d0d">
     <Grid>
         <Grid.RowDefinitions>
