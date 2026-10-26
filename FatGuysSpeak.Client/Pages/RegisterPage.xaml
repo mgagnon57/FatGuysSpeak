@@ -39,7 +39,15 @@
 
             <Button Text="Continue" Command="{Binding RegisterCommand}"
                     BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
-                    CornerRadius="4" HeightRequest="44" />
+                    CornerRadius="4" HeightRequest="44"
+                    IsEnabled="{Binding IsLoading, Converter={StaticResource InvertBoolConverter}}" />
+
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="8" IsVisible="{Binding IsLoading}">
+                <ActivityIndicator IsRunning="{Binding IsLoading}" Color="{DynamicResource ThemeAccentLight}"
+                                   WidthRequest="18" HeightRequest="18" VerticalOptions="Center" />
+                <Label Text="{Binding StatusMessage}" TextColor="{DynamicResource ThemeTextSecondary}"
+                       FontSize="12" VerticalOptions="Center" />
+            </HorizontalStackLayout>
 
             <HorizontalStackLayout HorizontalOptions="Center" Spacing="4">
                 <Label Text="Already have an account?" TextColor="{DynamicResource ThemeTextSecondary}" />

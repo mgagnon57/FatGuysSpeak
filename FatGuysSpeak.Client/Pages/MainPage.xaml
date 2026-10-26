@@ -43,8 +43,12 @@
             <!-- Brand lives in its own Auto column so the connection status can never squeeze it -->
             <HorizontalStackLayout Grid.Column="0" Spacing="8" VerticalOptions="Center">
                 <Image Source="fgs_logo.png" WidthRequest="34" HeightRequest="34" VerticalOptions="Center" />
-                <Label Text="FatGuysSpeak" FontFamily="Bebas" CharacterSpacing="1" TextColor="{DynamicResource ThemeTextPrimary}"
-                       FontSize="17" VerticalOptions="Center" LineBreakMode="NoWrap" />
+                <VerticalStackLayout Spacing="0" VerticalOptions="Center">
+                    <Label Text="FatGuysSpeak" FontFamily="Bebas" CharacterSpacing="1" TextColor="{DynamicResource ThemeTextPrimary}"
+                           FontSize="17" LineBreakMode="NoWrap" />
+                    <Label Text="BUILT BY BILLY BONG" FontFamily="DMMono" FontSize="7" CharacterSpacing="1"
+                           TextColor="{DynamicResource ThemeTextMuted}" LineBreakMode="NoWrap" Margin="0,-3,0,0" />
+                </VerticalStackLayout>
             </HorizontalStackLayout>
             <!-- Connection status -->
             <HorizontalStackLayout Grid.Column="1" Spacing="8" VerticalOptions="Center" Margin="8,0,0,0">
@@ -456,9 +460,9 @@
                     </VerticalStackLayout>
                 </ScrollView>
 
-                <!-- Profile bar -->
-                <Grid Grid.Row="1" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,7"
-                      ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                <!-- Profile bar: avatar + name on top, actions underneath -->
+                <Grid Grid.Row="1" BackgroundColor="{DynamicResource ThemeBgHeader}" Padding="8,7,8,4"
+                      ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
                     <Frame Grid.Column="0" CornerRadius="14" WidthRequest="28" HeightRequest="28"
                            BackgroundColor="{DynamicResource ThemeAccent}" Padding="0" Margin="0,0,8,0">
                         <Grid>
@@ -474,22 +478,24 @@
                     <Label Grid.Column="1" Text="{Binding CurrentUsername}"
                            TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12" FontAttributes="Bold"
                            VerticalOptions="Center" LineBreakMode="TailTruncation" />
-                    <Button Grid.Column="2" Text="💬"
-                            Command="{Binding ToggleDmModeCommand}"
-                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
-                            FontSize="13" HeightRequest="28" WidthRequest="32" Padding="0"
-                            ToolTipProperties.Text="Direct Messages" />
-                    <Button Grid.Column="3" Text="🔗"
-                            Command="{Binding CopyInviteLinkCommand}"
-                            IsVisible="{Binding IsServerAdmin}"
-                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
-                            FontSize="13" HeightRequest="28" WidthRequest="32" Padding="0"
-                            ToolTipProperties.Text="Copy invite link" />
-                    <Button Grid.Column="4" Text="📷"
-                            Command="{Binding UploadAvatarCommand}"
-                            BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextMuted}"
-                            FontSize="13" HeightRequest="28" WidthRequest="32" Padding="0"
-                            ToolTipProperties.Text="Change profile picture" />
+                    <HorizontalStackLayout Grid.Row="1" Grid.ColumnSpan="2" Spacing="2" Margin="0,4,0,0">
+                        <Button Text="💬"
+                                Command="{Binding ToggleDmModeCommand}"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
+                                FontSize="13" HeightRequest="28" WidthRequest="32" Padding="0"
+                                ToolTipProperties.Text="Direct Messages" />
+                        <Button Text="🔗"
+                                Command="{Binding CopyInviteLinkCommand}"
+                                IsVisible="{Binding IsServerAdmin}"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"
+                                FontSize="13" HeightRequest="28" WidthRequest="32" Padding="0"
+                                ToolTipProperties.Text="Copy invite link" />
+                        <Button Text="📷"
+                                Command="{Binding UploadAvatarCommand}"
+                                BackgroundColor="Transparent" TextColor="{DynamicResource ThemeTextMuted}"
+                                FontSize="13" HeightRequest="28" WidthRequest="32" Padding="0"
+                                ToolTipProperties.Text="Change profile picture" />
+                    </HorizontalStackLayout>
                 </Grid>
             </Grid>
 
@@ -518,7 +524,7 @@
                                     TextColor="{Binding PrivateModeStatusColor}"
                                     BackgroundColor="Transparent" FontSize="11"
                                     WidthRequest="120" HeightRequest="34" VerticalOptions="Center" Margin="0,0,4,0"
-                                    ToolTipProperties.Text="Switch Private Mode on/off — your voice is only used by AI when this says 'AI on'." />
+                                    ToolTipProperties.Text="Switch Private Mode on/off — your chat is only used by AI when this says 'AI on'." />
                             <Button Text="{Binding PorkChopVoiceIcon}"
                                     Command="{Binding TogglePorkChopVoiceCommand}"
                                     BackgroundColor="Transparent" TextColor="{DynamicResource ThemeAccentLight}"

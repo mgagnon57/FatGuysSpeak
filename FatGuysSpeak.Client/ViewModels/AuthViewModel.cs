@@ -11,6 +11,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
     [ObservableProperty] private string _password = "";
     [ObservableProperty] private string _errorMessage = "";
     [ObservableProperty] private bool _isLoading;
+    [ObservableProperty] private string _statusMessage = "";   // shown beside a spinner while IsLoading
     [ObservableProperty] private bool _isGoogleAvailable;
     [ObservableProperty] private bool _rememberMe = Preferences.Get("remember_me", false);
     [ObservableProperty] private string _serverUrl = Preferences.Get("server_url", ApiService.DefaultServerUrl);
@@ -106,6 +107,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
         try
         {
             api.SetServerUrl(ServerUrl);
+            StatusMessage = "Signing in…";
             var result = await api.LoginAsync(new LoginRequest(Username, Password));
             if (result is null) { ErrorMessage = "Login failed."; return; }
 
@@ -114,11 +116,13 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
             PersistServer(ServerUrl);
             await RememberCredentialsAsync();
             ptt.LoadForUser(result.UserId);
+            StatusMessage = "Connecting to chat…";
             await hub.ConnectAsync(result.Token, api.ServerUrl);
+            StatusMessage = "Loading your channels…";
             await Shell.Current.GoToAsync("//main");
         }
         catch (Exception ex) { ErrorMessage = ex.Message; }
-        finally { IsLoading = false; }
+        finally { IsLoading = false; StatusMessage = ""; }
     }
 
     [RelayCommand]
@@ -129,6 +133,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
         try
         {
             api.SetServerUrl(ServerUrl);
+            StatusMessage = "Creating your account…";
             var result = await api.RegisterAsync(new RegisterRequest(Username, Password));
             if (result is null) { ErrorMessage = "Registration failed."; return; }
 
@@ -136,11 +141,13 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
             api.SetCurrentUser(result.UserId, result.Username, result.AvatarUrl);
             PersistServer(ServerUrl);
             ptt.LoadForUser(result.UserId);
+            StatusMessage = "Connecting to chat…";
             await hub.ConnectAsync(result.Token, api.ServerUrl);
+            StatusMessage = "Loading your channels…";
             await Shell.Current.GoToAsync("//main");
         }
         catch (Exception ex) { ErrorMessage = ex.Message; }
-        finally { IsLoading = false; }
+        finally { IsLoading = false; StatusMessage = ""; }
     }
 
     private string? _googleClientId;
@@ -177,6 +184,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
                 return;
             }
 
+            StatusMessage = "Waiting for Google…";
             var result = await google.SignInAsync(clientId);
             if (!result.Success)
             {
@@ -184,6 +192,7 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
                 return;
             }
 
+            StatusMessage = "Signing in…";
             var auth = await api.ExchangeGoogleCodeAsync(
                 new FatGuysSpeak.Shared.GoogleCodeExchangeRequest(result.Code!, result.CodeVerifier!, result.RedirectUri!));
             if (auth is null) { ErrorMessage = "Google sign-in failed."; return; }
@@ -192,10 +201,12 @@ public partial class AuthViewModel(ApiService api, ChatHubService hub, PttServic
             api.SetCurrentUser(auth.UserId, auth.Username, auth.AvatarUrl);
             PersistServer(ServerUrl);
             ptt.LoadForUser(auth.UserId);
+            StatusMessage = "Connecting to chat…";
             await hub.ConnectAsync(auth.Token, api.ServerUrl);
+            StatusMessage = "Loading your channels…";
             await Shell.Current.GoToAsync("//main");
         }
         catch (Exception ex) { ErrorMessage = ex.Message; }
-        finally { IsLoading = false; }
+        finally { IsLoading = false; StatusMessage = ""; }
     }
 }

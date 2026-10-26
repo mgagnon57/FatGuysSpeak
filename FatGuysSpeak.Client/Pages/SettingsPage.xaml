@@ -290,6 +290,13 @@
                                TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12" FontAttributes="Bold"
                                VerticalOptions="Center" />
                     </Grid>
+                    <Grid ColumnDefinitions="140,*">
+                        <Label Grid.Column="0" Text="Built by"
+                               TextColor="{DynamicResource ThemeTextSecondary}" FontSize="12" VerticalOptions="Center" />
+                        <Label Grid.Column="1" Text="Billy Bong"
+                               TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12" FontAttributes="Bold"
+                               VerticalOptions="Center" />
+                    </Grid>
                 </VerticalStackLayout>
 
             </VerticalStackLayout>
