@@ -20,7 +20,7 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
     // userId -> username (currently connected users)
     private static readonly ConcurrentDictionary<int, string> OnlineUsers = new();
     // userId -> (channelId, serverId, username) for active screen shares
-    private static readonly ConcurrentDictionary<int, (int ChannelId, int ServerId, string Username)> ActiveStreamers = new();
+    private static readonly ConcurrentDictionary<int, (int ChannelId, int ServerId, string Username, StreamKind Kind, string? GameName)> ActiveStreamers = new();
     // userId -> (channelId, username) for active webcam feeds
     private static readonly ConcurrentDictionary<int, (int ChannelId, string Username)> ActiveCameras = new();
     // streamerUserId → (controllerUserId, channelId). At most one controller per stream.
@@ -100,6 +100,7 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, $"stream-{channelId}");
             await Clients.Caller.SendAsync("StreamStarted", streamer.Key, streamer.Value.Username, channelId);
+            await Clients.Caller.SendAsync("StreamDetails", streamer.Key, channelId, (int)streamer.Value.Kind, streamer.Value.GameName);
         }
     }
 
@@ -407,7 +408,24 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
 
     private const int MaxStreamFrameBytes = 4 * 1024 * 1024;
 
-    public async Task StartStream(int channelId)
+    // Share Screen (also what pre-0.13 clients call). Hub methods can't be overloaded, so Stream Game is
+    // a separate method rather than a new StartStream signature.
+    public Task StartStream(int channelId) => BeginStreamAsync(channelId, StreamKind.Screen, null);
+
+    public Task StartGameStream(int channelId, string gameName) =>
+        BeginStreamAsync(channelId, StreamKind.Game, StreamText.SanitizeGameName(gameName));
+
+    // Stream Game's "Change" link: same stream, different game window.
+    public async Task UpdateStreamGame(string gameName)
+    {
+        var game = StreamText.SanitizeGameName(gameName);
+        if (!ActiveStreamers.TryGetValue(UserId, out var info) || info.Kind != StreamKind.Game) return;
+        ActiveStreamers[UserId] = info with { GameName = game };
+        await Clients.Group($"server-{info.ServerId}").SendAsync("StreamDetails", UserId, info.ChannelId, (int)StreamKind.Game, game);
+        await BroadcastStreamNotificationAsync(info.ServerId, $"🎮 {Username} switched to {game}");
+    }
+
+    private async Task BeginStreamAsync(int channelId, StreamKind kind, string? gameName)
     {
         var channel = await db.Channels
             .Include(c => c.Server).ThenInclude(s => s.Members)
@@ -417,12 +435,13 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
 
         // Atomically capture any previous stream entry before writing the new one,
         // so concurrent StartStream calls can't both skip the StreamStopped notification.
-        (int ChannelId, int ServerId, string Username) prev = default;
+        (int ChannelId, int ServerId, string Username, StreamKind Kind, string? GameName) prev = default;
         bool hadPrev = false;
+        var entry = (channelId, channel.ServerId, Username, kind, gameName);
         ActiveStreamers.AddOrUpdate(
             UserId,
-            _ => (channelId, channel.ServerId, Username),
-            (_, old) => { prev = old; hadPrev = true; return (channelId, channel.ServerId, Username); });
+            _ => entry,
+            (_, old) => { prev = old; hadPrev = true; return entry; });
 
         await Groups.AddToGroupAsync(Context.ConnectionId, $"stream-{channelId}");
 
@@ -434,8 +453,10 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         }
         // Notify all server members so clients on any channel see the stream tab light up
         await Clients.Group($"server-{channel.ServerId}").SendAsync("StreamStarted", UserId, Username, channelId);
-        await BroadcastStreamNotificationAsync(channel.ServerId,
-            $"📺 {Username} started streaming in #{channel.Name}");
+        await Clients.Group($"server-{channel.ServerId}").SendAsync("StreamDetails", UserId, channelId, (int)kind, gameName);
+        await BroadcastStreamNotificationAsync(channel.ServerId, kind == StreamKind.Game
+            ? $"🎮 {Username} started streaming {gameName} in #{channel.Name}"
+            : $"🖥 {Username} started sharing their screen in #{channel.Name}");
     }
 
     public async Task SendStreamFrame(byte[] data)
@@ -459,8 +480,10 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"stream-{info.ChannelId}");
         await Clients.Group($"server-{info.ServerId}").SendAsync("StreamStopped", UserId, info.ChannelId);
         var channelName = (await db.Channels.FindAsync(info.ChannelId))?.Name ?? "";
-        await BroadcastStreamNotificationAsync(info.ServerId,
-            $"⏹ {Username} ended screen share" + (channelName.Length > 0 ? $" in #{channelName}" : ""));
+        var where = channelName.Length > 0 ? $" in #{channelName}" : "";
+        await BroadcastStreamNotificationAsync(info.ServerId, info.Kind == StreamKind.Game
+            ? $"⏹ {Username} stopped streaming {info.GameName}{where}"
+            : $"⏹ {Username} ended screen share{where}");
     }
 
     public async Task WatchStream(int channelId)
@@ -518,28 +541,32 @@ public class ChatHub(AppDbContext db, FatGuysSpeak.Server.Services.OnlineTimeTra
         await CloseControlSessionAsync(asController.Key);
     }
 
+    // Remote control is a troubleshooting tool: only offered on Share Screen streams, never on Stream Game.
+    private static bool IsScreenShare(int streamerId) =>
+        ActiveStreamers.TryGetValue(streamerId, out var s) && s.Kind == StreamKind.Screen;
+
     public async Task RequestControl(int streamerId)
     {
-        if (!ActiveStreamers.ContainsKey(streamerId)) return;
+        if (!IsScreenShare(streamerId)) return;
         await Clients.User(streamerId.ToString()).SendAsync("ControlRequested", UserId, Username);
     }
 
     public async Task OfferControl(int viewerId)
     {
-        if (!ActiveStreamers.ContainsKey(UserId)) return;
+        if (!IsScreenShare(UserId)) return;
         await Clients.User(viewerId.ToString()).SendAsync("ControlOffered", UserId, Username);
     }
 
     public async Task GrantControl(int controllerId)
     {
-        if (!ActiveStreamers.TryGetValue(UserId, out var info)) return;
+        if (!ActiveStreamers.TryGetValue(UserId, out var info) || info.Kind != StreamKind.Screen) return;
         if (!await TryOpenControlSessionAsync(UserId, controllerId, info.ChannelId))
             await Clients.Caller.SendAsync("ControlBusy");
     }
 
     public async Task AcceptControl(int streamerId)
     {
-        if (!ActiveStreamers.TryGetValue(streamerId, out var info)) return;
+        if (!ActiveStreamers.TryGetValue(streamerId, out var info) || info.Kind != StreamKind.Screen) return;
         if (!await TryOpenControlSessionAsync(streamerId, UserId, info.ChannelId))
             await Clients.Caller.SendAsync("ControlBusy");
     }

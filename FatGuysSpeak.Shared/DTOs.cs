@@ -74,6 +74,9 @@ public record AttachmentDto(string Url, string? OriginalFileName = null, string?
 
 public enum MessageSource { Text, Voice, Stream, AI }
 
+// Stream Game (window capture + game sound, Windows 11) vs Share Screen (troubleshooting, silent, remote control).
+public enum StreamKind { Screen, Game }
+
 public record UpdateStatusDto(string Current, string? Latest, bool UpdateAvailable, string? ReleaseUrl);
 
 // PorkChop's recap of one channel-day. Date is the UTC day as "yyyy-MM-dd".
