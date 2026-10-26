@@ -994,7 +994,7 @@ using (var scope = app.Services.CreateScope())
 
     if (!ctx.Servers.Any())
     {
-        var server = new Squelch.Server.Models.GuildServer { Name = "FatGuysSpeak", OwnerId = 0 };
+        var server = new Squelch.Server.Models.GuildServer { Name = "Squelch", OwnerId = 0 };
         ctx.Servers.Add(server);
         ctx.SaveChanges();
         ctx.Channels.AddRange(
@@ -1050,6 +1050,9 @@ using (var scope = app.Services.CreateScope())
     // Voice is never transcribed or stored (legal requirement): scrub anything older builds collected.
     var purged = await Squelch.Server.Services.VoiceTranscriptPurge.RunAsync(ctx);
     if (purged > 0) Console.WriteLine($"[Startup] purged {purged} stored voice transcription row(s)");
+
+    var rewritten = await Squelch.Server.Services.LegacyHostRewrite.RunAsync(ctx);
+    if (rewritten > 0) Console.WriteLine($"[Startup] rewrote {rewritten} legacy host/name row(s)");
 
     var blacklist = scope.ServiceProvider.GetRequiredService<SessionBlacklistService>();
     await blacklist.RehydrateAsync(ctx);
