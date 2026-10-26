@@ -11,6 +11,14 @@ public class SquelchHandoverPlanTests
         => Assert.Equal(Path.Combine(LocalAppData, "Squelch.Client", "Squelch.Client.exe"),
                         SquelchHandoverPlan.SquelchExePath(LocalAppData));
 
+    [Fact]
+    public void Decide_SquelchAlreadyInstalled_SkipsInstall()
+        => Assert.Equal(HandoverStart.OpenExisting, SquelchHandoverPlan.Decide(squelchExeExists: true));
+
+    [Fact]
+    public void Decide_NoSquelch_DownloadsAndInstalls()
+        => Assert.Equal(HandoverStart.DownloadAndInstall, SquelchHandoverPlan.Decide(squelchExeExists: false));
+
     [Theory]
     [InlineData(@"D:\Apps\FatGuysSpeak.Client\current\")]
     [InlineData(@"D:\Apps\FatGuysSpeak.Client\current")]

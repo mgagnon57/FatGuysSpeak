@@ -1,5 +1,9 @@
 namespace FatGuysSpeak.Shared;
 
+/// <summary>Where the handover starts: a fresh download + install, or just open the Squelch
+/// that is already there (never reinstall 0.14.0 over a possibly newer, possibly running Squelch).</summary>
+public enum HandoverStart { DownloadAndInstall, OpenExisting }
+
 /// <summary>Pure path/outcome rules for the 0.13.2 bridge that hands an installed
 /// FatGuysSpeak client over to Squelch. Kept here so it is unit-testable without MAUI.</summary>
 public static class SquelchHandoverPlan
@@ -12,6 +16,11 @@ public static class SquelchHandoverPlan
     /// <summary>Where Velopack's default (per-user) install puts the Squelch launcher.</summary>
     public static string SquelchExePath(string localAppData)
         => Path.Combine(localAppData, SquelchPackageId, SquelchExeName);
+
+    /// <summary>Squelch already installed (earlier handover whose uninstall didn't happen, or a
+    /// hand install) → skip download/install and only open it + retry the uninstall.</summary>
+    public static HandoverStart Decide(bool squelchExeExists)
+        => squelchExeExists ? HandoverStart.OpenExisting : HandoverStart.DownloadAndInstall;
 
     /// <summary>Velopack runs the app from &lt;root&gt;\current\ with Update.exe in &lt;root&gt;.
     /// Derive the root from the running app's base directory; if the app isn't running from a

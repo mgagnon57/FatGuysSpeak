@@ -22,8 +22,12 @@ public partial class HandoverPage : ContentPage
 #if WINDOWS
         var status = new Progress<string>(s => StatusLabel.Text = s);   // created on the UI thread
         HandoverResult result;
-        try { result = await SquelchHandover.RunAsync(status, CancellationToken.None); }
-        catch (Exception ex) { result = new HandoverResult(false, ex.Message); }
+        // Overall deadline so a stalled download / hung setup always ends on the failure panel.
+        using (var cts = new CancellationTokenSource(SquelchHandover.OverallTimeout))
+        {
+            try { result = await SquelchHandover.RunAsync(status, cts.Token); }
+            catch (Exception ex) { result = new HandoverResult(false, ex.Message); }
+        }
 
         if (!result.Success)
         {
@@ -31,9 +35,8 @@ public partial class HandoverPage : ContentPage
             return;
         }
 
-        StatusLabel.Text = "Removing FatGuysSpeak…";
-        // Squelch is installed and open; removal is best-effort (Update.exe stops this process).
-        SquelchHandover.StartUninstall();
+        // Squelch is open and the uninstall has started ("Removing FatGuysSpeak…" was reported
+        // through the same IProgress, so it can't be overwritten by an earlier queued line).
         await Task.Delay(500);   // let the status line paint before the window goes away
         Application.Current?.Quit();
 #endif
