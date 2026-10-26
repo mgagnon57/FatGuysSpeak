@@ -131,7 +131,7 @@ if ($env:GITHUB_TOKEN) {
     if ($LASTEXITCODE) { throw "vpk upload github ($verChannel) failed" }
 
     $winAssets = Get-ChildItem (Join-Path $vpkOut 'win') -File | ForEach-Object { $_.FullName }
-    gh release upload "v$Version" @winAssets --clobber
+    gh release upload "v$Version" @winAssets --clobber --repo mgagnon57/Squelch
     if ($LASTEXITCODE) { throw 'gh release upload (win channel) failed' }
 
     Write-Host "Velopack assets uploaded to release v$Version (channels: $verChannel via vpk, win via gh)." -ForegroundColor Green
