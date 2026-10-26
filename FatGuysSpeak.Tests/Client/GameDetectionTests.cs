@@ -63,6 +63,20 @@ public class GameDetectionTests
         Assert.Empty(result.Ranked);
     }
 
+    // Seen live on the owner's PC: NVIDIA's overlay is a full-monitor GPU window (score 60 without exclusion).
+    [Theory]
+    [InlineData("NVIDIA Overlay")]
+    [InlineData("NVIDIA Share")]
+    [InlineData("GameBar")]
+    [InlineData("XboxGameBarWidgets")]
+    [InlineData("GameOverlayUI")]
+    public void Detect_FullscreenOverlays_AreNeverCandidates(string overlay)
+    {
+        var result = GameDetector.Detect([Facts(overlay, overlay, gfx: true)], Library, Roots);
+
+        Assert.Empty(result.Ranked);
+    }
+
     [Fact]
     public void Detect_GameAndItsLauncher_PicksGame()
     {

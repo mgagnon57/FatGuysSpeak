@@ -33,6 +33,9 @@ public static class GameDetector
         "RiotClientUx", "EADesktop", "GalaxyClient", "upc",
         "Discord", "obs64", "obs32", "devenv", "Code", "WindowsTerminal", "powershell", "cmd", "Teams", "ms-teams",
         "Spotify", "CrashReportClient", "crashpad_handler", "UnityCrashHandler64",
+        // Overlays: transparent full-monitor GPU windows that sit on top of games.
+        "NVIDIA Overlay", "NVIDIA Share", "GameBar", "GameBarFTServer", "XboxGameBarWidgets", "GameOverlayUI",
+        "DiscordOverlay", "RTSS", "MSIAfterburner",
     };
 
     public static GameDetectionResult Detect(
