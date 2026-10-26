@@ -1,6 +1,7 @@
 #if WINDOWS
 using System.Runtime.InteropServices;
 using FatGuysSpeak.Client.Services.Interop;
+using FatGuysSpeak.Shared;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
@@ -21,6 +22,8 @@ public sealed class GameCaptureService : IDisposable
     public event Action<byte[]>? FrameCaptured;
     public event Action<byte[]>? StreamAudioCaptured;
     public event Action? TargetClosed;
+    /// <summary>Raised when the picked window's sound can't be streamed safely (it could carry voice chat).</summary>
+    public event Action? GameSoundBlocked;
     public bool IsCapturing { get; private set; }
 
     private readonly object _gate = new();
@@ -64,8 +67,10 @@ public sealed class GameCaptureService : IDisposable
         lock (_gate)
         {
             if (!IsCapturing) return;
+            // Build the new capture first: if the window can't be captured, the current stream carries on untouched.
+            var (item, pool, session) = CreateVideo(hwnd);
             StopVideo();
-            StartVideo(hwnd);
+            UseVideo(item, pool, session);
             if (processId != _processId)
             {
                 StopAudio();
@@ -106,14 +111,32 @@ public sealed class GameCaptureService : IDisposable
     // ── Video ───────────────────────────────────────────────────────────────
     private void StartVideo(IntPtr hwnd)
     {
-        _item = D3D11Interop.CreateItemForWindow(hwnd);
+        var (item, pool, session) = CreateVideo(hwnd);
+        UseVideo(item, pool, session);
+    }
+
+    private (GraphicsCaptureItem, Direct3D11CaptureFramePool, GraphicsCaptureSession) CreateVideo(IntPtr hwnd)
+    {
+        var item = D3D11Interop.CreateItemForWindow(hwnd);
+        var pool = Direct3D11CaptureFramePool.CreateFreeThreaded(_device, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, item.Size);
+        try
+        {
+            var session = pool.CreateCaptureSession(item);
+            session.IsCursorCaptureEnabled = false;
+            try { D3D11Interop.TryDisableBorder(session); } catch { /* border stays — cosmetic */ }
+            return (item, pool, session);
+        }
+        catch { pool.Dispose(); throw; }
+    }
+
+    private void UseVideo(GraphicsCaptureItem item, Direct3D11CaptureFramePool pool, GraphicsCaptureSession session)
+    {
+        _item = item;
+        _pool = pool;
+        _session = session;
+        _poolSize = item.Size;
         _item.Closed += OnItemClosed;
-        _poolSize = _item.Size;
-        _pool = Direct3D11CaptureFramePool.CreateFreeThreaded(_device, DirectXPixelFormat.B8G8R8A8UIntNormalized, 2, _poolSize);
         _pool.FrameArrived += OnFrameArrived;
-        _session = _pool.CreateCaptureSession(_item);
-        _session.IsCursorCaptureEnabled = false;
-        try { D3D11Interop.TryDisableBorder(_session); } catch { /* border stays — cosmetic */ }
         _lastEmit = TimeSpan.Zero;
         _session.StartCapture();
     }
@@ -180,7 +203,18 @@ public sealed class GameCaptureService : IDisposable
     // ── Game-only audio ─────────────────────────────────────────────────────
     private void StartAudio()
     {
-        AudioClient client;
+        // Never capture a process tree that could contain voice chat (FatGuysSpeak itself, whatever launched it,
+        // voice apps). Legal requirement — the stream goes video-only instead.
+        var tree = ProcessTree.Snapshot();
+        var name = tree.TryGetValue(_processId, out var me) ? me.Name : "";
+        if (!GameAudioPolicy.AllowsAudio(_processId, name, Environment.ProcessId,
+                pid => tree.TryGetValue(pid, out var e) ? e.ParentId : null))
+        {
+            GameSoundBlocked?.Invoke();
+            return;
+        }
+
+        AudioClient? client = null;
         try
         {
             client = ProcessLoopbackInterop.ActivateForProcessAsync(_processId).GetAwaiter().GetResult();
@@ -190,6 +224,7 @@ public sealed class GameCaptureService : IDisposable
         }
         catch (Exception ex)
         {
+            client?.Dispose();
             // Video keeps streaming without sound.
             System.Diagnostics.Debug.WriteLine($"[GameCapture] game audio unavailable: {ex.Message}");
             return;
@@ -259,6 +294,7 @@ public sealed class GameCaptureService : IDisposable
     public event Action<byte[]>? FrameCaptured;
     public event Action<byte[]>? StreamAudioCaptured;
     public event Action? TargetClosed;
+    public event Action? GameSoundBlocked;
     public bool IsCapturing => false;
     public void Start(IntPtr hwnd, int processId, bool gameSound, int fps = 20) { }
     public void SwitchTarget(IntPtr hwnd, int processId) { }

@@ -39,7 +39,7 @@ public partial class WindowPickerViewModel : ObservableObject
             .ToList();
         var likelyHandles = likely.Select(w => w.Handle).ToHashSet();
         var others = all
-            .Where(f => !likelyHandles.Contains((IntPtr)f.Handle))
+            .Where(f => !likelyHandles.Contains((IntPtr)f.Handle) && f.ProcessId != Environment.ProcessId)
             .OrderBy(f => f.ProcessName).ThenBy(f => f.Title)
             .Select(f => new AppWindow((IntPtr)f.Handle, f.Title, f.ProcessName, f.ProcessId));
         _allWindows = [.. likely, .. others];

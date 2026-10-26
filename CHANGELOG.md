@@ -5,6 +5,15 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Fixed
+- Stream Game never sends sound from FatGuysSpeak itself, from whatever launched it, or from voice
+  chat apps — picking such a window streams video only (game sound could otherwise have carried
+  voice chat). FatGuysSpeak no longer appears in the game picker.
+- A failed "Change" keeps the current game streaming instead of freezing it.
+- Someone else ending their stream no longer hides your own live stream's Stop button.
+- Stopping a stream while disconnected no longer crashes the app.
+
+
 ## [0.13.0] - 2026-10-25
 
 ### Added

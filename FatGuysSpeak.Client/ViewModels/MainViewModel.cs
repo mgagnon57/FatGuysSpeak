@@ -515,7 +515,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     partial void OnGameSoundEnabledChanged(bool value)
     {
         Preferences.Set("stream_game_sound", value);
-        gameCapture.SetGameSound(value);
+        _ = Task.Run(() => gameCapture.SetGameSound(value));   // audio activation blocks — keep it off the UI thread
         OnPropertyChanged(nameof(GameSoundLabel));
     }
     partial void OnIsStreamingChanged(bool value)
@@ -700,6 +700,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         gameCapture.FrameCaptured  += OnScreenFrameCaptured;
         gameCapture.StreamAudioCaptured += OnStreamAudioCaptured;
         gameCapture.TargetClosed   += OnGameTargetClosed;
+        gameCapture.GameSoundBlocked += OnGameSoundBlocked;
         _micLevelHandler = level => MainThread.BeginInvokeOnMainThread(() => MicLevel = level);
         audio.MicLevelChanged += _micLevelHandler;
         ptt.PttDown    += OnPttDown;
@@ -2284,6 +2285,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         gameCapture.FrameCaptured  -= OnScreenFrameCaptured;
         gameCapture.StreamAudioCaptured -= OnStreamAudioCaptured;
         gameCapture.TargetClosed   -= OnGameTargetClosed;
+        gameCapture.GameSoundBlocked -= OnGameSoundBlocked;
         if (_micLevelHandler is not null)         audio.MicLevelChanged    -= _micLevelHandler;
         ptt.PttDown -= OnPttDown;
         ptt.PttUp   -= OnPttUp;
@@ -3183,11 +3185,15 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         screen.StopCapture();
         gameCapture.Stop();
-        await hub.StopStreamAsync();
-        IsStreaming = false;
-        StreamingGameName = null;
-        ActiveStreamerName = null;
-        ActiveStreamerId = 0;
+        try { await hub.StopStreamAsync(); }
+        catch { /* disconnected — the server drops the stream with the connection anyway */ }
+        finally
+        {
+            IsStreaming = false;
+            StreamingGameName = null;
+            ActiveStreamerName = null;
+            ActiveStreamerId = 0;
+        }
     }
 
     // Shared pre-flight for both kinds of stream. Returns the channel to stream into, or null (already explained).
@@ -3325,6 +3331,9 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         });
     }
 
+    private void OnGameSoundBlocked() =>
+        toast.Show("Game sound off", "That window could carry voice chat, so it's streaming without sound.");
+
     private void OnStreamDetails(int userId, int channelId, StreamKind kind, string? gameName)
     {
         MainThread.BeginInvokeOnMainThread(() =>
@@ -3423,6 +3432,8 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
+            // While I'm streaming, someone else's stream elsewhere must not take over my stream state.
+            if (IsStreaming && userId != api.CurrentUserId) return;
             ActiveStreamerId = userId;
             ActiveStreamerName = username;
             ActiveStreamKind = StreamKind.Screen;   // StreamDetails follows with the real kind/game
@@ -3497,7 +3508,7 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
             ActiveStreamerId = 0;
             _streamChannelId = 0;
             StreamFrame = null;
-            IsStreaming = false;
+            if (userId == api.CurrentUserId) IsStreaming = false;
         });
     }
 
