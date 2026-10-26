@@ -5,12 +5,12 @@ Start-Sleep -Seconds 1
 # Start server with WPF dashboard (Windows build)
 $env:ASPNETCORE_ENVIRONMENT = "Development"
 $env:ASPNETCORE_URLS = "http://localhost:5238"
-Start-Process -FilePath "C:\Squelch\Squelch.Server\bin\Debug\net9.0-windows10.0.19041.0\Squelch.Server.exe" `
-    -WorkingDirectory "C:\Squelch\Squelch.Server" -WindowStyle Hidden
+Start-Process -FilePath (Join-Path $PSScriptRoot "Squelch.Server\bin\Debug\net9.0-windows10.0.19041.0\Squelch.Server.exe") `
+    -WorkingDirectory (Join-Path $PSScriptRoot "Squelch.Server") -WindowStyle Hidden
 Start-Sleep -Seconds 3
 
 # Start two clients
-$client = "C:\Squelch\Squelch.Client\bin\Debug\net9.0-windows10.0.19041.0\win10-x64\Squelch.Client.exe"
+$client = Join-Path $PSScriptRoot "Squelch.Client\bin\Debug\net9.0-windows10.0.19041.0\win10-x64\Squelch.Client.exe"
 Start-Process $client
 Start-Sleep -Milliseconds 800
 Start-Process $client

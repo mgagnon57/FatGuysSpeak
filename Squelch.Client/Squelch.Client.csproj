@@ -21,10 +21,10 @@
 		<Nullable>enable</Nullable>
 
 		<!-- Display name -->
-		<ApplicationTitle>Squelch.Client</ApplicationTitle>
+		<ApplicationTitle>Squelch</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.companyname.squelch.client</ApplicationId>
+		<ApplicationId>com.squelch.client</ApplicationId>
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
