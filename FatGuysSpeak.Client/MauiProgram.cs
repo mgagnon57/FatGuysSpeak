@@ -30,6 +30,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<PttService>();
         builder.Services.AddSingleton<ScreenStreamService>();
         builder.Services.AddSingleton<GameWindowScanner>();
+        builder.Services.AddSingleton<GameCaptureService>();
         builder.Services.AddSingleton<RemoteInputService>();
         builder.Services.AddSingleton<CameraService>();
         builder.Services.AddSingleton<ShareBorderOverlay>();
