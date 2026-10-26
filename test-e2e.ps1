@@ -22,7 +22,7 @@ function Get-FgsWindows {
     $root = [System.Windows.Automation.AutomationElement]::RootElement
     $all = $root.FindAll([System.Windows.Automation.TreeScope]::Children,
         [System.Windows.Automation.Condition]::TrueCondition)
-    $all | Where-Object { $_.Current.Name -like '*FatGuysSpeak*' }
+    $all | Where-Object { $_.Current.Name -like '*Squelch*' }
 }
 
 function Find-Desc($parent, $ctrlType, $name) {

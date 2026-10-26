@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Squelch.Client.ViewModels"
+             x:Class="Squelch.Client.Pages.LoginPage"
+             Title="Squelch"
+             BackgroundColor="{DynamicResource ThemeBgPrimary}">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="40" Spacing="16" VerticalOptions="Center">
+
+            <Image Source="fgs_logo.png" WidthRequest="120" HeightRequest="120" HorizontalOptions="Center" Margin="0,0,0,4" />
+            <Label Text="Squelch" FontFamily="Bebas" FontSize="44" CharacterSpacing="2"
+                   TextColor="{DynamicResource ThemeAccentLight}" HorizontalOptions="Center" />
+            <Label Text="BUILT BY BILLY BONG" FontFamily="DMMono" FontSize="11" CharacterSpacing="2"
+                   TextColor="{DynamicResource ThemeTextMuted}" HorizontalOptions="Center" Margin="0,-18,0,4" />
+            <Label Text="Welcome back!" FontSize="18" TextColor="{DynamicResource ThemeTextPrimary}"
+                   HorizontalOptions="Center" />
+            <Label Text="We're so excited to see you again!" FontSize="14"
+                   TextColor="{DynamicResource ThemeTextSecondary}" HorizontalOptions="Center" Margin="0,0,0,16" />
+
+            <Label Text="USERNAME" FontSize="12" TextColor="{DynamicResource ThemeTextSecondary}" FontAttributes="Bold" />
+            <Entry x:Name="UsernameEntry" Placeholder="Enter your username"
+                   PlaceholderColor="{DynamicResource ThemeTextMuted}" TextColor="{DynamicResource ThemeTextPrimary}" BackgroundColor="{DynamicResource ThemeBgInput}"
+                   Text="{Binding Username}" />
+
+            <Label Text="PASSWORD" FontSize="12" TextColor="{DynamicResource ThemeTextSecondary}" FontAttributes="Bold" />
+            <Entry x:Name="PasswordEntry" Placeholder="Enter your password"
+                   PlaceholderColor="{DynamicResource ThemeTextMuted}" TextColor="{DynamicResource ThemeTextPrimary}" BackgroundColor="{DynamicResource ThemeBgInput}"
+                   IsPassword="True" Text="{Binding Password}" />
+
+            <HorizontalStackLayout Spacing="8" Margin="0,4,0,0">
+                <Switch IsToggled="{Binding RememberMe}" OnColor="{DynamicResource ThemeAccent}" VerticalOptions="Center" />
+                <Label Text="Remember me" TextColor="{DynamicResource ThemeTextSecondary}" FontSize="13" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <Label Text="SERVER" FontSize="10" TextColor="{DynamicResource ThemeTextMuted}"
+                   FontAttributes="Bold" Margin="0,8,0,0" />
+            <Picker ItemsSource="{Binding ServerPickerItems}"
+                    SelectedItem="{Binding SelectedServerOption, Mode=TwoWay}"
+                    IsVisible="{Binding HasSavedServers}"
+                    Title="Select or add a server..." TitleColor="{DynamicResource ThemeTextMuted}"
+                    TextColor="{DynamicResource ThemeTextMuted}" BackgroundColor="{DynamicResource ThemeBgInput}" />
+            <Entry Placeholder="https://squelch-server.azurewebsites.net"
+                   Text="{Binding ServerUrl}"
+                   IsVisible="{Binding IsEnteringNewServer}"
+                   TextColor="{DynamicResource ThemeTextMuted}" BackgroundColor="{DynamicResource ThemeBgInput}"
+                   PlaceholderColor="{DynamicResource ThemeTextMuted}" FontSize="12" />
+
+            <Label Text="{Binding ErrorMessage}" TextColor="{DynamicResource ThemeDanger}" IsVisible="{Binding ErrorMessage, Converter={StaticResource StringToBoolConverter}}" />
+
+            <Button Text="Log In" Command="{Binding LoginCommand}"
+                    BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
+                    CornerRadius="8" HeightRequest="44"
+                    IsEnabled="{Binding IsLoading, Converter={StaticResource InvertBoolConverter}}" />
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="8" IsVisible="{Binding IsLoading}">
+                <ActivityIndicator IsRunning="{Binding IsLoading}" Color="{DynamicResource ThemeAccentLight}"
+                                   WidthRequest="18" HeightRequest="18" VerticalOptions="Center" />
+                <Label Text="{Binding StatusMessage}" TextColor="{DynamicResource ThemeTextSecondary}"
+                       FontSize="12" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <Button Text="Continue with Google" Command="{Binding GoogleSignInCommand}"
+                    IsVisible="{Binding IsGoogleAvailable}"
+                    BackgroundColor="#ffffff" TextColor="#1e1f22"
+                    CornerRadius="8" HeightRequest="44"
+                    IsEnabled="{Binding IsLoading, Converter={StaticResource InvertBoolConverter}}" />
+
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="4">
+                <Label Text="Need an account?" TextColor="{DynamicResource ThemeTextSecondary}" />
+                <Label Text="Register" TextColor="{DynamicResource ThemeAccentLight}" >
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnRegisterTapped" />
+                    </Label.GestureRecognizers>
+                </Label>
+            </HorizontalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -1,16 +1,16 @@
 # Kill existing instances
-Get-Process -Name "FatGuysSpeak*" -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process -Name "Squelch*" -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Seconds 1
 
 # Start server with WPF dashboard (Windows build)
 $env:ASPNETCORE_ENVIRONMENT = "Development"
 $env:ASPNETCORE_URLS = "http://localhost:5238"
-Start-Process -FilePath "C:\FatGuysSpeak\FatGuysSpeak.Server\bin\Debug\net9.0-windows10.0.19041.0\FatGuysSpeak.Server.exe" `
-    -WorkingDirectory "C:\FatGuysSpeak\FatGuysSpeak.Server" -WindowStyle Hidden
+Start-Process -FilePath "C:\Squelch\Squelch.Server\bin\Debug\net9.0-windows10.0.19041.0\Squelch.Server.exe" `
+    -WorkingDirectory "C:\Squelch\Squelch.Server" -WindowStyle Hidden
 Start-Sleep -Seconds 3
 
 # Start two clients
-$client = "C:\FatGuysSpeak\FatGuysSpeak.Client\bin\Debug\net9.0-windows10.0.19041.0\win10-x64\FatGuysSpeak.Client.exe"
+$client = "C:\Squelch\Squelch.Client\bin\Debug\net9.0-windows10.0.19041.0\win10-x64\Squelch.Client.exe"
 Start-Process $client
 Start-Sleep -Milliseconds 800
 Start-Process $client

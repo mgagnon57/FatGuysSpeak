@@ -9,9 +9,9 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - run: dotnet publish FatGuysSpeak.Server/FatGuysSpeak.Server.csproj -c Release -f net9.0 -p:EnableWindowsTargeting=true -o ${{ github.workspace }}/publish
+      - run: dotnet publish Squelch.Server/Squelch.Server.csproj -c Release -f net9.0 -p:EnableWindowsTargeting=true -o ${{ github.workspace }}/publish
       - uses: azure/webapps-deploy@v3
         with:
-          app-name: fatguysspeak-server
+          app-name: squelch-server
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ${{ github.workspace }}/publish

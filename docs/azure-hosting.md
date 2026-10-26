@@ -1,4 +1,4 @@
-# Hosting the FatGuysSpeak server on Azure
+# Hosting the Squelch server on Azure
 
 This is the step-by-step for running the server on **Azure App Service (Linux)**, the recommended
 single-instance host for this app. A Dockerfile is also included for Azure Container Apps / a VM.
@@ -39,7 +39,7 @@ app's static state and would only add cost.
 az login
 
 RG=fatguysspeak-rg
-APP=fatguysspeak-server          # must be globally unique; becomes <APP>.azurewebsites.net
+APP=squelch-server          # must be globally unique; becomes <APP>.azurewebsites.net
 LOCATION=eastus                  # pick the region nearest your testers (voice latency)
 
 az group create -n $RG -l $LOCATION
@@ -88,7 +88,7 @@ Two options — both build the headless `net9.0` target:
 
 2. **One-shot from your machine**:
    ```bash
-   dotnet publish FatGuysSpeak.Server -c Release -f net9.0 -o publish
+   dotnet publish Squelch.Server -c Release -f net9.0 -o publish
    cd publish && zip -r ../app.zip . && cd ..
    az webapp deploy -g $RG -n $APP --src-path app.zip --type zip
    ```
@@ -108,7 +108,7 @@ az webapp config ssl bind   -g $RG --name $APP \
 
 The client defaults its server URL to `http://localhost:5238` and persists whatever the user enters in
 Settings. For the beta, set the default to your Azure host so testers don't have to type it: edit
-`ApiService.DefaultServerUrl` in `FatGuysSpeak.Client/Services/ApiService.cs` to
+`ApiService.DefaultServerUrl` in `Squelch.Client/Services/ApiService.cs` to
 `https://chat.fatguysspeak.com` and rebuild the client installer. (Left unchanged for now since the
 hostname isn't decided yet.)
 
@@ -136,7 +136,7 @@ $bytes = New-Object byte[] 28
 [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
 $chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 $pw = -join ($bytes | ForEach-Object { $chars[$_ % $chars.Length] })
-az webapp config appsettings set -g fatguysspeak-rg -n fatguysspeak-server `
+az webapp config appsettings set -g fatguysspeak-rg -n squelch-server `
   --settings "Dashboard__Password=$pw" -o none   # -o none avoids dumping other secrets
 "New password: $pw"   # store in a password manager; not retrievable later
 ```

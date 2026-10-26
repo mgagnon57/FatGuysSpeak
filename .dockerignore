@@ -3,9 +3,9 @@
 release-output
 release-staging
 release-zips
-FatGuysSpeak.Client
-FatGuysSpeak.Tests
-FatGuysSpeak.Installer
+Squelch.Client
+Squelch.Tests
+Squelch.Installer
 *.db
 *.db-shm
 *.db-wal

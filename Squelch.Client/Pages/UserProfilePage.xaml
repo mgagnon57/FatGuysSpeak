@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Squelch.Client.ViewModels"
+             x:Class="Squelch.Client.Pages.UserProfilePage"
+             BackgroundColor="{DynamicResource ThemeBgPrimary}">
+
+    <ContentPage.Resources>
+        <local:InvertBoolConverter x:Key="InvertBool" xmlns:local="clr-namespace:Squelch.Client" />
+        <local:StringToBoolConverter x:Key="StringToBool" xmlns:local="clr-namespace:Squelch.Client" />
+    </ContentPage.Resources>
+
+    <ScrollView>
+    <VerticalStackLayout Padding="24,28" Spacing="0">
+
+        <!-- Loading indicator -->
+        <ActivityIndicator IsRunning="{Binding IsLoading}" IsVisible="{Binding IsLoading}"
+                           Color="{DynamicResource ThemeAccent}" HorizontalOptions="Center" Margin="0,40" />
+
+        <!-- Profile content -->
+        <VerticalStackLayout IsVisible="{Binding IsLoading, Converter={StaticResource InvertBool}}" Spacing="0">
+
+            <!-- Avatar + username -->
+            <Frame CornerRadius="40" WidthRequest="80" HeightRequest="80"
+                   BackgroundColor="{DynamicResource ThemeAccent}" Padding="0" HorizontalOptions="Center"
+                   BorderColor="Transparent" Margin="0,0,0,14">
+                <Grid>
+                    <Label Text="{Binding AvatarText}"
+                           TextColor="White" FontSize="26" FontAttributes="Bold"
+                           HorizontalOptions="Center" VerticalOptions="Center"
+                           IsVisible="{Binding Profile.AvatarUrl, Converter={StaticResource InvertBool}}" />
+                    <Image Source="{Binding Profile.AvatarUrl}"
+                           IsVisible="{Binding Profile.AvatarUrl, Converter={StaticResource StringToBool}}"
+                           Aspect="AspectFill" />
+                </Grid>
+            </Frame>
+
+            <Label Text="{Binding Profile.Username}"
+                   TextColor="{DynamicResource ThemeTextPrimary}" FontSize="20" FontAttributes="Bold"
+                   HorizontalOptions="Center" Margin="0,0,0,8" />
+
+            <!-- Status row -->
+            <HorizontalStackLayout HorizontalOptions="Center" Spacing="6" Margin="0,0,0,6">
+                <Ellipse WidthRequest="10" HeightRequest="10"
+                         Fill="{Binding StatusColor}" VerticalOptions="Center" />
+                <Label Text="{Binding StatusText}" TextColor="#a0a0a0" FontSize="13" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <!-- Custom status text -->
+            <Label Text="{Binding CustomStatus}" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="13"
+                   FontAttributes="Italic" HorizontalOptions="Center" HorizontalTextAlignment="Center"
+                   LineBreakMode="WordWrap" IsVisible="{Binding HasCustomStatus}" Margin="0,0,0,6" />
+
+            <!-- Last seen -->
+            <Label Text="{Binding LastSeenText}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="11"
+                   HorizontalOptions="Center" IsVisible="{Binding HasLastSeen}" Margin="0,0,0,4" />
+
+            <!-- Role -->
+            <Label Text="{Binding RoleText}" TextColor="{DynamicResource ThemeAccentLight}" FontSize="12"
+                   HorizontalOptions="Center" IsVisible="{Binding HasRole}" Margin="0,0,0,4" />
+
+            <!-- Joined date -->
+            <Label Text="{Binding JoinedText}" TextColor="{DynamicResource ThemeTextMuted}" FontSize="11"
+                   HorizontalOptions="Center" Margin="0,0,0,20" />
+
+            <!-- Block / Unblock (other users only) -->
+            <Button Text="{Binding BlockButtonText}"
+                    Command="{Binding ToggleBlockCommand}"
+                    IsVisible="{Binding IsOwnProfile, Converter={StaticResource InvertBool}}"
+                    BackgroundColor="#3a1010" TextColor="#ed8080"
+                    FontSize="12" CornerRadius="4" HeightRequest="32"
+                    HorizontalOptions="Center" Padding="16,0" Margin="0,10,0,0" />
+
+            <!-- Bio section -->
+            <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" Margin="0,14,0,14" />
+
+            <!-- Bio display (not editing) -->
+            <VerticalStackLayout IsVisible="{Binding IsEditingBio, Converter={StaticResource InvertBool}}" Spacing="6">
+                <Label Text="ABOUT ME" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" FontAttributes="Bold"
+                       HorizontalOptions="Start" Margin="0,0,0,4" />
+                <Label Text="{Binding Profile.Bio}"
+                       TextColor="{DynamicResource ThemeTextPrimary}" FontSize="13" LineBreakMode="WordWrap"
+                       IsVisible="{Binding HasBio}" />
+                <Label Text="No bio set yet."
+                       TextColor="{DynamicResource ThemeTextMuted}" FontSize="12" FontAttributes="Italic"
+                       IsVisible="{Binding HasBio, Converter={StaticResource InvertBool}}" />
+                <Button Text="✏ Edit Bio"
+                        Command="{Binding StartEditBioCommand}"
+                        IsVisible="{Binding IsOwnProfile}"
+                        BackgroundColor="#2a2a3a" TextColor="{DynamicResource ThemeAccentLight}"
+                        FontSize="12" CornerRadius="4" HeightRequest="32"
+                        HorizontalOptions="Start" Padding="14,0" Margin="0,8,0,0" />
+            </VerticalStackLayout>
+
+            <!-- Bio editor (own profile, editing) -->
+            <VerticalStackLayout IsVisible="{Binding IsEditingBio}" Spacing="8">
+                <Label Text="ABOUT ME" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" FontAttributes="Bold"
+                       HorizontalOptions="Start" />
+                <Editor Text="{Binding BioInput}"
+                        HeightRequest="90"
+                        BackgroundColor="{DynamicResource ThemeBgInput}" TextColor="{DynamicResource ThemeTextPrimary}"
+                        PlaceholderColor="#4a443d"
+                        Placeholder="Write something about yourself…"
+                        FontSize="13" />
+                <Label Text="{Binding BioError}"
+                       TextColor="{DynamicResource ThemeDanger}" FontSize="11"
+                       IsVisible="{Binding BioError, Converter={StaticResource StringToBool}}" />
+                <HorizontalStackLayout Spacing="8">
+                    <Button Text="Save"
+                            Command="{Binding SaveBioCommand}"
+                            BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
+                            FontSize="12" CornerRadius="4" HeightRequest="32" Padding="16,0" />
+                    <Button Text="Cancel"
+                            Command="{Binding CancelEditBioCommand}"
+                            BackgroundColor="{DynamicResource ThemeBgElevated}" TextColor="{DynamicResource ThemeTextPrimary}"
+                            FontSize="12" CornerRadius="4" HeightRequest="32" Padding="14,0" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+
+            <!-- Divider before status picker -->
+            <BoxView HeightRequest="1" BackgroundColor="{DynamicResource ThemeDivider}" Margin="0,20,0,20"
+                     IsVisible="{Binding IsOwnProfile}" />
+
+            <!-- Status picker (own profile only) -->
+            <VerticalStackLayout IsVisible="{Binding IsOwnProfile}" Spacing="6">
+                <Label Text="SET STATUS" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" FontAttributes="Bold"
+                       HorizontalOptions="Center" Margin="0,0,0,4" />
+                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8">
+                    <Button Grid.Row="0" Grid.Column="0" Text="🟢 Online"
+                            Command="{Binding SetStatusCommand}" CommandParameter="Online"
+                            BackgroundColor="#1a2a1a" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
+                            CornerRadius="6" HeightRequest="36" />
+                    <Button Grid.Row="0" Grid.Column="1" Text="🌙 Away"
+                            Command="{Binding SetStatusCommand}" CommandParameter="Away"
+                            BackgroundColor="#2a1e0a" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
+                            CornerRadius="6" HeightRequest="36" />
+                    <Button Grid.Row="1" Grid.Column="0" Text="⛔ Do Not Disturb"
+                            Command="{Binding SetStatusCommand}" CommandParameter="DoNotDisturb"
+                            BackgroundColor="#2a1010" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="11"
+                            CornerRadius="6" HeightRequest="36" />
+                    <Button Grid.Row="1" Grid.Column="1" Text="⚫ Offline"
+                            Command="{Binding SetStatusCommand}" CommandParameter="Offline"
+                            BackgroundColor="#1a1a1a" TextColor="{DynamicResource ThemeTextPrimary}" FontSize="12"
+                            CornerRadius="6" HeightRequest="36" />
+                </Grid>
+
+                <!-- Custom status message -->
+                <Label Text="CUSTOM STATUS" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" FontAttributes="Bold"
+                       HorizontalOptions="Center" Margin="0,12,0,2" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Entry Grid.Column="0" Text="{Binding CustomStatusInput}" MaxLength="100"
+                           Placeholder="What are you up to?  (e.g. 🎮 Halo Infinite)"
+                           BackgroundColor="{DynamicResource ThemeBgInput}" TextColor="{DynamicResource ThemeTextPrimary}"
+                           PlaceholderColor="#4a443d" FontSize="13" />
+                    <Button Grid.Column="1" Text="Set"
+                            Command="{Binding SaveStatusCommand}"
+                            BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
+                            FontSize="12" CornerRadius="6" HeightRequest="40" Padding="16,0" />
+                </Grid>
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

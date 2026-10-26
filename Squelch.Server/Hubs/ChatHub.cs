@@ -1,0 +1,643 @@
+using System.Collections.Concurrent;
+using System.Security.Claims;
+using Squelch.Server.Data;
+using Squelch.Shared;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+
+namespace Squelch.Server.Hubs;
+
+[Authorize]
+public class ChatHub(AppDbContext db, Squelch.Server.Services.OnlineTimeTracker onlineTime, Squelch.Server.Services.BotService bot, Squelch.Server.Services.TtsService tts) : Hub
+{
+    // userId -> voice channelId
+    private static readonly ConcurrentDictionary<int, int> VoiceChannelMap = new();
+    // userId -> text channelId
+    private static readonly ConcurrentDictionary<int, int> UserTextChannelMap = new();
+    // text channelId -> (userId -> username)
+    private static readonly ConcurrentDictionary<int, ConcurrentDictionary<int, string>> ChannelOccupants = new();
+    // userId -> username (currently connected users)
+    private static readonly ConcurrentDictionary<int, string> OnlineUsers = new();
+    // userId -> (channelId, serverId, username) for active screen shares
+    private static readonly ConcurrentDictionary<int, (int ChannelId, int ServerId, string Username, StreamKind Kind, string? GameName)> ActiveStreamers = new();
+    // userId -> (channelId, username) for active webcam feeds
+    private static readonly ConcurrentDictionary<int, (int ChannelId, string Username)> ActiveCameras = new();
+    // streamerUserId → (controllerUserId, channelId). At most one controller per stream.
+    private static readonly ConcurrentDictionary<int, (int ControllerId, int ChannelId)> RemoteControlSessions = new();
+    // voice channelId → last time anyone spoke/joined; used to detect "everyone's sitting silent".
+    private static readonly ConcurrentDictionary<int, DateTime> VoiceLastActivity = new();
+
+    // Snapshot of voice channels with their occupant count and last activity — for the idle nudge.
+    internal static List<(int ChannelId, int Count, DateTime LastActivity)> VoiceActivitySnapshot() =>
+        VoiceChannelMap.GroupBy(kv => kv.Value)
+            .Select(g => (g.Key, g.Count(),
+                          VoiceLastActivity.TryGetValue(g.Key, out var t) ? t : DateTime.UtcNow))
+            .ToList();
+
+    internal static List<int> VoiceParticipantIds(int channelId) =>
+        VoiceChannelMap.Where(kv => kv.Value == channelId).Select(kv => kv.Key).ToList();
+
+    // Exposed for the metrics dashboard — read-only snapshots of live state
+    internal static int OnlineUserCount       => OnlineUsers.Count;
+    internal static int VoiceParticipantCount => VoiceChannelMap.Count;
+    internal static int ActiveStreamCount     => ActiveStreamers.Count;
+    internal static IReadOnlyDictionary<int, string> OnlineUserSnapshot    => OnlineUsers;
+    internal static IReadOnlyDictionary<int, int>    VoiceChannelSnapshot  => VoiceChannelMap;
+    internal static IReadOnlyDictionary<int, int>    TextChannelSnapshot   => UserTextChannelMap;
+
+    // Server-authoritative voice removal for admin actions (which have no caller connection
+    // context): clears the user's voice state and tells that voice channel they left.
+    // Returns the channel they were in, or null if they weren't in voice.
+    internal static async Task<int?> RemoveUserFromVoiceAsync(IHubContext<ChatHub> hub, int userId)
+    {
+        if (!VoiceChannelMap.TryRemove(userId, out var channelId))
+            return null;
+        ActiveCameras.TryRemove(userId, out _);
+        var name = OnlineUsers.TryGetValue(userId, out var n) ? n : "";
+        await hub.Clients.Group($"voice-{channelId}").SendAsync("UserLeftVoice",
+            new VoiceStateDto(userId, name, null, false, false));
+        return channelId;
+    }
+
+    private int UserId => int.Parse(Context.User!.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private string Username => Context.User!.FindFirstValue(ClaimTypes.Name)!;
+
+    public async Task JoinChannel(int channelId)
+    {
+        var channel = await db.Channels
+            .Include(c => c.Server).ThenInclude(s => s.Members)
+            .FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId))
+            return;
+
+        // Enforce channel read permission
+        var perm = await db.ChannelPermissions.FindAsync(channelId);
+        if (perm is not null && perm.MinRoleToRead > ServerRole.Member)
+        {
+            var member = channel.Server.Members.FirstOrDefault(m => m.UserId == UserId);
+            if (member is null || member.Role < perm.MinRoleToRead) return;
+        }
+
+        // Atomically leave previous channel so a user can only be in one at a time
+        if (UserTextChannelMap.TryRemove(UserId, out var oldChannelId))
+        {
+            if (ChannelOccupants.TryGetValue(oldChannelId, out var oldOccupants))
+                oldOccupants.TryRemove(UserId, out _);
+            // Broadcast before removing so the leaving user also receives and updates their own sidebar
+            await Clients.Group($"server-{channel.ServerId}").SendAsync("UserLeftChannel", oldChannelId, new UserDto(UserId, Username, UserStatus.Online));
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"channel-{oldChannelId}");
+        }
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"channel-{channelId}");
+        UserTextChannelMap[UserId] = channelId;
+        ChannelOccupants.GetOrAdd(channelId, _ => new ConcurrentDictionary<int, string>())[UserId] = Username;
+        await Clients.OthersInGroup($"server-{channel.ServerId}").SendAsync("UserJoinedChannel", channelId, new UserDto(UserId, Username, UserStatus.Online));
+
+        // If someone is already streaming this channel, auto-join the stream group and notify caller
+        var streamer = ActiveStreamers.FirstOrDefault(kv => kv.Value.ChannelId == channelId);
+        if (streamer.Key != 0)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"stream-{channelId}");
+            await Clients.Caller.SendAsync("StreamStarted", streamer.Key, streamer.Value.Username, channelId);
+            await Clients.Caller.SendAsync("StreamDetails", streamer.Key, channelId, (int)streamer.Value.Kind, streamer.Value.GameName);
+        }
+    }
+
+    public async Task LeaveChannel(int channelId)
+    {
+        UserTextChannelMap.TryRemove(UserId, out _);
+        if (ChannelOccupants.TryGetValue(channelId, out var occupants))
+        {
+            occupants.TryRemove(UserId, out _);
+            // Broadcast to the whole server so everyone's sidebar updates — not just this channel.
+            var sid = await db.Channels.Where(c => c.Id == channelId).Select(c => (int?)c.ServerId).FirstOrDefaultAsync();
+            if (sid is not null)
+                await Clients.Group($"server-{sid}").SendAsync("UserLeftChannel", channelId, new UserDto(UserId, Username, UserStatus.Online));
+        }
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"channel-{channelId}");
+    }
+
+    public async Task<List<UserDto>> GetChannelOccupants(int channelId)
+    {
+        var channel = await db.Channels
+            .Include(c => c.Server).ThenInclude(s => s.Members)
+            .FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId))
+            return [];
+        if (!ChannelOccupants.TryGetValue(channelId, out var occupants))
+            return [];
+        return occupants.Select(kv => new UserDto(kv.Key, kv.Value, UserStatus.Online)).ToList();
+    }
+
+    public async Task JoinVoiceChannel(int channelId)
+    {
+        var channel = await db.Channels
+            .Include(c => c.Server).ThenInclude(s => s.Members)
+            .FirstOrDefaultAsync(c => c.Id == channelId);
+
+        if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId))
+            return;
+
+        // Enforce the same read permission as JoinChannel/WatchStream so a low-role member
+        // can't join a restricted channel's voice session.
+        var perm = await db.ChannelPermissions.FindAsync(channelId);
+        if (perm is not null && perm.MinRoleToRead > ServerRole.Member)
+        {
+            var member = channel.Server.Members.FirstOrDefault(m => m.UserId == UserId);
+            if (member is null || member.Role < perm.MinRoleToRead) return;
+        }
+
+        if (VoiceChannelMap.TryGetValue(UserId, out var oldChannel))
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"voice-{oldChannel}");
+            await Clients.Group($"voice-{oldChannel}").SendAsync("UserLeftVoice",
+                new VoiceStateDto(UserId, Username, null, false, false));
+        }
+
+        VoiceChannelMap[UserId] = channelId;
+        VoiceLastActivity[channelId] = DateTime.UtcNow;   // a fresh join counts as activity
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"voice-{channelId}");
+
+        var state = new VoiceStateDto(UserId, Username, channelId, false, false);
+        await Clients.Group($"voice-{channelId}").SendAsync("UserJoinedVoice", state);
+
+        // Send existing voice participants to the new joiner
+        var existing = VoiceChannelMap
+            .Where(kv => kv.Value == channelId && kv.Key != UserId)
+            .Select(kv => kv.Key)
+            .ToList();
+        await Clients.Caller.SendAsync("VoiceParticipants", existing);
+    }
+
+    /// <summary>An admin moves any member into a channel: validates + audits, then tells
+    /// the target's client to switch to that channel (reuses the proven ForceJoinChannel relay
+    /// that Kick-Voice uses). Silent no-op on any invalid request.</summary>
+    public async Task MoveUserToChannel(int targetUserId, int channelId)
+    {
+        if (targetUserId == UserId) return;   // moving yourself is just normal navigation
+
+        var channel = await db.Channels
+            .Include(c => c.Server).ThenInclude(s => s.Members)
+            .FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null) return;
+
+        // Caller must be an admin of the channel's server (flat permission).
+        var mover = channel.Server.Members.FirstOrDefault(m => m.UserId == UserId);
+        if (mover is null || mover.Role < ServerRole.Admin) return;
+
+        // Target must be a member of that server.
+        var target = channel.Server.Members.FirstOrDefault(m => m.UserId == targetUserId);
+        if (target is null) return;
+
+        // Respect the destination's read permission for the target.
+        var perm = await db.ChannelPermissions.FindAsync(channelId);
+        if (perm is not null && perm.MinRoleToRead > ServerRole.Member && target.Role < perm.MinRoleToRead)
+            return;
+
+        var targetName = OnlineUsers.TryGetValue(targetUserId, out var tn)
+            ? tn
+            : (await db.Users.Where(u => u.Id == targetUserId).Select(u => u.Username).FirstOrDefaultAsync() ?? "");
+
+        db.AuditLogs.Add(new Squelch.Server.Models.AuditLog
+        {
+            ServerId = channel.ServerId,
+            ActorId = UserId,
+            ActorUsername = Username,
+            Action = "UserMoved",
+            TargetId = targetUserId,
+            TargetUsername = targetName,
+            Detail = $"to #{channel.Name}"
+        });
+        await db.SaveChangesAsync();
+
+        // Tell the target's client to switch to that channel (it already handles ForceJoinChannel).
+        await Clients.User(targetUserId.ToString()).SendAsync("ForceJoinChannel", channelId);
+    }
+
+    private const int MaxVoicePacketBytes = 8_192;
+
+    public async Task SendVoiceData(byte[] data)
+    {
+        if (data.Length > MaxVoicePacketBytes) return;
+        if (!VoiceChannelMap.TryGetValue(UserId, out var channelId)) return;
+        VoiceLastActivity[channelId] = DateTime.UtcNow;   // someone's talking — reset the idle timer
+        tts.StopSpeaking(channelId);                       // a human is talking — PorkChop yields the floor
+        var group = Clients.OthersInGroup($"voice-{channelId}");
+        await group.SendAsync("ReceiveVoiceData", data);
+        await group.SendAsync("UserSpeaking", UserId);
+    }
+
+    /// <summary>Manually cut PorkChop off mid-sentence in the caller's current voice channel.</summary>
+    public Task StopBotSpeech()
+    {
+        if (VoiceChannelMap.TryGetValue(UserId, out var channelId)) tts.StopSpeaking(channelId);
+        return Task.CompletedTask;
+    }
+
+    public async Task LeaveVoiceChannel()
+    {
+        if (!VoiceChannelMap.TryRemove(UserId, out var channelId))
+            return;
+
+        if (ActiveCameras.TryRemove(UserId, out var cam) && cam.ChannelId == channelId)
+            await Clients.OthersInGroup($"voice-{channelId}").SendAsync("CameraStopped", UserId, channelId);
+
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"voice-{channelId}");
+        await Clients.Group($"voice-{channelId}").SendAsync("UserLeftVoice",
+            new VoiceStateDto(UserId, Username, null, false, false));
+    }
+
+    // ─── Webcam Video ─────────────────────────────────────────────────────────
+
+    private const int MaxCameraFrameBytes = 64 * 1024; // 64 KB — 320×240 JPEG
+
+    public async Task StartCamera(int channelId)
+    {
+        if (!VoiceChannelMap.TryGetValue(UserId, out var voiceCh) || voiceCh != channelId) return;
+        ActiveCameras[UserId] = (channelId, Username);
+        await Clients.OthersInGroup($"voice-{channelId}")
+            .SendAsync("CameraStarted", UserId, Username, channelId);
+    }
+
+    public async Task StopCamera(int channelId)
+    {
+        if (!VoiceChannelMap.TryGetValue(UserId, out var voiceCh) || voiceCh != channelId) return;
+        ActiveCameras.TryRemove(UserId, out _);
+        await Clients.OthersInGroup($"voice-{channelId}")
+            .SendAsync("CameraStopped", UserId, channelId);
+    }
+
+    public async Task SendCameraFrame(byte[] frame)
+    {
+        if (frame.Length > MaxCameraFrameBytes) return;
+        if (!ActiveCameras.TryGetValue(UserId, out var info)) return;
+        await Clients.OthersInGroup($"voice-{info.ChannelId}")
+            .SendAsync("ReceiveCameraFrame", UserId, frame);
+    }
+
+    public async Task<List<UserDto>> GetOnlineUsersForServer(int serverId)
+    {
+        if (!await db.ServerMembers.AnyAsync(sm => sm.ServerId == serverId && sm.UserId == UserId))
+            return [];
+
+        var memberIds = await db.ServerMembers
+            .Where(sm => sm.ServerId == serverId)
+            .Select(sm => sm.UserId)
+            .ToListAsync();
+
+        var onlineUsers = memberIds
+            .Select(id => OnlineUsers.TryGetValue(id, out var name) ? (id, name) : default)
+            .Where(x => x.name is not null)
+            .ToList();
+        var onlineIds = onlineUsers.Select(x => x.id).ToList();
+        var statusMap = await db.Users
+            .Where(u => onlineIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.Status);
+
+        return onlineUsers
+            .Select(x => new UserDto(x.id, x.name!, statusMap.GetValueOrDefault(x.id, UserStatus.Online)))
+            .ToList();
+    }
+
+    // WebRTC signaling relay — both parties must be in the same voice channel
+    public async Task SendOffer(int targetUserId, string sdpOffer)
+    {
+        if (!VoiceChannelMap.TryGetValue(UserId, out var ch)) return;
+        if (!VoiceChannelMap.TryGetValue(targetUserId, out var targetCh) || targetCh != ch) return;
+        await Clients.User(targetUserId.ToString()).SendAsync("ReceiveOffer", UserId, sdpOffer);
+    }
+
+    public async Task SendAnswer(int targetUserId, string sdpAnswer)
+    {
+        if (!VoiceChannelMap.TryGetValue(UserId, out var ch)) return;
+        if (!VoiceChannelMap.TryGetValue(targetUserId, out var targetCh) || targetCh != ch) return;
+        await Clients.User(targetUserId.ToString()).SendAsync("ReceiveAnswer", UserId, sdpAnswer);
+    }
+
+    public async Task SendIceCandidate(int targetUserId, string candidate)
+    {
+        if (!VoiceChannelMap.TryGetValue(UserId, out var ch)) return;
+        if (!VoiceChannelMap.TryGetValue(targetUserId, out var targetCh) || targetCh != ch) return;
+        await Clients.User(targetUserId.ToString()).SendAsync("ReceiveIceCandidate", UserId, candidate);
+    }
+
+    public override async Task OnConnectedAsync()
+    {
+        OnlineUsers[UserId] = Username;
+        onlineTime.Connect(UserId);
+
+        var user = await db.Users.FindAsync(UserId);
+        var awaySince = user?.LastSeenAt;   // set on last disconnect; captured before we flip status
+        if (user is not null)
+        {
+            user.Status = UserStatus.Online;
+            await db.SaveChangesAsync();
+        }
+
+        // PorkChop welcomes real arrivals (fire-and-forget; it gates quick reconnects itself).
+        _ = bot.AnnounceJoinAsync(UserId, awaySince);
+
+        var serverIds = await db.ServerMembers
+            .Where(sm => sm.UserId == UserId)
+            .Select(sm => sm.ServerId)
+            .ToListAsync();
+
+        var userDto = new UserDto(UserId, Username, user?.Status ?? UserStatus.Online);
+        foreach (var sid in serverIds)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"server-{sid}");
+            await Clients.OthersInGroup($"server-{sid}").SendAsync("UserConnected", userDto);
+        }
+
+        // Personal group so DM notifications can be pushed to this user
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{UserId}");
+
+        await base.OnConnectedAsync();
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        OnlineUsers.TryRemove(UserId, out _);
+        await EndControlSessionsInvolvingAsync(UserId);
+
+        if (UserTextChannelMap.TryRemove(UserId, out var textChannelId))
+        {
+            if (ChannelOccupants.TryGetValue(textChannelId, out var occ))
+                occ.TryRemove(UserId, out _);
+            var sid = await db.Channels.Where(c => c.Id == textChannelId).Select(c => (int?)c.ServerId).FirstOrDefaultAsync();
+            if (sid is not null)
+                await Clients.Group($"server-{sid}").SendAsync("UserLeftChannel", textChannelId, new UserDto(UserId, Username, UserStatus.Offline));
+        }
+
+        var addSeconds = onlineTime.Disconnect(UserId);
+        var user = await db.Users.FindAsync(UserId);
+        if (user is not null)
+        {
+            user.Status = UserStatus.Offline;
+            user.LastSeenAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+        // Persist online time via an atomic DB increment (not a read-modify-write on the
+        // tracked entity) so two connections for the same user disconnecting concurrently
+        // can't overwrite each other's accumulated seconds. Quoted identifiers work on both
+        // SQLite and PostgreSQL.
+        if (addSeconds > 0)
+            await db.Database.ExecuteSqlRawAsync(
+                "UPDATE \"Users\" SET \"TotalOnlineSeconds\" = \"TotalOnlineSeconds\" + {0} WHERE \"Id\" = {1}",
+                addSeconds, UserId);
+
+        var serverIds = await db.ServerMembers
+            .Where(sm => sm.UserId == UserId)
+            .Select(sm => sm.ServerId)
+            .ToListAsync();
+
+        var userDto = new UserDto(UserId, Username, UserStatus.Offline);
+        foreach (var sid in serverIds)
+            await Clients.OthersInGroup($"server-{sid}").SendAsync("UserDisconnected", userDto);
+
+        await LeaveVoiceChannel();
+        await StopStream();
+        if (ActiveCameras.TryRemove(UserId, out var camInfo))
+            await Clients.OthersInGroup($"voice-{camInfo.ChannelId}")
+                .SendAsync("CameraStopped", UserId, camInfo.ChannelId);
+        await base.OnDisconnectedAsync(exception);
+    }
+
+    // ─── Screen Sharing ───────────────────────────────────────────────────────
+
+    private const int MaxStreamFrameBytes = 4 * 1024 * 1024;
+
+    // Share Screen (also what pre-0.13 clients call). Hub methods can't be overloaded, so Stream Game is
+    // a separate method rather than a new StartStream signature.
+    public Task StartStream(int channelId) => BeginStreamAsync(channelId, StreamKind.Screen, null);
+
+    public Task StartGameStream(int channelId, string gameName) =>
+        BeginStreamAsync(channelId, StreamKind.Game, StreamText.SanitizeGameName(gameName));
+
+    // Stream Game's "Change" link: same stream, different game window.
+    public async Task UpdateStreamGame(string gameName)
+    {
+        var game = StreamText.SanitizeGameName(gameName);
+        if (!ActiveStreamers.TryGetValue(UserId, out var info) || info.Kind != StreamKind.Game) return;
+        ActiveStreamers[UserId] = info with { GameName = game };
+        await Clients.Group($"server-{info.ServerId}").SendAsync("StreamDetails", UserId, info.ChannelId, (int)StreamKind.Game, game);
+        await BroadcastStreamNotificationAsync(info.ServerId, $"🎮 {Username} switched to {game}");
+    }
+
+    private async Task BeginStreamAsync(int channelId, StreamKind kind, string? gameName)
+    {
+        var channel = await db.Channels
+            .Include(c => c.Server).ThenInclude(s => s.Members)
+            .FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId))
+            return;
+
+        // Atomically capture any previous stream entry before writing the new one,
+        // so concurrent StartStream calls can't both skip the StreamStopped notification.
+        (int ChannelId, int ServerId, string Username, StreamKind Kind, string? GameName) prev = default;
+        bool hadPrev = false;
+        var entry = (channelId, channel.ServerId, Username, kind, gameName);
+        ActiveStreamers.AddOrUpdate(
+            UserId,
+            _ => entry,
+            (_, old) => { prev = old; hadPrev = true; return entry; });
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"stream-{channelId}");
+
+        if (hadPrev)
+        {
+            if (prev.ChannelId != channelId)
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"stream-{prev.ChannelId}");
+            await Clients.Group($"server-{prev.ServerId}").SendAsync("StreamStopped", UserId, prev.ChannelId);
+        }
+        // Notify all server members so clients on any channel see the stream tab light up
+        await Clients.Group($"server-{channel.ServerId}").SendAsync("StreamStarted", UserId, Username, channelId);
+        await Clients.Group($"server-{channel.ServerId}").SendAsync("StreamDetails", UserId, channelId, (int)kind, gameName);
+        await BroadcastStreamNotificationAsync(channel.ServerId, kind == StreamKind.Game
+            ? $"🎮 {Username} started streaming {gameName} in #{channel.Name}"
+            : $"🖥 {Username} started sharing their screen in #{channel.Name}");
+    }
+
+    public async Task SendStreamFrame(byte[] data)
+    {
+        if (data.Length > MaxStreamFrameBytes) return;
+        if (!ActiveStreamers.TryGetValue(UserId, out var info)) return;
+        await Clients.OthersInGroup($"stream-{info.ChannelId}").SendAsync("ReceiveStreamFrame", data);
+    }
+
+    public async Task SendStreamAudio(byte[] data)
+    {
+        if (data.Length > 1275) return; // max Opus packet
+        if (!ActiveStreamers.TryGetValue(UserId, out var info)) return;
+        await Clients.OthersInGroup($"stream-{info.ChannelId}").SendAsync("ReceiveStreamAudio", UserId, data);
+    }
+
+    public async Task StopStream()
+    {
+        if (!ActiveStreamers.TryRemove(UserId, out var info)) return;
+        await EndControlSessionsInvolvingAsync(UserId);
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"stream-{info.ChannelId}");
+        await Clients.Group($"server-{info.ServerId}").SendAsync("StreamStopped", UserId, info.ChannelId);
+        var channelName = (await db.Channels.FindAsync(info.ChannelId))?.Name ?? "";
+        var where = channelName.Length > 0 ? $" in #{channelName}" : "";
+        await BroadcastStreamNotificationAsync(info.ServerId, info.Kind == StreamKind.Game
+            ? $"⏹ {Username} stopped streaming {info.GameName}{where}"
+            : $"⏹ {Username} ended screen share{where}");
+    }
+
+    public async Task WatchStream(int channelId)
+    {
+        var channel = await db.Channels
+            .Include(c => c.Server).ThenInclude(s => s.Members)
+            .FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel is null || !channel.Server.Members.Any(m => m.UserId == UserId)) return;
+
+        // Enforce the same read permission as JoinChannel
+        var perm = await db.ChannelPermissions.FindAsync(channelId);
+        if (perm is not null && perm.MinRoleToRead > ServerRole.Member)
+        {
+            var member = channel.Server.Members.FirstOrDefault(m => m.UserId == UserId);
+            if (member is null || member.Role < perm.MinRoleToRead) return;
+        }
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"stream-{channelId}");
+    }
+
+    public Task StopWatching(int channelId) =>
+        Groups.RemoveFromGroupAsync(Context.ConnectionId, $"stream-{channelId}");
+
+    // ─── Remote Control ─────────────────────────────────────────────────────────
+
+    // Returns false if a session already exists for this streamer (atomic via TryAdd).
+    private async Task<bool> TryOpenControlSessionAsync(int streamerId, int controllerId, int channelId)
+    {
+        if (!RemoteControlSessions.TryAdd(streamerId, (controllerId, channelId)))
+            return false;
+        var controllerName = OnlineUsers.TryGetValue(controllerId, out var cn) ? cn : "";
+        var streamerName   = OnlineUsers.TryGetValue(streamerId,   out var sn) ? sn : "";
+        await Clients.User(streamerId.ToString()).SendAsync("ControlActive", controllerId, controllerName);
+        await Clients.User(controllerId.ToString()).SendAsync("ControlGranted", streamerId, streamerName);
+        return true;
+    }
+
+    private async Task CloseControlSessionAsync(int streamerId)
+    {
+        if (!RemoteControlSessions.TryRemove(streamerId, out var s)) return;
+        await Clients.User(streamerId.ToString()).SendAsync("ControlEnded", s.ControllerId);
+        await Clients.User(s.ControllerId.ToString()).SendAsync("ControlEnded", streamerId);
+    }
+
+    // Ends any control session in which `userId` is the streamer OR the controller.
+    private async Task EndControlSessionsInvolvingAsync(int userId)
+    {
+        if (RemoteControlSessions.ContainsKey(userId))           // user is a streamer
+        {
+            await CloseControlSessionAsync(userId);
+            return;
+        }
+        var asController = RemoteControlSessions.FirstOrDefault(kv => kv.Value.ControllerId == userId);
+        if (asController.Value.ControllerId != userId) return;   // not in any session
+        await CloseControlSessionAsync(asController.Key);
+    }
+
+    // Remote control is a troubleshooting tool: only offered on Share Screen streams, never on Stream Game.
+    private static bool IsScreenShare(int streamerId) =>
+        ActiveStreamers.TryGetValue(streamerId, out var s) && s.Kind == StreamKind.Screen;
+
+    public async Task RequestControl(int streamerId)
+    {
+        if (!IsScreenShare(streamerId)) return;
+        await Clients.User(streamerId.ToString()).SendAsync("ControlRequested", UserId, Username);
+    }
+
+    public async Task OfferControl(int viewerId)
+    {
+        if (!IsScreenShare(UserId)) return;
+        await Clients.User(viewerId.ToString()).SendAsync("ControlOffered", UserId, Username);
+    }
+
+    public async Task GrantControl(int controllerId)
+    {
+        if (!ActiveStreamers.TryGetValue(UserId, out var info) || info.Kind != StreamKind.Screen) return;
+        if (!await TryOpenControlSessionAsync(UserId, controllerId, info.ChannelId))
+            await Clients.Caller.SendAsync("ControlBusy");
+    }
+
+    public async Task AcceptControl(int streamerId)
+    {
+        if (!ActiveStreamers.TryGetValue(streamerId, out var info) || info.Kind != StreamKind.Screen) return;
+        if (!await TryOpenControlSessionAsync(streamerId, UserId, info.ChannelId))
+            await Clients.Caller.SendAsync("ControlBusy");
+    }
+
+    public Task DenyControl(int otherUserId) =>
+        Clients.User(otherUserId.ToString()).SendAsync("ControlDeclined", UserId);
+
+    public Task StopControl() => CloseControlSessionAsync(UserId);
+
+    public async Task ReleaseControl()
+    {
+        var entry = RemoteControlSessions.FirstOrDefault(kv => kv.Value.ControllerId == UserId);
+        if (entry.Value.ControllerId != UserId) return;   // not a controller → no session found
+        await CloseControlSessionAsync(entry.Key);
+    }
+
+    public async Task SendRemoteInput(Squelch.Shared.RemoteInputDto dto)
+    {
+        var entry = RemoteControlSessions.FirstOrDefault(kv => kv.Value.ControllerId == UserId);
+        if (entry.Value.ControllerId != UserId) return;   // not a controller → drop
+        await Clients.User(entry.Key.ToString()).SendAsync("ReceiveRemoteInput", dto);
+    }
+
+    // ─── Typing Indicators ────────────────────────────────────────────────────
+
+    public async Task StartTyping(int channelId)
+    {
+        if (!UserTextChannelMap.TryGetValue(UserId, out var current) || current != channelId) return;
+        await Clients.OthersInGroup($"channel-{channelId}")
+            .SendAsync("UserTyping", UserId, Username, channelId);
+    }
+
+    public async Task StopTyping(int channelId)
+    {
+        // No membership guard (unlike StartTyping): always broadcast the stop so a stale
+        // "user is typing" indicator is cleared even after the sender switched channels.
+        await Clients.OthersInGroup($"channel-{channelId}")
+            .SendAsync("UserStoppedTyping", UserId, channelId);
+    }
+
+    public async Task StartDmTyping(int conversationId)
+    {
+        var convo = await db.DirectConversations.FindAsync(conversationId);
+        if (convo is null) return;
+        if (convo.User1Id != UserId && convo.User2Id != UserId) return;
+        int recipientId = convo.User1Id == UserId ? convo.User2Id : convo.User1Id;
+        await Clients.Group($"user-{recipientId}")
+            .SendAsync("DmUserTyping", UserId, Username, conversationId);
+    }
+
+    public async Task StopDmTyping(int conversationId)
+    {
+        var convo = await db.DirectConversations.FindAsync(conversationId);
+        if (convo is null) return;
+        if (convo.User1Id != UserId && convo.User2Id != UserId) return;
+        int recipientId = convo.User1Id == UserId ? convo.User2Id : convo.User1Id;
+        await Clients.Group($"user-{recipientId}")
+            .SendAsync("DmUserStoppedTyping", UserId, conversationId);
+    }
+
+    // Echo back immediately so the client can measure round-trip time
+    public Task Ping() => Task.CompletedTask;
+
+    // Sends a system notification message to every text channel on the server
+    private async Task BroadcastStreamNotificationAsync(int serverId, string text)
+    {
+        var textChannels = await db.Channels
+            .Where(c => c.ServerId == serverId && c.Type == ChannelType.Text)
+            .ToListAsync();
+
+        foreach (var ch in textChannels)
+            await Clients.Group($"channel-{ch.Id}").SendAsync("StreamNotification", ch.Id, text);
+    }
+}

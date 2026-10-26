@@ -64,9 +64,9 @@ foreach ($p in @('website/index.html', 'docs/index.html')) {
 
 # 6. Build (Release). Abort on any failure.
 Write-Host "Building $Version..." -ForegroundColor Cyan
-dotnet build (Join-Path $root 'FatGuysSpeak.Server') -c Release --framework net9.0; if ($LASTEXITCODE) { throw 'server net9.0 build failed' }
-dotnet build (Join-Path $root 'FatGuysSpeak.Server') -c Release --framework net9.0-windows10.0.19041.0; if ($LASTEXITCODE) { throw 'server windows build failed' }
-dotnet build (Join-Path $root 'FatGuysSpeak.Client') -c Release --framework net9.0-windows10.0.19041.0; if ($LASTEXITCODE) { throw 'client build failed' }
+dotnet build (Join-Path $root 'Squelch.Server') -c Release --framework net9.0; if ($LASTEXITCODE) { throw 'server net9.0 build failed' }
+dotnet build (Join-Path $root 'Squelch.Server') -c Release --framework net9.0-windows10.0.19041.0; if ($LASTEXITCODE) { throw 'server windows build failed' }
+dotnet build (Join-Path $root 'Squelch.Client') -c Release --framework net9.0-windows10.0.19041.0; if ($LASTEXITCODE) { throw 'client build failed' }
 
 # Server installer: publish the server SELF-CONTAINED (bundles the .NET runtime + native SQLite +
 # WebView2 loader, so the target machine needs no .NET install), zip it, then publish the installer
@@ -75,14 +75,14 @@ dotnet build (Join-Path $root 'FatGuysSpeak.Client') -c Release --framework net9
 Write-Host "Publishing self-contained server + installer..." -ForegroundColor Cyan
 $serverFiles = Join-Path $root 'release-staging\server-files'
 Remove-Item -Recurse -Force $serverFiles -ErrorAction SilentlyContinue
-dotnet publish (Join-Path $root 'FatGuysSpeak.Server') -c Release -f net9.0-windows10.0.19041.0 `
+dotnet publish (Join-Path $root 'Squelch.Server') -c Release -f net9.0-windows10.0.19041.0 `
     -r win-x64 --self-contained true -o $serverFiles --nologo; if ($LASTEXITCODE) { throw 'server publish failed' }
-$bundleZip = Join-Path $root 'FatGuysSpeak.Installer\server-bundle.zip'
+$bundleZip = Join-Path $root 'Squelch.Installer\server-bundle.zip'
 Remove-Item $bundleZip -ErrorAction SilentlyContinue
 Compress-Archive -Path (Join-Path $serverFiles '*') -DestinationPath $bundleZip -CompressionLevel Optimal
 $installerPub = Join-Path $root 'release-output\installer-pub'
 Remove-Item -Recurse -Force $installerPub -ErrorAction SilentlyContinue
-dotnet publish (Join-Path $root 'FatGuysSpeak.Installer') -c Release -f net9.0-windows10.0.19041.0 `
+dotnet publish (Join-Path $root 'Squelch.Installer') -c Release -f net9.0-windows10.0.19041.0 `
     -r win-x64 --self-contained true -o $installerPub --nologo; if ($LASTEXITCODE) { throw 'installer publish failed' }
 Remove-Item $bundleZip -ErrorAction SilentlyContinue   # don't leave the bundle lying around
 
@@ -91,15 +91,15 @@ Remove-Item $bundleZip -ErrorAction SilentlyContinue   # don't leave the bundle 
 #    differs per project: installer -> win-x64, client -> win10-x64), so search for it.
 $out = Join-Path $root 'release-output'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
-$setup = Join-Path $installerPub 'FatGuysSpeak-Server-Setup.exe'
+$setup = Join-Path $installerPub 'Squelch-Server-Setup.exe'
 if (-not (Test-Path $setup)) { throw "Self-contained installer exe not found at $setup after publish." }
-Copy-Item $setup (Join-Path $out "FatGuysSpeak-Server-Setup-$Version.exe") -Force
-$clientDir = Join-Path $root 'FatGuysSpeak.Client\bin\Release\net9.0-windows10.0.19041.0\win10-x64'
+Copy-Item $setup (Join-Path $out "Squelch-Server-Setup-$Version.exe") -Force
+$clientDir = Join-Path $root 'Squelch.Client\bin\Release\net9.0-windows10.0.19041.0\win10-x64'
 if (-not (Test-Path $clientDir)) { throw "Client build output not found at $clientDir." }
-Compress-Archive -Path (Join-Path $clientDir '*') -DestinationPath (Join-Path $out "FatGuysSpeak-Client-$Version.zip") -Force
+Compress-Archive -Path (Join-Path $clientDir '*') -DestinationPath (Join-Path $out "Squelch-Client-$Version.zip") -Force
 
 # 7b. Velopack: publish the client and upload to the GitHub release (default + per-version channel)
-$repoUrl = 'https://github.com/mgagnon57/FatGuysSpeak'
+$repoUrl = 'https://github.com/mgagnon57/Squelch'
 $verChannel = 'v' + ($Version -replace '\.', '-')        # 1.2.0 -> v1-2-0 (matches UpdateChannel.ForVersion)
 $clientPub = Join-Path $root 'release-output\client-pub'
 Remove-Item -Recurse -Force $clientPub -ErrorAction SilentlyContinue
@@ -107,15 +107,15 @@ Remove-Item -Recurse -Force $clientPub -ErrorAction SilentlyContinue
 # .NET. Notes: use the portable 'win-x64' RID (the net9.0 Shared lib doesn't know legacy
 # 'win10-x64'); UseMonoRuntime=false forces the Windows CoreCLR runtime pack (MAUI defaults to
 # Mono, whose win-x64 pack doesn't exist); PublishReadyToRun=false avoids flaky crossgen.
-dotnet publish (Join-Path $root 'FatGuysSpeak.Client') -c Release -f net9.0-windows10.0.19041.0 `
+dotnet publish (Join-Path $root 'Squelch.Client') -c Release -f net9.0-windows10.0.19041.0 `
     -r win-x64 --self-contained true -p:UseMonoRuntime=false -p:PublishReadyToRun=false `
     -p:WindowsPackageType=None -o $clientPub
 if ($LASTEXITCODE) { throw 'client publish failed' }
 
 $vpkOut = Join-Path $root 'release-output\vpk'
 foreach ($ch in @('win', $verChannel)) {
-    vpk pack --packId FatGuysSpeak.Client --packVersion $Version --packDir $clientPub `
-        --mainExe FatGuysSpeak.Client.exe --channel $ch -o (Join-Path $vpkOut $ch)
+    vpk pack --packId Squelch.Client --packVersion $Version --packDir $clientPub `
+        --mainExe Squelch.Client.exe --channel $ch -o (Join-Path $vpkOut $ch)
     if ($LASTEXITCODE) { throw "vpk pack ($ch) failed" }
 }
 
@@ -126,7 +126,7 @@ if ($env:GITHUB_TOKEN) {
     # release, then attach the 'win' channel's (distinctly-named) assets with gh. Channel asset names
     # are suffixed (…-win-…, …-v0-10-1-…) so they never collide on the release.
     vpk upload github --repoUrl $repoUrl --token $env:GITHUB_TOKEN --channel $verChannel `
-        --tag "v$Version" --releaseName "FatGuysSpeak $Version" --publish -o (Join-Path $vpkOut $verChannel)
+        --tag "v$Version" --releaseName "Squelch $Version" --publish -o (Join-Path $vpkOut $verChannel)
     if ($LASTEXITCODE) { throw "vpk upload github ($verChannel) failed" }
 
     $winAssets = Get-ChildItem (Join-Path $vpkOut 'win') -File | ForEach-Object { $_.FullName }

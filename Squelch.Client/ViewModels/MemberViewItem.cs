@@ -1,0 +1,41 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+using Squelch.Shared;
+
+namespace Squelch.Client.ViewModels;
+
+public partial class MemberViewItem : ObservableObject
+{
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RoleIcon), nameof(HasRoleIcon))]
+    private ServerRole _role;
+
+    [ObservableProperty] private UserStatus _status;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasStatusText))]
+    private string? _statusText;
+
+    public bool HasStatusText => !string.IsNullOrWhiteSpace(StatusText);
+
+    public int Id { get; }
+    public string Username { get; }
+    public string? AvatarUrl { get; }
+
+    public string RoleIcon => Role switch
+    {
+        ServerRole.Admin => "👑",
+        _ => ""
+    };
+
+    public bool HasRoleIcon => Role >= ServerRole.Admin;
+
+    public MemberViewItem(UserDto user, ServerRole role = ServerRole.Member)
+    {
+        Id = user.Id;
+        Username = user.Username;
+        AvatarUrl = user.AvatarUrl;
+        _role = role;
+        _status = user.Status;
+        _statusText = user.StatusText;
+    }
+}

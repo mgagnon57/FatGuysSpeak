@@ -38,7 +38,7 @@ server-err.txt
 test-out.txt
 
 ## Local dev SQLite database (runtime data — not source)
-FatGuysSpeak.Server/fatguys.db
+Squelch.Server/squelch.db
 ## SQLite write-ahead-log sidecars
 *.db-shm
 *.db-wal
@@ -46,7 +46,7 @@ FatGuysSpeak.Server/fatguys.db
 *.db.bak*
 
 ## Local uploads (server stores files here at runtime)
-FatGuysSpeak.Server/uploads/
+Squelch.Server/uploads/
 
 ## Release / packaging artifacts
 release-output/
@@ -58,7 +58,7 @@ logs/
 **/logs/
 
 # ASP.NET Data Protection keys (local) — sensitive, never commit
-FatGuysSpeak.Server/dp-keys/
+Squelch.Server/dp-keys/
 
 # Icon design scratch (working files; final assets live in Resources/Installer/docs)
 icon-concepts/

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="Squelch.Client.Pages.StreamViewPage"
+             BackgroundColor="Black"
+             Title="Screen Share">
+    <Grid>
+        <Image x:Name="StreamImage"
+               Source="{Binding StreamFrame}"
+               Aspect="AspectFit"
+               IsVisible="{Binding HasStreamFrame}" />
+
+        <Label Text="⏳  Waiting for stream…"
+               TextColor="{DynamicResource ThemeTextMuted}" FontSize="16" FontAttributes="Italic"
+               HorizontalOptions="Center" VerticalOptions="Center"
+               IsVisible="{Binding HasStreamFrame, Converter={StaticResource InvertBoolConverter}}" />
+
+        <!-- Overlay: streamer name + latency (top-left) -->
+        <VerticalStackLayout HorizontalOptions="Start" VerticalOptions="Start"
+                             Margin="10,8,0,0" Spacing="3">
+            <Label Text="{Binding ActiveStreamLabel}"
+                   TextColor="#8ab4d4" FontSize="11" FontAttributes="Bold" />
+            <HorizontalStackLayout Spacing="5">
+                <Ellipse WidthRequest="7" HeightRequest="7"
+                         Fill="{Binding StreamLatencyColor}"
+                         VerticalOptions="Center" />
+                <Label Text="{Binding StreamLatencyText}"
+                       TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10" VerticalOptions="Center" />
+                <Label Text="·" TextColor="{DynamicResource ThemeTextMuted}" FontSize="10" VerticalOptions="Center" />
+                <Label Text="{Binding StreamQualityLabel}"
+                       TextColor="{DynamicResource ThemeTextSecondary}" FontSize="10" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+        </VerticalStackLayout>
+
+        <!-- Overlay: return button (top-right) -->
+        <Button Text="⛶  Return to In-App"
+                Command="{Binding ToggleFullScreenCommand}"
+                BackgroundColor="#CC141420"
+                TextColor="White" FontSize="11"
+                HorizontalOptions="End" VerticalOptions="Start"
+                Margin="0,6,8,0"
+                HeightRequest="30" CornerRadius="4" Padding="10,0" />
+
+        <!-- Request control button (viewer): shown when CanRequestControl -->
+        <Button Text="🖱 Request Control"
+                Command="{Binding RequestControlCommand}"
+                BackgroundColor="#CCd42d00"
+                TextColor="White" FontSize="11"
+                HorizontalOptions="End" VerticalOptions="End"
+                Margin="0,0,8,8"
+                HeightRequest="30" CornerRadius="4" Padding="10,0"
+                IsVisible="{Binding CanRequestControl}" />
+
+        <!-- Banner: I am being controlled (red, sharer side) -->
+        <Grid VerticalOptions="End" HorizontalOptions="Fill"
+              BackgroundColor="#CC8B0000"
+              IsVisible="{Binding IsBeingControlled}"
+              Padding="12,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0"
+                   Text="{Binding ControllerName, StringFormat='🖱 {0} is controlling your screen'}"
+                   TextColor="White" FontSize="12" FontAttributes="Bold"
+                   VerticalOptions="Center" />
+            <Button Grid.Column="1"
+                    Text="Stop control"
+                    Command="{Binding StopControlCommand}"
+                    BackgroundColor="{DynamicResource ThemeDanger}" TextColor="White" FontSize="11"
+                    HeightRequest="30" CornerRadius="4" Padding="10,0" />
+        </Grid>
+
+        <!-- Banner: I am controlling (blue, controller side) -->
+        <Grid VerticalOptions="End" HorizontalOptions="Fill"
+              BackgroundColor="#CCd42d00"
+              IsVisible="{Binding IsControlling}"
+              Padding="12,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0"
+                   Text="{Binding ControlledName, StringFormat='🖱 You are controlling {0}\'s screen'}"
+                   TextColor="White" FontSize="12" FontAttributes="Bold"
+                   VerticalOptions="Center" />
+            <Button Grid.Column="1"
+                    Text="Release"
+                    Command="{Binding ReleaseControlCommand}"
+                    BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White" FontSize="11"
+                    HeightRequest="30" CornerRadius="4" Padding="10,0" />
+        </Grid>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,135 @@
+using System.Security.Claims;
+using Squelch.Server.Data;
+using Squelch.Server.Hubs;
+using Squelch.Server.Models;
+using Squelch.Server.Services;
+using Squelch.Shared;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Moq;
+
+namespace Squelch.Tests.Helpers;
+
+public sealed class TestDb : IDisposable
+{
+    private readonly SqliteConnection _conn;
+    public AppDbContext Db { get; }
+
+    public TestDb()
+    {
+        _conn = new SqliteConnection("Data Source=:memory:");
+        _conn.Open();
+        var opts = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(_conn)
+            .Options;
+        Db = new AppDbContext(opts);
+        Db.Database.EnsureCreated();
+    }
+
+    public void Dispose()
+    {
+        Db.Dispose();
+        _conn.Dispose();
+    }
+}
+
+public static class TestHelpers
+{
+    public static TokenService CreateTokenService()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:Key"] = "SquelchSuperSecretKeyForTests32Chars!",
+                ["Jwt:Issuer"] = "Squelch",
+                ["Jwt:Audience"] = "Squelch"
+            })
+            .Build();
+        return new TokenService(config);
+    }
+
+    public static void SetUser(ControllerBase controller, int userId, string username = "testuser")
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+            new Claim(ClaimTypes.Name, username)
+        };
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"))
+            }
+        };
+    }
+
+    public static Squelch.Server.Services.BotService NullBot()
+    {
+        var config = new ConfigurationBuilder().Build(); // ApiKey empty → RespondAsync returns immediately
+        var httpFactory = new Mock<IHttpClientFactory>().Object;
+        var scopeFactory = new Mock<IServiceScopeFactory>().Object;
+        return new Squelch.Server.Services.BotService(httpFactory, config, scopeFactory, MockHub(), NullTts());
+    }
+
+    // A TtsService with no ElevenLabs key configured, so Enabled is false and it never tries to speak.
+    public static Squelch.Server.Services.TtsService NullTts()
+    {
+        var config = new ConfigurationBuilder().Build();
+        var httpFactory = new Mock<IHttpClientFactory>().Object;
+        var logger = new Mock<Microsoft.Extensions.Logging.ILogger<Squelch.Server.Services.TtsService>>();
+        return new Squelch.Server.Services.TtsService(httpFactory, config, MockHub(), logger.Object);
+    }
+
+    public static Squelch.Server.Services.AutomodService NullAutomod() =>
+        new Squelch.Server.Services.AutomodService();
+
+    public static Squelch.Server.Services.WebhookDeliveryService NullWebhooks()
+    {
+        var factory = new Mock<IHttpClientFactory>();
+        factory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(new System.Net.Http.HttpClient());
+        var logger = new Mock<Microsoft.Extensions.Logging.ILogger<Squelch.Server.Services.WebhookDeliveryService>>();
+        return new Squelch.Server.Services.WebhookDeliveryService(factory.Object, logger.Object);
+    }
+
+    public static IHubContext<ChatHub> MockHub()
+    {
+        var proxy = new Mock<IClientProxy>();
+        proxy.Setup(p => p.SendCoreAsync(It.IsAny<string>(), It.IsAny<object[]>(), It.IsAny<CancellationToken>()))
+             .Returns(Task.CompletedTask);
+
+        var clients = new Mock<IHubClients>();
+        clients.Setup(c => c.Group(It.IsAny<string>())).Returns(proxy.Object);
+        clients.Setup(c => c.User(It.IsAny<string>())).Returns(proxy.Object);
+
+        var hub = new Mock<IHubContext<ChatHub>>();
+        hub.Setup(h => h.Clients).Returns(clients.Object);
+        return hub.Object;
+    }
+
+    public static async Task<(GuildServer server, User user)> SeedServerAsync(
+        AppDbContext db, string username = "owner")
+    {
+        var user = new User { Username = username, Email = $"{username}@test.com", PasswordHash = "*" };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var server = new GuildServer { Name = "Squelch", OwnerId = user.Id };
+        db.Servers.Add(server);
+        await db.SaveChangesAsync();
+
+        db.Channels.AddRange(
+            new Channel { Name = "general", Type = ChannelType.Text, ServerId = server.Id, Position = 0 },
+            new Channel { Name = "General Voice", Type = ChannelType.Voice, ServerId = server.Id, Position = 1 }
+        );
+        db.ServerMembers.Add(new ServerMember { ServerId = server.Id, UserId = user.Id, Role = ServerRole.Admin });
+        await db.SaveChangesAsync();
+
+        return (server, user);
+    }
+}
