@@ -656,7 +656,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         _hubDisconnectedHandler = _ => MainThread.BeginInvokeOnMainThread(() => HubConnectionState = "Disconnected");
         hub.Disconnected += _hubDisconnectedHandler;
         screen.FrameCaptured       += OnScreenFrameCaptured;
-        screen.StreamAudioCaptured += OnStreamAudioCaptured;
         _micLevelHandler = level => MainThread.BeginInvokeOnMainThread(() => MicLevel = level);
         audio.MicLevelChanged += _micLevelHandler;
         ptt.PttDown    += OnPttDown;
@@ -2237,7 +2236,6 @@ public partial class MainViewModel(ApiService api, ChatHubService hub, AudioServ
         if (_hubReconnectedHandler is not null)   hub.Reconnected  -= _hubReconnectedHandler;
         if (_hubDisconnectedHandler is not null)  hub.Disconnected -= _hubDisconnectedHandler;
         screen.FrameCaptured       -= OnScreenFrameCaptured;
-        screen.StreamAudioCaptured -= OnStreamAudioCaptured;
         if (_micLevelHandler is not null)         audio.MicLevelChanged    -= _micLevelHandler;
         ptt.PttDown -= OnPttDown;
         ptt.PttUp   -= OnPttUp;

@@ -28,6 +28,7 @@ public class ChatHubService
     public event Action<int, string>? IceCandidateReceived;
     public event Action<int, string, int>? StreamStarted;   // (streamerId, streamerName, channelId)
     public event Action<int, int>? StreamStopped;            // (streamerId, channelId)
+    public event Action<int, int, StreamKind, string?>? StreamDetails;   // (streamerId, channelId, kind, gameName)
     public event Action<byte[]>? StreamFrameReceived;
     public event Action<int, byte[]>? StreamAudioReceived;   // (streamerId, opusData)
     public event Action<int, string>? StreamNotification;   // (channelId, text)
@@ -103,6 +104,7 @@ public class ChatHubService
         _connection.On<int, string>("ReceiveIceCandidate", (uid, c) => IceCandidateReceived?.Invoke(uid, c));
         _connection.On<int, string, int>("StreamStarted", (uid, name, cid) => StreamStarted?.Invoke(uid, name, cid));
         _connection.On<int, int>("StreamStopped", (uid, cid) => StreamStopped?.Invoke(uid, cid));
+        _connection.On<int, int, int, string?>("StreamDetails", (uid, cid, kind, game) => StreamDetails?.Invoke(uid, cid, (StreamKind)kind, game));
         _connection.On<byte[]>("ReceiveStreamFrame", data => StreamFrameReceived?.Invoke(data));
         _connection.On<int, byte[]>("ReceiveStreamAudio", (uid, data) => StreamAudioReceived?.Invoke(uid, data));
         _connection.On<int, string>("StreamNotification", (cid, text) => StreamNotification?.Invoke(cid, text));
@@ -191,6 +193,8 @@ public class ChatHubService
         _connection!.InvokeAsync<List<UserDto>>("GetChannelOccupants", channelId);
 
     public Task StartStreamAsync(int channelId) => _connection!.InvokeAsync("StartStream", channelId);
+    public Task StartGameStreamAsync(int channelId, string gameName) => _connection!.InvokeAsync("StartGameStream", channelId, gameName);
+    public Task UpdateStreamGameAsync(string gameName) => _connection!.InvokeAsync("UpdateStreamGame", gameName);
     public Task StopStreamAsync() => _connection!.InvokeAsync("StopStream");
     public Task SendStreamFrameAsync(byte[] data) => _connection?.SendAsync("SendStreamFrame", data) ?? Task.CompletedTask;
     public Task SendStreamAudioAsync(byte[] data) => _connection?.SendAsync("SendStreamAudio", data) ?? Task.CompletedTask;

@@ -3,19 +3,15 @@ using SysDrawing = System.Drawing;
 using SysImaging = System.Drawing.Imaging;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using Concentus;
-using Concentus.Enums;
-using NAudio.CoreAudioApi;
-using NAudio.Wave;
-using NAudio.Wave.SampleProviders;
 using FatGuysSpeak.Client.Models;
 
 namespace FatGuysSpeak.Client.Services;
 
+/// <summary>Share Screen: GDI capture of a picked window or the whole screen, for troubleshooting.
+/// Sends no audio (Stream Game is the one with sound — see GameCaptureService).</summary>
 public sealed class ScreenStreamService : IDisposable
 {
     public event Action<byte[]>? FrameCaptured;
-    public event Action<byte[]>? StreamAudioCaptured;
     public bool IsCapturing { get; private set; }
 
     private Timer? _timer;
@@ -24,17 +20,6 @@ public sealed class ScreenStreamService : IDisposable
     private volatile int _jpegQuality = 75;
     private volatile int _maxWidth = 1920;
     private IntPtr _targetWindow;
-
-    // ── Stream audio (loopback) ─────────────────────────────────────────────
-    private WasapiLoopbackCapture? _loopback;
-    private BufferedWaveProvider? _loopbackBuf;
-    private ISampleProvider? _audioChain;
-    private IOpusEncoder? _audioEncoder;
-    private Timer? _audioTimer;
-    private readonly float[] _pullBuf = new float[960];
-    private readonly short[] _opusBuf = new short[960];
-    private const int OpusSampleRate = 48000;
-    private const int OpusFrameSamples = 960; // 20 ms at 48 kHz
 
     // ── P/Invoke ────────────────────────────────────────────────────────────
     [DllImport("user32.dll")] private static extern int GetSystemMetrics(int n);
@@ -56,10 +41,6 @@ public sealed class ScreenStreamService : IDisposable
     private const int SM_CXSCREEN = 0;
     private const int SM_CYSCREEN = 1;
     private const uint PW_RENDERFULLCONTENT = 2;
-
-    // ── JPEG codec (cached) ─────────────────────────────────────────────────
-    private static readonly SysImaging.ImageCodecInfo JpegCodec =
-        SysImaging.ImageCodecInfo.GetImageEncoders().First(e => e.FormatID == SysImaging.ImageFormat.Jpeg.Guid);
 
     // ── Window enumeration ──────────────────────────────────────────────────
     public static List<AppWindow> GetOpenWindows()
@@ -93,7 +74,6 @@ public sealed class ScreenStreamService : IDisposable
         IsCapturing = true;
         _busy = 0;
         _timer = new Timer(_ => CaptureAndEmit(), null, 0, 1000 / fps);
-        StartAudioCapture();
     }
 
     public void StopCapture()
@@ -102,7 +82,6 @@ public sealed class ScreenStreamService : IDisposable
         _timer?.Dispose();
         _timer = null;
         _targetWindow = IntPtr.Zero;
-        StopAudioCapture();
     }
 
     /// <summary>Live capture bounds in screen pixels: (left, top, width, height).
@@ -163,106 +142,7 @@ public sealed class ScreenStreamService : IDisposable
                 g.CopyFromScreen(0, 0, 0, 0, new SysDrawing.Size(sw, sh), SysDrawing.CopyPixelOperation.SourceCopy);
         }
 
-        int srcW = raw.Width, srcH = raw.Height;
-        int maxW = _maxWidth;
-        int tw = Math.Min(srcW, maxW);
-        int th = (int)Math.Round(tw * (double)srcH / srcW);
-
-        SysDrawing.Bitmap target;
-        if (tw == srcW && th == srcH)
-        {
-            target = raw;
-        }
-        else
-        {
-            target = new SysDrawing.Bitmap(tw, th);
-            using var g = SysDrawing.Graphics.FromImage(target);
-            g.InterpolationMode = SysDrawing.Drawing2D.InterpolationMode.NearestNeighbor;
-            g.DrawImage(raw, 0, 0, tw, th);
-        }
-
-        try
-        {
-            var ep = new SysImaging.EncoderParameters(1);
-            ep.Param[0] = new SysImaging.EncoderParameter(SysImaging.Encoder.Quality, (long)_jpegQuality);
-            using var ms = new MemoryStream();
-            target.Save(ms, JpegCodec, ep);
-            return ms.ToArray();
-        }
-        finally
-        {
-            raw.Dispose();
-            if (!ReferenceEquals(target, raw)) target.Dispose();
-        }
-    }
-
-    // ── Loopback audio capture ──────────────────────────────────────────────
-    private void StartAudioCapture()
-    {
-        try
-        {
-            _audioEncoder = OpusCodecFactory.CreateEncoder(OpusSampleRate, 1, OpusApplication.OPUS_APPLICATION_AUDIO);
-            _loopback = new WasapiLoopbackCapture();
-            _loopbackBuf = new BufferedWaveProvider(_loopback.WaveFormat) { DiscardOnBufferOverflow = true };
-            _loopback.DataAvailable += (_, e) =>
-            {
-                if (e.BytesRecorded > 0)
-                    _loopbackBuf.AddSamples(e.Buffer, 0, e.BytesRecorded);
-            };
-
-            ISampleProvider chain = _loopbackBuf.ToSampleProvider();
-            if (chain.WaveFormat.Channels == 2)
-                chain = new StereoToMonoSampleProvider(chain);
-            else if (chain.WaveFormat.Channels != 1)
-                throw new NotSupportedException($"Unsupported channel count: {chain.WaveFormat.Channels}");
-            if (chain.WaveFormat.SampleRate != OpusSampleRate)
-                chain = new WdlResamplingSampleProvider(chain, OpusSampleRate);
-            _audioChain = chain;
-
-            _loopback.StartRecording();
-            _audioTimer = new Timer(_ => PullAndEncodeAudio(), null, 0, 20);
-        }
-        catch
-        {
-            // WASAPI loopback unavailable (RDP without audio, no audio device, etc.)
-            StopAudioCapture();
-        }
-    }
-
-    private void StopAudioCapture()
-    {
-        _audioTimer?.Dispose();
-        _audioTimer = null;
-        try { _loopback?.StopRecording(); } catch { }
-        _loopback?.Dispose();
-        _loopback = null;
-        _loopbackBuf = null;
-        _audioChain = null;
-        _audioEncoder = null;
-    }
-
-    private void PullAndEncodeAudio()
-    {
-        if (_audioEncoder is null || _audioChain is null) return;
-
-        int read = _audioChain.Read(_pullBuf, 0, OpusFrameSamples);
-        if (read < OpusFrameSamples) return;
-
-        for (int i = 0; i < OpusFrameSamples; i++)
-            _opusBuf[i] = (short)Math.Clamp(_pullBuf[i] * 32767f, short.MinValue, short.MaxValue);
-
-        try
-        {
-            var output = new byte[1275];
-            int len = _audioEncoder.Encode(_opusBuf, OpusFrameSamples, output, output.Length);
-            if (len > 0)
-            {
-                var packet = new byte[len];
-                Array.Copy(output, packet, len);
-                StreamAudioCaptured?.Invoke(packet);
-            }
-        }
-        catch { }
+        return JpegFrameEncoder.Encode(raw, _maxWidth, _jpegQuality);
     }
 
     public void Dispose() => StopCapture();
@@ -275,7 +155,6 @@ namespace FatGuysSpeak.Client.Services;
 public sealed class ScreenStreamService : IDisposable
 {
     public event Action<byte[]>? FrameCaptured;
-    public event Action<byte[]>? StreamAudioCaptured;
     public bool IsCapturing { get; private set; }
     public static List<AppWindow> GetOpenWindows() => [];
     public void StartCapture(IntPtr targetWindow = default, int fps = 20) { }
