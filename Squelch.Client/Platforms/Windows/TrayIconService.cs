@@ -14,7 +14,8 @@ namespace Squelch.Client.Services;
 public sealed class TrayIconService : IDisposable
 {
     private const uint TrayId = 1;
-    private const uint WM_TRAY = 0x8000 + 1;              // WM_APP + 1
+    private const uint WM_TRAY = 0x8000 + 1;              // WM_APP + 1: shell icon callback
+    private const uint WM_TRAY_REFRESH = 0x8000 + 2;      // WM_APP + 2: apply the pending icon on the UI thread
     private const int LevelTimerMs = 100;
     private const uint CmdOpen = 1, CmdMute = 2, CmdQuit = 3;
 
@@ -27,6 +28,7 @@ public sealed class TrayIconService : IDisposable
     private IntPtr _hwnd;
     private uint _taskbarCreatedMsg;
     private bool _iconAdded;
+    private bool _refreshPosted;
     private bool _disposed;
     private IntPtr _hIdle, _hMuted;
     private readonly IntPtr[] _hLevels = new IntPtr[8];
@@ -62,9 +64,10 @@ public sealed class TrayIconService : IDisposable
             _inVoice = vm.InVoice;
             _muted = vm.IsMuted;
             _transmitting = vm.IsPttActive;
-            if (_hwnd == IntPtr.Zero) CreateWindowAndIcon();
+            if (_hwnd == IntPtr.Zero) CreateWindowAndLoadIcons();
             UpdateLocked();
         }
+        if (!_iconAdded) AddIcon();   // shell IPC: never under the lock
     }
 
     // ── state feed ───────────────────────────────────────────────────────────
@@ -111,6 +114,9 @@ public sealed class TrayIconService : IDisposable
         }
     }
 
+    /// <summary>Runs on the capture thread, the timer threadpool or the UI thread. Only evaluates the model and
+    /// records the choice; Shell_NotifyIcon is cross-process IPC that can block, so the icon swap is posted to the
+    /// tray window and applied on the UI thread (coalesced: at most one refresh in flight).</summary>
     private void UpdateLocked()
     {
         double gate = _audio.NoiseGateEnabled ? _audio.NoiseGateThreshold : 0.01;
@@ -118,7 +124,8 @@ public sealed class TrayIconService : IDisposable
         if (choice is { } c)
         {
             _shown = c;
-            ModifyIcon();
+            if (!_refreshPosted && _hwnd != IntPtr.Zero)
+                _refreshPosted = PostMessage(_hwnd, WM_TRAY_REFRESH, IntPtr.Zero, IntPtr.Zero);
         }
         _levelTimer.Change(_shown.Visual == TrayVisual.Level ? LevelTimerMs : Timeout.Infinite,
                            _shown.Visual == TrayVisual.Level ? LevelTimerMs : Timeout.Infinite);
@@ -126,7 +133,7 @@ public sealed class TrayIconService : IDisposable
 
     // ── shell icon ───────────────────────────────────────────────────────────
 
-    private void CreateWindowAndIcon()
+    private void CreateWindowAndLoadIcons()
     {
         var hInst = GetModuleHandle(null);
         var cls = new WNDCLASSEX
@@ -148,8 +155,6 @@ public sealed class TrayIconService : IDisposable
         _hIdle = Load("tray-idle.ico");
         _hMuted = Load("tray-muted.ico");
         for (int i = 0; i < _hLevels.Length; i++) _hLevels[i] = Load($"tray-level-{i}.ico");
-
-        AddIcon();
     }
 
     private NOTIFYICONDATA MakeData(uint flags)
@@ -174,17 +179,35 @@ public sealed class TrayIconService : IDisposable
         };
     }
 
+    // UI thread. Builds the data under the lock, calls the shell outside it.
     private void AddIcon()
     {
-        if (_hwnd == IntPtr.Zero) return;
-        var data = MakeData(NIF_MESSAGE | NIF_ICON | NIF_TIP);
-        _iconAdded = Shell_NotifyIcon(NIM_ADD, ref data);
+        NOTIFYICONDATA data;
+        lock (_lock)
+        {
+            if (_disposed || _hwnd == IntPtr.Zero) return;
+            data = MakeData(NIF_MESSAGE | NIF_ICON | NIF_TIP);
+        }
+        bool ok = Shell_NotifyIcon(NIM_ADD, ref data);
+        bool orphaned;
+        lock (_lock)
+        {
+            orphaned = ok && _disposed;   // Dispose ran on another thread (ProcessExit) meanwhile
+            if (!_disposed) _iconAdded = ok;
+        }
+        if (orphaned) Shell_NotifyIcon(NIM_DELETE, ref data);
     }
 
-    private void ModifyIcon()
+    // UI thread, from the posted WM_TRAY_REFRESH. A refresh arriving after Dispose is a no-op.
+    private void ApplyPendingIcon()
     {
-        if (!_iconAdded) return;
-        var data = MakeData(NIF_ICON | NIF_TIP);
+        NOTIFYICONDATA data;
+        lock (_lock)
+        {
+            _refreshPosted = false;
+            if (_disposed || !_iconAdded) return;
+            data = MakeData(NIF_ICON | NIF_TIP);
+        }
         Shell_NotifyIcon(NIM_MODIFY, ref data);
     }
 
@@ -199,9 +222,14 @@ public sealed class TrayIconService : IDisposable
             }
             return IntPtr.Zero;
         }
+        if (msg == WM_TRAY_REFRESH)
+        {
+            ApplyPendingIcon();
+            return IntPtr.Zero;
+        }
         if (msg == _taskbarCreatedMsg && _taskbarCreatedMsg != 0)
         {
-            lock (_lock) { if (!_disposed) AddIcon(); }   // Explorer restarted: re-add
+            AddIcon();   // Explorer restarted: re-add
             return IntPtr.Zero;
         }
         return DefWindowProc(hWnd, msg, wParam, lParam);
@@ -267,10 +295,13 @@ public sealed class TrayIconService : IDisposable
 
     public void Dispose()
     {
+        bool removeIcon;
+        IntPtr hwnd;
+        IntPtr[] icons;
         lock (_lock)
         {
             if (_disposed) return;
-            _disposed = true;
+            _disposed = true;          // any posted refresh / later callback is now a no-op
             _levelTimer.Change(Timeout.Infinite, Timeout.Infinite);
             _levelTimer.Dispose();
             _audio.MicLevelChanged -= OnMicLevel;
@@ -278,24 +309,27 @@ public sealed class TrayIconService : IDisposable
             _vm = null;
             AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
 
-            if (_iconAdded)
-            {
-                var data = new NOTIFYICONDATA
-                {
-                    cbSize = (uint)Marshal.SizeOf<NOTIFYICONDATA>(),
-                    hWnd = _hwnd, uID = TrayId, szTip = "", szInfo = "", szInfoTitle = "",
-                };
-                Shell_NotifyIcon(NIM_DELETE, ref data);
-                _iconAdded = false;
-            }
-            if (_hIdle != IntPtr.Zero) DestroyIcon(_hIdle);
-            if (_hMuted != IntPtr.Zero) DestroyIcon(_hMuted);
-            foreach (var h in _hLevels) if (h != IntPtr.Zero) DestroyIcon(h);
+            removeIcon = _iconAdded;
+            _iconAdded = false;
+            hwnd = _hwnd;
+            _hwnd = IntPtr.Zero;
+            icons = [_hIdle, _hMuted, .. _hLevels];
             _hIdle = _hMuted = IntPtr.Zero;
             Array.Clear(_hLevels);
-            if (_hwnd != IntPtr.Zero) DestroyWindow(_hwnd);   // no-op off the owning thread (ProcessExit)
-            _hwnd = IntPtr.Zero;
         }
+
+        // Shell IPC and handle cleanup outside the lock so the capture thread never waits on Explorer.
+        if (removeIcon)
+        {
+            var data = new NOTIFYICONDATA
+            {
+                cbSize = (uint)Marshal.SizeOf<NOTIFYICONDATA>(),
+                hWnd = hwnd, uID = TrayId, szTip = "", szInfo = "", szInfoTitle = "",
+            };
+            Shell_NotifyIcon(NIM_DELETE, ref data);
+        }
+        foreach (var h in icons) if (h != IntPtr.Zero) DestroyIcon(h);
+        if (hwnd != IntPtr.Zero) DestroyWindow(hwnd);   // no-op off the owning thread (ProcessExit)
     }
 
     // ── Win32 ────────────────────────────────────────────────────────────────
