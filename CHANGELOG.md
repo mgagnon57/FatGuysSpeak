@@ -5,6 +5,8 @@ All notable changes to Squelch (formerly FatGuysSpeak) are documented here. This
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-25
+
 Planned as 0.14.0.
 
 ### Changed
