@@ -1,9 +1,21 @@
 # Changelog
 
-All notable changes to FatGuysSpeak are documented here. This project adheres to
+All notable changes to Squelch (formerly FatGuysSpeak) are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) and the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ## [Unreleased]
+
+Planned as 0.14.0.
+
+### Changed
+- FatGuysSpeak is now Squelch: new name and a new knob icon.
+- New server address: the app now connects to https://squelch-server.azurewebsites.net.
+
+### Added
+- Voice-state tray icon showing whether you're talking, muted or idle, with Open, Mute/Unmute and
+  Quit in its menu.
+- Your settings, saved login and server list carry over from FatGuysSpeak automatically the first
+  time Squelch starts; the old server address is switched to the new one for you.
 
 ## [0.13.1] - 2026-10-25
 

@@ -28,9 +28,9 @@ public static class LegacyHostRewrite
 
     public static async Task<int> RunAsync(AppDbContext db)
     {
-        // Cheap SQL pre-filter on the host (LIKE is case-insensitive for ASCII on SQLite; Railway/
-        // Postgres LIKE is case-sensitive, so mixed-case hosts there are still handled by Rewrite on
-        // whatever the filter returns, and lowercase hosts are what the app ever stored).
+        // Cheap SQL pre-filter on the host. EF translates Contains to instr() on SQLite and strpos() on
+        // Postgres, both case-SENSITIVE, so a mixed-case host would be skipped here. That is fine: the
+        // app only ever stored the lowercase host; Rewrite then matches case-insensitively on what's returned.
         var needle = OldHost;
         var changed = 0;
 

@@ -21,12 +21,44 @@ public class LegacySettingsImportTests
         return doc.RootElement.GetProperty("").TryGetProperty(key, out var v) ? v.GetString() : null;
     }
 
+    [Fact]
+    public void ShouldImport_OldPresent_NewMissing()
+        => Assert.True(LegacySettingsImport.ShouldImport(true, null));
+
+    [Fact]
+    public void ShouldImport_NewPresentWithoutMarker_Imports()
+        // A stale dev-run preferences.dat (localhost/theme/PTT only) must not block the real handover.
+        => Assert.True(LegacySettingsImport.ShouldImport(true,
+            Build(("server_url", "http://localhost:5238"), ("ui_theme", "Ember"))));
+
+    [Fact]
+    public void ShouldImport_NewPresentWithMarker_Skips()
+        => Assert.False(LegacySettingsImport.ShouldImport(true,
+            Build(("server_url", New), (LegacySettingsImport.ImportDoneKey, "True"))));
+
+    [Fact]
+    public void ShouldImport_NewUnparsable_Imports()
+        => Assert.True(LegacySettingsImport.ShouldImport(true, "{not json"));
+
     [Theory]
-    [InlineData(false, true, true)]
-    [InlineData(true, true, false)]
-    [InlineData(false, false, false)]
-    public void ShouldImport_OnlyWhenNewMissingAndOldPresent(bool newExists, bool oldExists, bool expected)
-        => Assert.Equal(expected, LegacySettingsImport.ShouldImport(newExists, oldExists));
+    [InlineData(null)]
+    [InlineData("{\"\":{}}")]
+    [InlineData("{\"\":{\"legacy_import_done\":\"True\"}}")]
+    public void ShouldImport_OldMissing_NeverImports(string? newJson)
+        => Assert.False(LegacySettingsImport.ShouldImport(false, newJson));
+
+    [Fact]
+    public void Rewrite_WritesImportMarker()
+    {
+        var output = LegacySettingsImport.RewritePreferencesJson(Build(("ui_theme", "Ember")));
+        Assert.Equal("True", Get(output, LegacySettingsImport.ImportDoneKey));
+        Assert.True(LegacySettingsImport.HasImportMarker(output));
+        Assert.False(LegacySettingsImport.ShouldImport(true, output));
+    }
+
+    [Fact]
+    public void Rewrite_MissingPrefsObject_StillWritesMarkerInMauiShape()
+        => Assert.Equal("True", Get(LegacySettingsImport.RewritePreferencesJson("{}"), LegacySettingsImport.ImportDoneKey));
 
     [Fact]
     public void RewritesServerUrl()

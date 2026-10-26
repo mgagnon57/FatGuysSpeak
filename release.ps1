@@ -115,7 +115,8 @@ if ($LASTEXITCODE) { throw 'client publish failed' }
 $vpkOut = Join-Path $root 'release-output\vpk'
 foreach ($ch in @('win', $verChannel)) {
     vpk pack --packId Squelch.Client --packVersion $Version --packDir $clientPub `
-        --mainExe Squelch.Client.exe --channel $ch -o (Join-Path $vpkOut $ch)
+        --mainExe Squelch.Client.exe --packTitle Squelch --packAuthors Squelch `
+        --channel $ch -o (Join-Path $vpkOut $ch)
     if ($LASTEXITCODE) { throw "vpk pack ($ch) failed" }
 }
 

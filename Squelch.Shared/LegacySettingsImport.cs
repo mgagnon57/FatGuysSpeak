@@ -14,25 +14,52 @@ public static class LegacySettingsImport
 
     private static readonly JsonSerializerOptions Options = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
-    /// <summary>Import only once: never overwrite a preferences file Squelch has already written.</summary>
-    public static bool ShouldImport(bool newPrefsFileExists, bool oldPrefsFileExists)
-        => !newPrefsFileExists && oldPrefsFileExists;
+    /// <summary>Written into the imported preferences; its presence means the import already happened.</summary>
+    public const string ImportDoneKey = "legacy_import_done";
 
-    /// <summary>Input/output is the MAUI unpackaged preferences.dat JSON, shape {"": {"key": "value", ...}}.</summary>
+    /// <summary>Import when the old prefs exist and Squelch's prefs are missing or don't carry the import marker.
+    /// A Squelch preferences.dat without the marker (e.g. a dev run, which shares the ApplicationId) doesn't count
+    /// as imported. <paramref name="newPrefsJson"/> is null when the file is missing; unparsable JSON lacks the marker.</summary>
+    public static bool ShouldImport(bool oldPrefsFileExists, string? newPrefsJson)
+        => oldPrefsFileExists && !HasImportMarker(newPrefsJson);
+
+    public static bool HasImportMarker(string? prefsJson)
+    {
+        if (string.IsNullOrWhiteSpace(prefsJson)) return false;
+        try
+        {
+            return JsonNode.Parse(prefsJson) is JsonObject root
+                && root[""] is JsonObject prefs
+                && prefs[ImportDoneKey] is JsonValue v
+                && v.TryGetValue<string>(out var s)
+                && string.Equals(s, "True", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Input/output is the MAUI unpackaged preferences.dat JSON, shape {"": {"key": "value", ...}}.
+    /// The output always carries <see cref="ImportDoneKey"/> = "True".</summary>
     public static string RewritePreferencesJson(string json)
     {
         var root = JsonNode.Parse(json)!.AsObject();
-        if (root[""] is JsonObject prefs)
+        if (root[""] is not JsonObject prefs)
         {
-            if (prefs["server_url"]?.GetValue<string>() is { } url)
-                prefs["server_url"] = Rewrite(url);
+            prefs = new JsonObject();
+            root[""] = prefs;
+        }
+        prefs[ImportDoneKey] = "True";
 
-            if (prefs["saved_servers"]?.GetValue<string>() is { } saved)
-            {
-                var entries = saved.Split('|', StringSplitOptions.RemoveEmptyEntries)
-                    .Select(Rewrite).Distinct(StringComparer.OrdinalIgnoreCase);
-                prefs["saved_servers"] = string.Join('|', entries);
-            }
+        if (prefs["server_url"]?.GetValue<string>() is { } url)
+            prefs["server_url"] = Rewrite(url);
+
+        if (prefs["saved_servers"]?.GetValue<string>() is { } saved)
+        {
+            var entries = saved.Split('|', StringSplitOptions.RemoveEmptyEntries)
+                .Select(Rewrite).Distinct(StringComparer.OrdinalIgnoreCase);
+            prefs["saved_servers"] = string.Join('|', entries);
         }
         return root.ToJsonString(Options);
     }
