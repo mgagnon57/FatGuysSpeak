@@ -22,6 +22,7 @@ public partial class App : Application
 #endif
         var window = new Window(firstPage)
         {
+            Title  = "FatGuysSpeak",
             Width  = phoneMode ? 390 : 1000,
             Height = phoneMode ? 844 : 900,
             MinimumWidth  = phoneMode ? 360 : 800,
