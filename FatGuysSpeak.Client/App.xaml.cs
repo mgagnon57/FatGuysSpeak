@@ -13,7 +13,14 @@ public partial class App : Application
     protected override Window CreateWindow(IActivationState? activationState)
     {
         bool phoneMode = Environment.GetEnvironmentVariable("FATGUYS_PHONE_MODE") == "1";
-        var window = new Window(new AppShell())
+        // 0.13.2 bridge: an installed FatGuysSpeak hands itself over to Squelch instead of opening
+        // the normal shell. Dev / unpackaged runs (not Velopack-installed) go straight to AppShell.
+#if WINDOWS
+        Page firstPage = SquelchHandover.ShouldRun() ? new Pages.HandoverPage() : new AppShell();
+#else
+        Page firstPage = new AppShell();
+#endif
+        var window = new Window(firstPage)
         {
             Width  = phoneMode ? 390 : 1000,
             Height = phoneMode ? 844 : 900,

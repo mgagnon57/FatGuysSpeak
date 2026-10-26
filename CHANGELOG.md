@@ -5,6 +5,10 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 
 ## [Unreleased]
 
+### Changed
+- Moves you to Squelch: FatGuysSpeak is now Squelch. This update installs Squelch, opens it, and
+  removes FatGuysSpeak.
+
 ## [0.13.1] - 2026-10-25
 
 ### Fixed

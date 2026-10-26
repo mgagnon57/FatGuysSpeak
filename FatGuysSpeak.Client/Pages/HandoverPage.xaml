@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FatGuysSpeak.Client.Pages.HandoverPage"
+             Title="FatGuysSpeak"
+             BackgroundColor="{DynamicResource ThemeBgPrimary}">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="40" Spacing="16" VerticalOptions="Center" MaximumWidthRequest="520">
+
+            <Image Source="fgs_logo.png" WidthRequest="120" HeightRequest="120" HorizontalOptions="Center" Margin="0,0,0,4" />
+            <Label Text="FatGuysSpeak is now Squelch" FontFamily="Bebas" FontSize="40" CharacterSpacing="2"
+                   TextColor="{DynamicResource ThemeAccentLight}" HorizontalOptions="Center"
+                   HorizontalTextAlignment="Center" />
+            <Label Text="Moving you over…" FontSize="16" TextColor="{DynamicResource ThemeTextPrimary}"
+                   HorizontalOptions="Center" Margin="0,-8,0,12" />
+
+            <HorizontalStackLayout x:Name="ProgressRow" HorizontalOptions="Center" Spacing="8">
+                <ActivityIndicator IsRunning="True" Color="{DynamicResource ThemeAccentLight}"
+                                   WidthRequest="18" HeightRequest="18" VerticalOptions="Center" />
+                <Label x:Name="StatusLabel" Text="Getting ready…" FontFamily="DMMono" FontSize="13"
+                       TextColor="{DynamicResource ThemeTextSecondary}" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <VerticalStackLayout x:Name="FailurePanel" IsVisible="False" Spacing="14">
+                <Label x:Name="ErrorLabel" TextColor="{DynamicResource ThemeDanger}" FontSize="14"
+                       HorizontalTextAlignment="Center" />
+                <Label Text="You can install Squelch yourself from:" FontSize="13"
+                       TextColor="{DynamicResource ThemeTextSecondary}" HorizontalOptions="Center" />
+                <Label x:Name="SetupLink" FontSize="12" TextDecorations="Underline"
+                       TextColor="{DynamicResource ThemeAccentLight}" HorizontalTextAlignment="Center"
+                       LineBreakMode="CharacterWrap">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSetupLinkTapped" />
+                    </Label.GestureRecognizers>
+                </Label>
+                <Button Text="Keep using FatGuysSpeak for now" Clicked="OnKeepUsingClicked"
+                        BackgroundColor="{DynamicResource ThemeAccent}" TextColor="White"
+                        CornerRadius="8" HeightRequest="44" Margin="0,8,0,0" />
+            </VerticalStackLayout>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
