@@ -9,6 +9,7 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        LegacySettingsMigration.RunOnce();   // before anything reads Preferences/SecureStorage
 #if WINDOWS
         Velopack.VelopackApp.Build().Run();
 #endif
