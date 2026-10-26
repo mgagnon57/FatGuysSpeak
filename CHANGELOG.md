@@ -4,6 +4,21 @@ All notable changes to FatGuysSpeak are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/) and the [Keep a Changelog](https://keepachangelog.com/) format.
 
 ## [Unreleased]
+
+### Added
+- 🎮 Stream Game: one click streams the game you're playing. It finds the game on its own (Steam,
+  Epic, Xbox, Riot, Battle.net and more), captures just that window — so alt-tabbing never shows
+  your desktop — and sends only the game's own sound (switchable with "🔊 Game sound"). A
+  "Streaming X · Change" link switches games without ending the stream, and the stream ends by
+  itself when the game closes. Viewers see "🎮 BillyBong is streaming Wardogs". Needs Windows 11.
+- "Built by Billy Bong" credit on the login screen, in the top-left brand, and in Settings.
+- Sign-in now shows what it's doing (Signing in / Connecting to chat / Loading your channels).
+
+### Changed
+- 🖥 Share Screen is now just for troubleshooting: it sends no sound, and remote control is only
+  available on Share Screen streams (never on game streams).
+- The profile bar puts your name on its own line with the buttons underneath.
+
 ### Removed
 - Voice is no longer transcribed, for anyone. Speech-to-text (Whisper) is gone from the client:
   push-to-talk only carries your live audio to the people in the channel, and nothing you say is
