@@ -1,0 +1,118 @@
+# AGENTS.md
+
+This file provides guidance to AI coding agents (e.g. Codex) when working with code in this repository.
+
+## Commands
+
+**Build server (Windows, with WPF dashboard):**
+```
+dotnet build Squelch.Server --framework net9.0-windows10.0.19041.0
+```
+
+**Build server (headless / Railway):**
+```
+dotnet build Squelch.Server --framework net9.0
+```
+
+**Build client (Windows only):**
+```
+dotnet build Squelch.Client --framework net9.0-windows10.0.19041.0
+```
+
+**Build installer (Windows only):**
+```
+dotnet build Squelch.Installer --framework net9.0-windows10.0.19041.0
+```
+Output binary: `Squelch.Installer\bin\Debug\net9.0-windows10.0.19041.0\Squelch-Server-Setup.exe`. Requires UAC elevation (requireAdministrator manifest). Copies server files from a `server\` subfolder next to the exe; if that folder is absent, the wizard runs in demo mode (skips all install steps).
+
+**Run all tests:**
+```
+dotnet test Squelch.Tests
+```
+
+**Run a single test class:**
+```
+dotnet test Squelch.Tests --filter "FullyQualifiedName~AuthControllerTests"
+```
+
+**Run a single test method:**
+```
+dotnet test Squelch.Tests --filter "FullyQualifiedName~AuthControllerTests.Login_Success_ReturnsToken"
+```
+
+**Launch server + 2 clients (pre-built binaries):**
+```
+.\launch.ps1
+```
+The server binary must be in `Squelch.Server\bin\Debug\net9.0\` (not net9.0-windows). Always launch two client instances when manually testing.
+
+**Server runs at:** `http://localhost:5238`
+
+## Architecture
+
+Five projects in one solution:
+
+- **Squelch.Server** — ASP.NET Core 9 Web API + SignalR. Targets both `net9.0` (Railway/Linux) and `net9.0-windows10.0.19041.0` (local dev with WPF dashboard window). On Windows the dashboard opens as a WPF window; closing it stops the server.
+- **Squelch.Client** — .NET MAUI app targeting Windows (primary), Android, iOS, macCatalyst. All features are Windows-only except basic chat.
+- **Squelch.Shared** — DTOs, enums, and pure-logic helpers referenced by both Server and Client. Client-only logic that must be testable (e.g. `VideoUrlHelper`) lives here instead of in Client.
+- **Squelch.Tests** — xUnit tests against Server + Shared only (no MAUI dependency). Uses in-memory SQLite via `TestDb` helper.
+- **Squelch.Installer** — WPF wizard (5 pages) for installing the server on Windows. Dark-themed, UAC-elevated. Pages: Welcome → Credentials → Network → Options → Install. `InstallConfig` carries state across pages; each page implements `IWizardPage` (CanAdvance/OnActivated). The Install page writes `appsettings.Production.json` with a generated JWT key and optionally registers a Windows Service. Page content area is ~391px tall; all pages use `Margin="28,20,28,16"` to fit without scrolling.
+
+### Database
+
+SQLite in local dev (`squelch.db` in the Server directory), PostgreSQL on Railway (detected via `DATABASE_URL` env var). EF Core `EnsureCreated()` handles schema creation; new columns are added via raw SQL `ALTER TABLE` checks at startup (no EF migrations). All new tables must be added to both the SQLite and PostgreSQL branches in `Program.cs`.
+
+Single seeded server named "Squelch" (OwnerId=0). All users auto-join on login. Channels: `lobby`, `angry-fat-guys`. All channels are `ChannelType.Text` but support voice too.
+
+### SignalR Hub (`ChatHub`)
+
+The hub (`/hubs/chat`) holds all live state in static `ConcurrentDictionary` fields — no distributed cache. JWT is passed via query string (`?access_token=`) for WebSocket handshakes. Key dictionaries:
+
+- `OnlineUsers`: userId → username
+- `VoiceChannelMap`: userId → channelId (voice)
+- `UserTextChannelMap`: userId → channelId (text)
+- `ChannelOccupants`: channelId → (userId → username)
+- `ActiveStreamers`: userId → (channelId, serverId, username)
+- `ActiveCameras`: userId → (channelId, username)
+
+SignalR groups follow naming conventions: `channel-{id}`, `voice-{id}`, `stream-{id}`.
+
+Because these dictionaries are static, hub tests are in the `[Collection("HubTests")]` collection (defined in `HubTestCollection.cs`) which disables parallelization to prevent state bleed between tests.
+
+### Voice + Media Pipeline
+
+Voice: NAudio WaveIn (48kHz/16-bit/mono) → Opus encode (Concentus) → `SendVoiceData` hub method (max 8 KB) → server relays to `voice-{channelId}` group → `ReceiveVoiceData` → Opus decode → NAudio playback. PTT via global keyboard hook (`PttService`). Voice is NEVER transcribed or stored (legal requirement): there is no STT, the server drops any `MessageSource.Voice` post, and `VoiceTranscriptPurge` scrubs old transcripts at startup. Don't reintroduce speech capture.
+
+Streaming has two kinds (`StreamKind`): **Share Screen** (`ScreenStreamService`, GDI `CopyFromScreen`/`PrintWindow`, picker incl. Entire Screen, NO audio, remote control allowed) and **Stream Game** (`GameCaptureService`, Windows.Graphics.Capture on one window via `Interop/D3D11Interop`, game-process-only audio via WASAPI process loopback `Interop/ProcessLoopbackInterop`, Windows 11 only). The game is auto-picked by `GameDetector` (Shared, pure + tested) from `GameWindowScanner` facts (Steam `libraryfolders.vdf` + well-known library folders; match by exe name because anti-cheat games hide their path). The hub keeps kind + game name in `ActiveStreamers`, sends `StreamDetails` after `StreamStarted` (old clients ignore it; `StartStream(int)` stays = Share Screen), and refuses remote control for game streams. Game names come only from `GameNames.Clean(processName)` + server `StreamText.SanitizeGameName`, never window titles. Webcam: `CameraService` uses WinRT `MediaCapture`. All capture paths encode via `JpegFrameEncoder` and use an Interlocked `_busy` flag to drop frames when the previous send is still in flight. `MaximumReceiveMessageSize` is set to 4 MB to handle full-res JPEG frames.
+
+### PorkChop / AI (`BotService`)
+
+`BotService` (singleton) wraps the Anthropic API (`anthropic` HttpClient; model from `Anthropic:Model`). It powers:
+- `@PorkChop` replies — `RespondAsync`, triggered from `MessagesController` on an `@PorkChop` mention; includes recent context plus any shared `/uploads` image as a Claude vision block. Replies post as `MessageSource.AI`.
+- Daily recaps per (channel, UTC day, source) → `DailyChatSummary`; pre-generated by `RecapPregenService`.
+- Server-wide weekly digest → `WeeklyDigest`; posted by `WeeklyDigestService`.
+- Catch-up (`CatchupController`), join roasts (`AnnounceJoinAsync`, fired from `ChatHub.OnConnectedAsync`), idle-channel roasts (`IdleNudgeService`). Roast dossiers come from `BuildUserDossierAsync` — each user's own Text+Voice messages plus what others say about them (username + learned aliases). Replies that look like a refusal are dropped, not posted.
+- Alias learning: `AliasLearningService` → `LearnAliasesAsync`, stored in `UserAlias`.
+
+`TtsService` speaks roasts into a voice channel via ElevenLabs (`elevenlabs` HttpClient): PCM → resample to 48 kHz → Opus (Concentus) → `ReceiveVoiceData` to `voice-{id}`, paced with a short client-buffer lead. Config: `ElevenLabs:ApiKey` / `VoiceIds` (array; one picked at random per line) / `Model`.
+
+New tables (add to BOTH Program.cs branches): `DailyChatSummary`, `WeeklyDigest`, `Poll`/`PollOption`/`PollVote`, `UserAlias`. Polls ride the message stream via `Message.PollId` (`PollsController`, live updates via the `PollUpdated` hub event). PorkChop toggles: `PorkChop:AnnounceJoins`, `PorkChop:IdleNudges`, `PorkChop:JoinCooldownMinutes`. All keys (Anthropic, ElevenLabs) live in the gitignored `appsettings.Development.json`. Tests that mutate the static `BotService.BotUserId` share the `[Collection("BotState")]` non-parallel collection.
+
+### Client Architecture
+
+MAUI MVVM with `CommunityToolkit.Mvvm`. All real-time events flow through `ChatHubService` (event-based wrapper around `HubConnection`) and REST calls through `ApiService`. `MainViewModel` is the central hub connecting both services to the UI. `ApiService.CurrentUserId/CurrentUsername/CurrentAvatarUrl` are set on login and cleared on sign-out.
+
+The server URL defaults to `http://localhost:5238` and is persisted in MAUI `Preferences` (configurable in settings).
+
+### Security
+
+- JWT key must be set in `appsettings.Development.json` (empty string in base config throws at startup)
+- Rate limiting: auth endpoints 10 req/min per IP (fixed window); messages 30 req/min per user (sliding window)
+- CORS allows only localhost/127.0.0.1
+- SSRF prevention in `PreviewController`: DNS + RFC1918 check before fetching link previews
+- BCrypt dummy-hash on failed login to prevent timing attacks
+- Channel permissions stored in `ChannelPermissions` table; enforced in `JoinChannel` hub method
+
+### Testing Patterns
+
+Tests instantiate controllers directly with a `TestDb` (in-memory SQLite) and `TestHelpers.SetUser()` to inject a claims principal. `TestHelpers.SeedServerAsync()` creates a server + two channels + one admin member. Hub tests use a mock `IHubContext<ChatHub>` from `TestHelpers.MockHub()`. The `BotService` is silenced with `TestHelpers.NullBot()` (empty API key causes it to no-op).
